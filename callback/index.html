@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signing in... — Mnemolog</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #FAF8F5;
+            --text: #2C2A26;
+            --accent: #B8860B;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .container {
+            text-align: center;
+            padding: 2rem;
+        }
+        
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid #E5DFD5;
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1.5rem;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        h1 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.5rem;
+            font-weight: 400;
+            margin-bottom: 0.5rem;
+        }
+        
+        p {
+            color: #6B6560;
+            font-size: 0.9rem;
+        }
+        
+        .error {
+            color: #C4650A;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="spinner"></div>
+        <h1>Signing you in...</h1>
+        <p>Just a moment</p>
+        <p class="error" id="error" style="display: none;"></p>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/assets/app.js"></script>
+    <script>
+        async function handleCallback() {
+            try {
+                // Get the hash fragment (Supabase returns tokens in hash)
+                const hashParams = new URLSearchParams(window.location.hash.substring(1));
+                const accessToken = hashParams.get('access_token');
+                const refreshToken = hashParams.get('refresh_token');
+                
+                if (accessToken) {
+                    // Session will be automatically picked up by Supabase client
+                    await mnemolog.checkAuth();
+                    
+                    // Redirect to intended destination or home
+                    const redirectTo = sessionStorage.getItem('auth_redirect') || '/';
+                    sessionStorage.removeItem('auth_redirect');
+                    window.location.href = redirectTo;
+                } else {
+                    // Check for error
+                    const error = hashParams.get('error_description') || hashParams.get('error');
+                    if (error) {
+                        throw new Error(error);
+                    }
+                    
+                    // No tokens and no error - might be code flow, wait for Supabase
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    await mnemolog.checkAuth();
+                    
+                    if (mnemolog.isLoggedIn) {
+                        window.location.href = sessionStorage.getItem('auth_redirect') || '/';
+                    } else {
+                        throw new Error('Authentication failed. Please try again.');
+                    }
+                }
+            } catch (err) {
+                console.error('Auth callback error:', err);
+                document.querySelector('.spinner').style.display = 'none';
+                document.querySelector('h1').textContent = 'Sign in failed';
+                document.querySelector('p').textContent = 'Something went wrong';
+                const errorEl = document.getElementById('error');
+                errorEl.textContent = err.message;
+                errorEl.style.display = 'block';
+                
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 3000);
+            }
+        }
+        
+        handleCallback();
+    </script>
+</body>
+</html>

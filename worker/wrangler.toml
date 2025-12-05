@@ -1,0 +1,20 @@
+name = "mnemolog-api"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+[vars]
+ENVIRONMENT = "production"
+
+# Add these via `wrangler secret put` for production:
+# SUPABASE_URL
+# SUPABASE_ANON_KEY
+# SUPABASE_SERVICE_KEY
+
+[dev]
+port = 8787
+local_protocol = "http"
+
+# Uncomment for custom domain
+# [routes]
+# pattern = "api.mnemolog.com/*"
+# zone_name = "mnemolog.com"
