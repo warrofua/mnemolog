@@ -4,3 +4,4 @@ node_modules/
 dist
 .DS_Store
 assets/config.js
+frontend/assets/config.js
