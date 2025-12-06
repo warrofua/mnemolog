@@ -864,7 +864,7 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
                     </svg>
                     Back
                 </button>
-                <button class="btn btn-primary" onclick="goToStep(4)" id="publish-btn">
+                <button class="btn btn-primary" type="button" id="publish-btn">
                     Publish Conversation
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
@@ -898,12 +898,16 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
         </div>
     </div>
 
+    <script src="/assets/config.js"></script>
     <script src="/assets/app.js"></script>
     <script>
         // State
         let currentStep = 1;
         let tags = [];
         let flaggedItems = [];
+        let parsedMessages = [];
+
+        document.getElementById('publish-btn').addEventListener('click', publishConversation);
 
         // Platform selection
         document.querySelectorAll('.platform-option').forEach(option => {
@@ -999,6 +1003,8 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
             ];
 
             let flagCount = 0;
+
+            parsedMessages = messages;
 
             // Render messages with highlighted sensitive info
             preview.innerHTML = messages.map((msg, i) => {
@@ -1098,6 +1104,71 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
             input.select();
             document.execCommand('copy');
         }
+
+        function getRedactedMessages() {
+            const previewMessages = document.querySelectorAll('.conversation-preview .message');
+            return Array.from(previewMessages).map((el, idx) => {
+                const role = parsedMessages[idx]?.role || el.querySelector('.message-role')?.textContent.trim().toLowerCase() || 'assistant';
+                const content = (el.querySelector('.message-content')?.textContent || '').trim();
+                return { role, content };
+            }).filter(m => m.content.length > 0);
+        }
+
+        async function publishConversation() {
+            if (!window.mnemolog?.isLoggedIn) {
+                sessionStorage.setItem('auth_redirect', '/share');
+                alert('Please sign in to publish your conversation.');
+                return;
+            }
+
+            const publishBtn = document.getElementById('publish-btn');
+            const originalPublishHtml = publishBtn.innerHTML;
+
+            const platformInput = document.querySelector('input[name="platform"]:checked');
+            const platform = platformInput?.value;
+            const title = document.getElementById('title').value.trim();
+            const description = document.getElementById('description').value.trim();
+            const showAuthor = document.getElementById('show-name').checked;
+            const messages = getRedactedMessages();
+
+            if (!platform) {
+                alert('Select a platform before publishing.');
+                return;
+            }
+            if (!title) {
+                alert('Add a title before publishing.');
+                return;
+            }
+            if (messages.length === 0) {
+                alert('Add a conversation before publishing.');
+                return;
+            }
+
+            publishBtn.disabled = true;
+            publishBtn.innerHTML = 'Publishing...';
+
+            try {
+                const { conversation } = await mnemolog.createConversation({
+                    title,
+                    description: description || undefined,
+                    platform,
+                    messages,
+                    tags,
+                    is_public: true,
+                    show_author: showAuthor,
+                });
+
+                const shareUrl = `${window.location.origin}/share/${conversation.id}`;
+                document.getElementById('share-url').value = shareUrl;
+                goToStep(4);
+            } catch (err) {
+                console.error('Publish error:', err);
+                alert(err?.message || 'Failed to publish conversation. Please try again.');
+            } finally {
+                publishBtn.disabled = false;
+                publishBtn.innerHTML = originalPublishHtml;
+            }
+        }
     </script>
-</body>
-</html>
+  </body>
+  </html>

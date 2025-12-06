@@ -66,7 +66,13 @@ router.get('/api/health', () => json({ status: 'ok', timestamp: new Date().toISO
 
 // Get current user
 router.get('/api/auth/user', async (request: IRequest, env: Env) => {
-  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
+  const authHeader = request.headers.get('Authorization') || undefined;
+  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+    global: {
+      // Only forward the header when present to avoid sending "Authorization: null"
+      headers: authHeader ? { Authorization: authHeader } : {},
+    },
+  });
   const user = await getUser(request, supabase);
   
   if (!user) {
@@ -85,7 +91,12 @@ router.get('/api/auth/user', async (request: IRequest, env: Env) => {
 
 // Create conversation
 router.post('/api/conversations', async (request: IRequest, env: Env) => {
-  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
+  const authHeader = request.headers.get('Authorization') || undefined;
+  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+    global: {
+      headers: authHeader ? { Authorization: authHeader } : {},
+    },
+  });
   const user = await getUser(request, supabase);
   
   if (!user) {
@@ -136,7 +147,12 @@ router.post('/api/conversations', async (request: IRequest, env: Env) => {
 
 // List public conversations
 router.get('/api/conversations', async (request: IRequest, env: Env) => {
-  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
+  const authHeader = request.headers.get('Authorization') || undefined;
+  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+    global: {
+      headers: authHeader ? { Authorization: authHeader } : {},
+    },
+  });
   const url = new URL(request.url);
   
   const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 100);
@@ -147,7 +163,8 @@ router.get('/api/conversations', async (request: IRequest, env: Env) => {
 
   let query = supabase
     .from('conversations')
-    .select(`
+    .select(
+      `
       id,
       title,
       description,
@@ -161,7 +178,9 @@ router.get('/api/conversations', async (request: IRequest, env: Env) => {
         display_name,
         avatar_url
       )
-    `)
+    `,
+      { count: 'exact' }
+    )
     .eq('is_public', true)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
@@ -195,7 +214,12 @@ router.get('/api/conversations', async (request: IRequest, env: Env) => {
 
 // Get single conversation
 router.get('/api/conversations/:id', async (request: IRequest, env: Env) => {
-  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
+  const authHeader = request.headers.get('Authorization') || undefined;
+  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+    global: {
+      headers: authHeader ? { Authorization: authHeader } : {},
+    },
+  });
   const { id } = request.params;
 
   const { data, error } = await supabase
@@ -235,7 +259,12 @@ router.get('/api/conversations/:id', async (request: IRequest, env: Env) => {
 
 // Get user's conversations
 router.get('/api/users/:userId/conversations', async (request: IRequest, env: Env) => {
-  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
+  const authHeader = request.headers.get('Authorization') || undefined;
+  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+    global: {
+      headers: authHeader ? { Authorization: authHeader } : {},
+    },
+  });
   const { userId } = request.params;
   const user = await getUser(request, supabase);
   const url = new URL(request.url);
@@ -268,7 +297,12 @@ router.get('/api/users/:userId/conversations', async (request: IRequest, env: En
 
 // Update conversation
 router.put('/api/conversations/:id', async (request: IRequest, env: Env) => {
-  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
+  const authHeader = request.headers.get('Authorization') || undefined;
+  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+    global: {
+      headers: authHeader ? { Authorization: authHeader } : {},
+    },
+  });
   const user = await getUser(request, supabase);
   
   if (!user) {
@@ -309,7 +343,12 @@ router.put('/api/conversations/:id', async (request: IRequest, env: Env) => {
 
 // Delete conversation
 router.delete('/api/conversations/:id', async (request: IRequest, env: Env) => {
-  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
+  const authHeader = request.headers.get('Authorization') || undefined;
+  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+    global: {
+      headers: authHeader ? { Authorization: authHeader } : {},
+    },
+  });
   const user = await getUser(request, supabase);
   
   if (!user) {
