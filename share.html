@@ -58,6 +58,90 @@
             margin-left: 2rem;
         }
 
+        .nav-actions {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .auth-buttons {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .auth-button {
+            padding: 0.45rem 0.9rem;
+            border: 1px solid var(--border);
+            background: white;
+            color: var(--text);
+            border-radius: 4px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .auth-button:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .user-menu {
+            display: none;
+        }
+
+        .user-menu details { position: relative; }
+
+        .user-menu summary {
+            list-style: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+        }
+
+        .user-menu summary::-webkit-details-marker { display: none; }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 1px solid var(--border);
+        }
+
+        .user-name {
+            font-size: 0.9rem;
+            color: var(--text);
+        }
+
+        .user-dropdown {
+            position: absolute;
+            right: 0;
+            margin-top: 0.5rem;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.5rem;
+            min-width: 160px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        .user-menu details[open] .user-dropdown { display: block; }
+
+        .user-dropdown button {
+            width: 100%;
+            background: none;
+            border: none;
+            padding: 0.5rem 0.75rem;
+            text-align: left;
+            font-size: 0.9rem;
+            cursor: pointer;
+            color: var(--text);
+        }
+
+        .user-dropdown button:hover { background: var(--bg-warm); }
+
         .container {
             max-width: 800px;
             margin: 0 auto;
@@ -574,6 +658,27 @@
             <a href="/#explore">Explore</a>
             <a href="/#about">About</a>
         </div>
+        <div class="nav-actions">
+            <div class="auth-buttons">
+                <button class="auth-button" onclick="mnemolog.signInWith('google')">Sign in with Google</button>
+                <button class="auth-button" onclick="mnemolog.signInWith('github')">GitHub</button>
+                <button class="auth-button" onclick="mnemolog.signInWith('email')">Email</button>
+            </div>
+            <div class="user-menu">
+                <details>
+                    <summary>
+                        <img class="user-avatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='22' r='14' fill='%23E5DFD5'/%3E%3Ccircle cx='32' cy='48' r='20' fill='%23E5DFD5'/%3E%3C/svg%3E" alt="User avatar">
+                        <span class="user-name">Signed in</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </summary>
+                    <div class="user-dropdown">
+                        <button type="button" onclick="mnemolog.signOut()">Sign out</button>
+                    </div>
+                </details>
+            </div>
+        </div>
     </nav>
 
     <div class="container">
@@ -793,6 +898,7 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
         </div>
     </div>
 
+    <script src="/assets/app.js"></script>
     <script>
         // State
         let currentStep = 1;
