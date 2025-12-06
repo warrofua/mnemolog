@@ -1,9 +1,9 @@
 // Mnemolog Frontend JS
 // Configuration - update these for your deployment
 const CONFIG = {
-  API_URL: 'https://mnemolog-api.YOUR_SUBDOMAIN.workers.dev', // Update after deploying worker
-  SUPABASE_URL: 'https://YOUR_PROJECT.supabase.co',           // From Supabase dashboard
-  SUPABASE_ANON_KEY: 'YOUR_ANON_KEY',                         // From Supabase dashboard
+  API_URL: 'EXAMPLE KEY', // Update after deploying worker
+  SUPABASE_URL: 'EXAMPLE KEY',           // From Supabase dashboard
+  SUPABASE_ANON_KEY: 'EXAMPLE KEY',                         // From Supabase dashboard
 };
 
 // Initialize Supabase client
