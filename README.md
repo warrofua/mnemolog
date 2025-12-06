@@ -13,16 +13,16 @@ Conversations that persist. A living archive for human-AI collaboration.
 
 ```
 mnemolog/
-├── frontend/           # Static site → Cloudflare Pages
-│   ├── index.html      # Homepage
-│   ├── share.html      # Share conversation flow
-│   └── assets/
-├── worker/             # API → Cloudflare Workers
-│   ├── src/
-│   │   ├── index.ts    # Main router
-│   │   ├── auth.ts     # Auth middleware
-│   │   ├── conversations.ts
-│   │   └── users.ts
+├── frontend/               # Static site → Cloudflare Pages
+│   ├── index.html          # Homepage
+│   ├── share.html          # Share conversation flow
+│   ├── conversation.html   # Public conversation view
+│   ├── faq.html            # FAQ
+│   ├── auth/callback/      # Supabase auth callback page
+│   ├── assets/             # app.js + config.js
+│   └── _redirects          # Pages rewrites (c/<id> → conversation)
+├── worker/                 # API → Cloudflare Workers
+│   ├── src/index.ts        # Main router (all endpoints)
 │   ├── wrangler.toml
 │   └── package.json
 └── supabase/
@@ -68,11 +68,22 @@ SUPABASE_SERVICE_KEY=eyJ...  # For server-side operations
 ## API Endpoints
 
 ```
-POST   /api/auth/callback     # OAuth callback
-GET    /api/auth/user         # Get current user
-POST   /api/conversations     # Create conversation
-GET    /api/conversations     # List conversations (public)
-GET    /api/conversations/:id # Get single conversation
-GET    /api/users/:id/conversations # User's conversations
-DELETE /api/conversations/:id # Delete (owner only)
+GET     /api/auth/user                # Get current user
+POST    /api/conversations            # Create conversation (auth required)
+GET     /api/conversations            # List public conversations (filters: limit, offset, platform, tag, q)
+GET     /api/conversations/:id        # Get single conversation (public or owner)
+PUT     /api/conversations/:id        # Update (owner)
+DELETE  /api/conversations/:id        # Delete (owner)
+GET     /api/users/:userId/conversations # User’s conversations (public unless owner)
 ```
+
+## Frontend Routes
+
+- `/` — homepage
+- `/share` — submit/publish a conversation
+- `/c/<uuid>` → `/conversation/<uuid>` — public conversation view (rewritten by `_redirects`)
+- `/faq` — FAQ
+
+**Deployment notes**
+- Pages: `cd frontend && npx wrangler pages deploy . --project-name=mnemolog` (ensure `_redirects` ships so `/c/<id>` works).
+- Worker: `cd worker && npm install && npm run deploy` after API changes.

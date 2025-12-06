@@ -1,0 +1,2 @@
+# SPA fallback for any unmatched routes (optional)
+# /*    /index.html   200

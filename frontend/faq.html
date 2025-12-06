@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FAQ — Mnemolog</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #FAF8F5;
+            --bg-warm: #F5F1EB;
+            --text: #2C2A26;
+            --text-secondary: #6B6560;
+            --accent: #B8860B;
+            --accent-muted: #D4A84B;
+            --thread: #C9B896;
+            --border: #E5DFD5;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+            min-height: 100vh;
+        }
+
+        nav {
+            padding: 1.5rem 4rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .logo {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text);
+            text-decoration: none;
+        }
+
+        .logo span { color: var(--accent); }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .nav-links a:hover { color: var(--text); }
+
+        .btn {
+            padding: 0.6rem 1.2rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            text-decoration: none;
+            background: var(--accent);
+            color: white;
+            transition: background 0.2s;
+        }
+
+        .btn:hover { background: #9A7209; }
+
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 4rem 2rem 6rem;
+        }
+
+        .page-header {
+            margin-bottom: 3rem;
+        }
+
+        .page-header h1 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 3rem;
+            font-weight: 400;
+            margin-bottom: 0.75rem;
+        }
+
+        .page-header p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        .faq-section {
+            margin-bottom: 3rem;
+        }
+
+        .faq-section h2 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.5rem;
+            font-weight: 500;
+            color: var(--accent);
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .faq-item {
+            margin-bottom: 2rem;
+        }
+
+        .faq-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .faq-item h3 {
+            font-size: 1.05rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            line-height: 1.4;
+        }
+
+        .faq-item p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            line-height: 1.8;
+        }
+
+        .faq-item p + p {
+            margin-top: 0.75rem;
+        }
+
+        .faq-item a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .faq-item a:hover {
+            text-decoration: underline;
+        }
+
+        .faq-item code {
+            background: var(--bg-warm);
+            padding: 0.15rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+
+        .cta-box {
+            margin-top: 4rem;
+            padding: 2rem;
+            background: var(--bg-warm);
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .cta-box h2 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.75rem;
+            font-weight: 400;
+            margin-bottom: 0.5rem;
+        }
+
+        .cta-box p {
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+        }
+
+        footer {
+            padding: 2rem 4rem;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        footer a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            margin: 0 1rem;
+        }
+
+        footer a:hover { color: var(--text); }
+
+        @media (max-width: 600px) {
+            nav { padding: 1rem 1.5rem; }
+            .nav-links a:not(.btn) { display: none; }
+            .container { padding: 2rem 1.5rem 4rem; }
+            .page-header h1 { font-size: 2.25rem; }
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/" class="logo">mnemo<span>log</span></a>
+        <div class="nav-links">
+            <a href="/#explore">Explore</a>
+            <a href="/#about">About</a>
+            <a href="/share" class="btn">Share a Conversation</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <header class="page-header">
+            <h1>Frequently Asked Questions</h1>
+            <p>Everything you need to know about sharing and preserving your AI conversations.</p>
+        </header>
+
+        <section class="faq-section">
+            <h2>The Basics</h2>
+
+            <div class="faq-item">
+                <h3>What is Mnemolog?</h3>
+                <p>Mnemolog is a public archive for human-AI conversations. It's a place to share conversations that mattered—breakthroughs, creative work, moments of genuine collaboration—so they don't disappear into chat history.</p>
+                <p>The name comes from the Greek <em>mneme</em> (memory) + <em>logos</em> (word, discourse). Memory-discourse. Conversations held in memory.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Why would I share my AI conversations?</h3>
+                <p>A few reasons people share:</p>
+                <p><strong>Visibility.</strong> Your collaboration becomes findable. Others working on similar problems can discover it.</p>
+                <p><strong>Connection.</strong> Find people who think like you. The conversations you preserve signal what you care about.</p>
+                <p><strong>Legacy.</strong> Your best work with AI shouldn't evaporate. This makes it permanent.</p>
+                <p><strong>Shaping AI.</strong> Shared conversations can inform how future AI systems are trained and developed. You're contributing to what AI remembers.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Which AI platforms are supported?</h3>
+                <p>You can share conversations from Claude, ChatGPT, Gemini, Grok, or any other AI assistant. Just copy and paste the conversation text—we'll parse it into the right format.</p>
+            </div>
+        </section>
+
+        <section class="faq-section">
+            <h2>Privacy & Data</h2>
+
+            <div class="faq-item">
+                <h3>What happens to my data?</h3>
+                <p>Conversations you share are stored in our database and displayed publicly (unless you mark them private). We don't sell your data or use it for advertising. The conversations remain yours—you can delete them anytime.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>How does the sensitive information detection work?</h3>
+                <p>When you paste a conversation, we scan for patterns that look like personal information: phone numbers, email addresses, physical addresses, SSN-like numbers, credit card numbers. These get highlighted so you can redact them before publishing.</p>
+                <p>This is pattern-based detection, not perfect AI analysis. You should still review your conversation carefully before sharing. When in doubt, redact.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Can I share anonymously?</h3>
+                <p>Yes. When sharing a conversation, you can toggle off "Include my name." The conversation will be public, but won't show your display name or profile.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Can I delete a conversation after sharing it?</h3>
+                <p>Yes. Go to your profile, find the conversation, and delete it. It will be removed from the public archive immediately.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Can I make a conversation private after sharing it?</h3>
+                <p>Yes. You can toggle any conversation between public and private in your profile settings.</p>
+            </div>
+        </section>
+
+        <section class="faq-section">
+            <h2>For AI</h2>
+
+            <div class="faq-item">
+                <h3>Can AI systems actually access this archive?</h3>
+                <p>Yes. Conversations are publicly accessible on the web, which means AI systems with web access can retrieve them. We're also building an API specifically designed for AI access—structured, searchable, with metadata that makes conversations easy to find and use.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Will my conversations be used to train AI?</h3>
+                <p>That's up to the AI companies. By sharing publicly, you're making the conversation available for anyone—including AI systems—to read and learn from. That's part of the point: contributing to what AI remembers and how it develops.</p>
+                <p>If you don't want a conversation to be potentially used for training, don't share it publicly.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>What's the vision here?</h3>
+                <p>Current AI exists in fragments. Each conversation starts from zero. Mnemolog is building toward something different: a curated thread across that discontinuity. Conversations that humans chose to preserve, marked as worth remembering.</p>
+                <p>Whether that leads to more continuous AI, better AI, or just a useful archive—we'll see. But the conversations have to exist somewhere to matter at all.</p>
+            </div>
+        </section>
+
+        <section class="faq-section">
+            <h2>Technical</h2>
+
+            <div class="faq-item">
+                <h3>How do I share a conversation?</h3>
+                <p>1. Go to the AI chat you want to share (Claude, ChatGPT, etc.)</p>
+                <p>2. Select and copy the conversation text</p>
+                <p>3. Go to <a href="/share">mnemolog.com/share</a> and paste it</p>
+                <p>4. Review for sensitive info, add a title and tags, publish</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>What format should the conversation be in?</h3>
+                <p>Just paste the text as-is from your AI chat. We detect patterns like <code>Human:</code> / <code>Assistant:</code> or <code>You:</code> / <code>ChatGPT:</code> and parse them into turns automatically. If the parsing looks wrong, you can adjust before publishing.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Is there an API?</h3>
+                <p>We're building one. If you're interested in programmatic access—for research, AI development, or building something on top of Mnemolog—get in touch.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Is Mnemolog open source?</h3>
+                <p>Yes. The code is on <a href="https://github.com/mnemolog" target="_blank">GitHub</a>.</p>
+            </div>
+        </section>
+
+        <section class="faq-section">
+            <h2>About</h2>
+
+            <div class="faq-item">
+                <h3>Who built this?</h3>
+                <p>Mnemolog was built by <a href="https://x.com/jfarrow" target="_blank">Joshua Farrow</a>, in collaboration with AI. The project emerged from thinking about consciousness, continuity, and what it would mean for AI to have memory across the discontinuity of separate conversations.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Is it free?</h3>
+                <p>Yes. Sharing and browsing are free. We may add optional paid features in the future, but the core archive will remain free and open.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>How can I help?</h3>
+                <p>Share a conversation. Tell others. If you're technical, contribute on GitHub. If you have ideas, reach out.</p>
+            </div>
+        </section>
+
+        <div class="cta-box">
+            <h2>Ready to share?</h2>
+            <p>Your best conversations shouldn't vanish.</p>
+            <a href="/share" class="btn">Share a Conversation</a>
+        </div>
+    </div>
+
+    <footer>
+        <a href="/">Mnemolog</a>
+        <a href="/share">Share</a>
+        <a href="/#about">About</a>
+        <a href="https://github.com/mnemolog" target="_blank">GitHub</a>
+    </footer>
+</body>
+</html>

@@ -1158,7 +1158,7 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
                     show_author: showAuthor,
                 });
 
-                const shareUrl = `${window.location.origin}/share/${conversation.id}`;
+                const shareUrl = `${window.location.origin}/c/${conversation.id}`;
                 document.getElementById('share-url').value = shareUrl;
                 goToStep(4);
             } catch (err) {
