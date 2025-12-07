@@ -300,5 +300,80 @@ window.mnemolog = {
   get isLoggedIn() { return !!currentUser; },
 };
 
-// Auto-check auth on load
-document.addEventListener('DOMContentLoaded', checkAuth);
+// Build header HTML (single source of truth for all pages)
+function buildHeaderHTML() {
+  const isSharePage = window.location.pathname.startsWith('/share');
+  const shareCta = isSharePage ? '' : `
+    <a href="/share" class="btn btn-primary share-cta">Share <span class="desktop-only">a Conversation</span><span class="mobile-only"> Now</span></a>
+  `;
+  return `
+    <nav>
+      <div class="nav-left">
+        <a href="/" class="logo">mnemo<span>log</span></a>
+      </div>
+      <div class="nav-center">
+        ${shareCta}
+      </div>
+      <div class="nav-right">
+        <div class="nav-dropdown">
+          <div class="nav-links">
+            <a href="/explore">Explore</a>
+            <a href="/#about">About</a>
+            <a href="/faq">FAQ</a>
+            <a href="/profile">Profile</a>
+          </div>
+          <div class="nav-actions">
+            <div class="auth-buttons">
+              <button class="auth-button" onclick="mnemolog.signInWith('google')">Google</button>
+              <button class="auth-button" onclick="mnemolog.signInWith('github')">GitHub</button>
+              <button class="auth-button" onclick="mnemolog.signInWith('email')">Email</button>
+            </div>
+            <div class="user-menu">
+              <details>
+              <summary>
+                <img class="user-avatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='22' r='14' fill='%23E5DFD5'/%3E%3Ccircle cx='32' cy='48' r='20' fill='%23E5DFD5'/%3E%3C/svg%3E" alt="User avatar">
+                <span class="user-name">Signed in</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </summary>
+              <div class="user-dropdown">
+                <button type="button" onclick="mnemolog.signOut()">Sign out</button>
+              </div>
+            </details>
+          </div>
+        </div>
+        </div>
+        <button class="mobile-menu-button" aria-label="Toggle menu">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </nav>
+  `;
+}
+
+// Inject header into placeholder if present
+function injectHeader() {
+  const target = document.getElementById('site-header');
+  if (!target) return;
+  target.innerHTML = buildHeaderHTML();
+}
+
+// Wire up mobile menu toggle
+function setupMobileMenus() {
+  document.querySelectorAll('.mobile-menu-button').forEach(button => {
+    const nav = button.closest('nav');
+    const dropdown = nav?.querySelector('.nav-dropdown');
+    if (!dropdown) return;
+    button.addEventListener('click', () => {
+      dropdown.classList.toggle('active');
+    });
+  });
+}
+
+// Initialize header + auth when DOM ready
+document.addEventListener('DOMContentLoaded', async () => {
+  injectHeader();
+  setupMobileMenus();
+  await checkAuth();
+});

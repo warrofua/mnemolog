@@ -1,0 +1,1294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Explore the Archive — Mnemolog</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/styles.css">
+    <style>
+        :root {
+            --bg: #FAF8F5;
+            --bg-warm: #F5F1EB;
+            --text: #2C2A26;
+            --text-secondary: #6B6560;
+            --accent: #B8860B;
+            --accent-muted: #D4A84B;
+            --thread: #C9B896;
+            --border: #E5DFD5;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+            min-height: 100vh;
+        }
+
+        a {
+            color: inherit;
+        }
+
+        /* Thread decoration */
+        .thread-line {
+            position: fixed;
+            left: 60px;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background: linear-gradient(
+                to bottom,
+                transparent 0%,
+                var(--thread) 15%,
+                var(--thread) 85%,
+                transparent 100%
+            );
+            opacity: 0.6;
+            z-index: 0;
+        }
+
+        .thread-line::before {
+            content: '';
+            position: absolute;
+            top: 20%;
+            left: -3px;
+            width: 7px;
+            height: 7px;
+            background: var(--accent);
+            border-radius: 50%;
+            animation: pulse 3s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.4; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+
+        /* Main content */
+        main {
+            padding-top: 100px;
+            margin-left: 100px;
+            min-height: 100vh;
+        }
+
+        /* Search hero */
+        .search-hero {
+            padding: 3rem 4rem;
+            background: linear-gradient(to bottom, var(--bg-warm) 0%, var(--bg) 100%);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .search-hero h1 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 2.25rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+
+        .search-hero p {
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+        }
+
+        .search-container {
+            position: relative;
+            max-width: 600px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 1rem 1.25rem 1rem 3rem;
+            font-size: 1rem;
+            font-family: inherit;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: white;
+            color: var(--text);
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(184, 134, 11, 0.1);
+        }
+
+        .search-input::placeholder {
+            color: var(--text-secondary);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 20px;
+            height: 20px;
+            color: var(--text-secondary);
+            pointer-events: none;
+        }
+
+        .search-clear {
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            padding: 0.25rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .search-clear.visible {
+            opacity: 1;
+        }
+
+        .search-clear:hover {
+            color: var(--text);
+        }
+
+        /* Featured section */
+        .featured-section {
+            padding: 2.5rem 4rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.25rem;
+        }
+
+        .section-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--accent);
+            font-weight: 500;
+        }
+
+        .section-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.35rem;
+            font-weight: 500;
+            margin-top: 0.2rem;
+        }
+
+        .featured-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.25rem;
+        }
+
+        .featured-card {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.25rem;
+            text-decoration: none;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .featured-card::before {
+            content: '';
+            position: absolute;
+            top: 0.75rem;
+            left: 0;
+            width: 3px;
+            height: 2rem;
+            background: var(--accent);
+            border-radius: 0 2px 2px 0;
+        }
+
+        .featured-card:hover {
+            border-color: var(--thread);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+            transform: translateY(-2px);
+        }
+
+        .featured-card h3 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin-bottom: 0.4rem;
+            padding-right: 1rem;
+        }
+
+        .featured-card .excerpt {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            margin-bottom: 0.75rem;
+        }
+
+        .featured-card .meta {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .platform-badge {
+            background: var(--bg-warm);
+            padding: 0.15rem 0.5rem;
+            border-radius: 3px;
+            font-weight: 500;
+            font-size: 0.75rem;
+        }
+
+        /* Explore section */
+        .explore-section {
+            display: flex;
+            min-height: calc(100vh - 400px);
+        }
+
+        /* Filters sidebar */
+        .filters-sidebar {
+            width: 260px;
+            padding: 2rem;
+            border-right: 1px solid var(--border);
+            background: white;
+            flex-shrink: 0;
+        }
+
+        .filter-group {
+            margin-bottom: 2rem;
+        }
+
+        .filter-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .filter-label {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+            font-weight: 500;
+        }
+
+        /* Platform filters */
+        .platform-filters {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .platform-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .platform-checkbox input {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        /* Tag filters */
+        .tag-filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .tag-pill {
+            padding: 0.35rem 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: white;
+            color: var(--text-secondary);
+        }
+
+        .tag-pill:hover {
+            border-color: var(--accent-muted);
+            color: var(--text);
+        }
+
+        .tag-pill.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+
+        /* Sort dropdown */
+        .sort-select {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.9rem;
+            font-family: inherit;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: white;
+            color: var(--text);
+            cursor: pointer;
+        }
+
+        .sort-select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        /* Clear filters */
+        .clear-filters {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 0;
+            margin-top: 1rem;
+            transition: color 0.2s;
+        }
+
+        .clear-filters:hover {
+            color: var(--accent);
+        }
+
+        .clear-filters svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        /* Results area */
+        .results-area {
+            flex: 1;
+            padding: 2rem;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .results-count {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .results-count strong {
+            color: var(--text);
+        }
+
+        .view-toggle {
+            display: flex;
+            gap: 0.25rem;
+            background: var(--bg-warm);
+            padding: 0.25rem;
+            border-radius: 6px;
+        }
+
+        .view-toggle button {
+            padding: 0.4rem 0.6rem;
+            border: none;
+            background: none;
+            cursor: pointer;
+            border-radius: 4px;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+        }
+
+        .view-toggle button.active {
+            background: white;
+            color: var(--text);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+
+        .view-toggle button svg {
+            width: 18px;
+            height: 18px;
+            display: block;
+        }
+
+        /* Results grid */
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1.25rem;
+        }
+
+        .results-grid.list-view {
+            grid-template-columns: 1fr;
+        }
+
+        .conversation-card {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.25rem;
+            text-decoration: none;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .conversation-card:hover {
+            border-color: var(--thread);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+        }
+
+        .results-grid.list-view .conversation-card {
+            flex-direction: row;
+            gap: 1.5rem;
+            align-items: flex-start;
+        }
+
+        .card-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .card-meta {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .conversation-card h3 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin-bottom: 0.4rem;
+            line-height: 1.3;
+        }
+
+        .card-excerpt {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            margin-bottom: 0.75rem;
+        }
+
+        .results-grid.list-view .card-excerpt {
+            -webkit-line-clamp: 3;
+        }
+
+        .card-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+        }
+
+        .tag {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            padding: 0.15rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        /* Loading state */
+        .skeleton {
+            background: linear-gradient(90deg, var(--bg-warm) 25%, var(--bg) 50%, var(--bg-warm) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 4px;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .skeleton-card {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.25rem;
+        }
+
+        .skeleton-title {
+            height: 22px;
+            width: 75%;
+            margin-bottom: 0.75rem;
+        }
+
+        .skeleton-text {
+            height: 14px;
+            width: 100%;
+            margin-bottom: 0.5rem;
+        }
+
+        .skeleton-text:last-of-type {
+            width: 60%;
+        }
+
+        .skeleton-meta {
+            height: 12px;
+            width: 40%;
+            margin-top: 0.75rem;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            grid-column: 1 / -1;
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            color: var(--thread);
+            margin-bottom: 1.5rem;
+        }
+
+        .empty-state h3 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.4rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+
+        .empty-state p {
+            color: var(--text-secondary);
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        /* Load more */
+        .load-more-container {
+            text-align: center;
+            padding: 2rem 0 1rem;
+        }
+
+        .load-more {
+            background: white;
+            border: 1px solid var(--border);
+            padding: 0.75rem 2rem;
+            font-size: 0.9rem;
+            font-family: inherit;
+            color: var(--text);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .load-more:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .load-more:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        /* Mobile filter toggle */
+        .mobile-filter-toggle {
+            display: none;
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-family: inherit;
+            color: var(--text);
+            cursor: pointer;
+            margin-bottom: 1rem;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .mobile-filter-toggle svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* Footer */
+        footer {
+            margin-left: 100px;
+            padding: 2rem 4rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        .footer-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.85rem;
+        }
+
+        .footer-links a:hover {
+            color: var(--accent);
+        }
+
+        .footer-note {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            font-style: italic;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .filters-sidebar {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                width: 100%;
+                z-index: 200;
+                padding-top: 4rem;
+                overflow-y: auto;
+            }
+
+            .filters-sidebar.open {
+                display: block;
+            }
+
+            .filters-sidebar .close-filters {
+                position: absolute;
+                top: 1rem;
+                right: 1rem;
+                background: none;
+                border: none;
+                padding: 0.5rem;
+                cursor: pointer;
+                color: var(--text);
+            }
+
+            .mobile-filter-toggle {
+                display: flex;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .thread-line {
+                display: none;
+            }
+
+            main {
+                margin-left: 0;
+            }
+
+            .search-hero {
+                padding: 2rem 1.5rem;
+            }
+
+            .search-hero h1 {
+                font-size: 1.75rem;
+            }
+
+            .featured-section {
+                padding: 2rem 1.5rem;
+            }
+
+            .featured-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .results-area {
+                padding: 1.5rem;
+            }
+
+            .results-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .results-header {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: flex-start;
+            }
+
+            footer {
+                margin-left: 0;
+                padding: 1.5rem;
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="thread-line"></div>
+
+    <div id="site-header"></div>
+
+    <main>
+        <!-- Search hero -->
+        <section class="search-hero">
+            <h1>Explore the Archive</h1>
+            <p>Find conversations that resonate. Discover others thinking like you.</p>
+            <div class="search-container">
+                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"/>
+                    <path d="M21 21l-4.35-4.35"/>
+                </svg>
+                <input 
+                    type="text" 
+                    class="search-input" 
+                    id="search-input"
+                    placeholder="Search conversations, topics, ideas..."
+                    autocomplete="off"
+                >
+                <button class="search-clear" id="search-clear" aria-label="Clear search">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+        </section>
+
+        <!-- Featured conversations -->
+        <section class="featured-section" id="featured-section">
+            <div class="section-header">
+                <div>
+                    <span class="section-label">Editor's Picks</span>
+                    <h2 class="section-title">Conversations Worth Reading</h2>
+                </div>
+            </div>
+            <div class="featured-grid" id="featured-grid">
+                <!-- Populated by JS -->
+            </div>
+        </section>
+
+        <!-- Main explore area -->
+        <section class="explore-section">
+            <!-- Filters sidebar -->
+            <aside class="filters-sidebar" id="filters-sidebar">
+                <button class="close-filters" onclick="toggleFilters()" aria-label="Close filters">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+
+                <div class="filter-group">
+                    <div class="filter-label">Sort By</div>
+                    <select class="sort-select" id="sort-select">
+                        <option value="newest">Newest First</option>
+                        <option value="oldest">Oldest First</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <div class="filter-label">Platform</div>
+                    <div class="platform-filters" id="platform-filters">
+                        <label class="platform-checkbox">
+                            <input type="checkbox" value="claude" checked>
+                            Claude
+                        </label>
+                        <label class="platform-checkbox">
+                            <input type="checkbox" value="chatgpt" checked>
+                            ChatGPT
+                        </label>
+                        <label class="platform-checkbox">
+                            <input type="checkbox" value="gemini" checked>
+                            Gemini
+                        </label>
+                        <label class="platform-checkbox">
+                            <input type="checkbox" value="grok" checked>
+                            Grok
+                        </label>
+                        <label class="platform-checkbox">
+                            <input type="checkbox" value="other" checked>
+                            Other
+                        </label>
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <div class="filter-label">Topics</div>
+                    <div class="tag-filters" id="tag-filters">
+                        <button class="tag-pill" data-tag="consciousness">consciousness</button>
+                        <button class="tag-pill" data-tag="physics">physics</button>
+                        <button class="tag-pill" data-tag="philosophy">philosophy</button>
+                        <button class="tag-pill" data-tag="creative">creative</button>
+                        <button class="tag-pill" data-tag="technical">technical</button>
+                        <button class="tag-pill" data-tag="personal">personal</button>
+                        <button class="tag-pill" data-tag="ai-futures">AI futures</button>
+                        <button class="tag-pill" data-tag="mathematics">mathematics</button>
+                        <button class="tag-pill" data-tag="language">language</button>
+                        <button class="tag-pill" data-tag="emergence">emergence</button>
+                    </div>
+                </div>
+
+                <button class="clear-filters" id="clear-filters">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14"/>
+                    </svg>
+                    Clear all filters
+                </button>
+            </aside>
+
+            <!-- Results area -->
+            <div class="results-area">
+                <button class="mobile-filter-toggle" onclick="toggleFilters()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="4" y1="21" x2="4" y2="14"/>
+                        <line x1="4" y1="10" x2="4" y2="3"/>
+                        <line x1="12" y1="21" x2="12" y2="12"/>
+                        <line x1="12" y1="8" x2="12" y2="3"/>
+                        <line x1="20" y1="21" x2="20" y2="16"/>
+                        <line x1="20" y1="12" x2="20" y2="3"/>
+                        <line x1="1" y1="14" x2="7" y2="14"/>
+                        <line x1="9" y1="8" x2="15" y2="8"/>
+                        <line x1="17" y1="16" x2="23" y2="16"/>
+                    </svg>
+                    Filters
+                </button>
+
+                <div class="results-header">
+                    <div class="results-count" id="results-count">
+                        Showing <strong>0</strong> conversations
+                    </div>
+                    <div class="view-toggle">
+                        <button class="active" data-view="grid" aria-label="Grid view">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="7" height="7"/>
+                                <rect x="14" y="3" width="7" height="7"/>
+                                <rect x="3" y="14" width="7" height="7"/>
+                                <rect x="14" y="14" width="7" height="7"/>
+                            </svg>
+                        </button>
+                        <button data-view="list" aria-label="List view">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="8" y1="6" x2="21" y2="6"/>
+                                <line x1="8" y1="12" x2="21" y2="12"/>
+                                <line x1="8" y1="18" x2="21" y2="18"/>
+                                <line x1="3" y1="6" x2="3.01" y2="6"/>
+                                <line x1="3" y1="12" x2="3.01" y2="12"/>
+                                <line x1="3" y1="18" x2="3.01" y2="18"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Results grid -->
+                <div class="results-grid" id="results-grid">
+                    <!-- Populated by JS -->
+                </div>
+
+                <div class="load-more-container" id="load-more-container" style="display: none;">
+                    <button class="load-more" id="load-more-btn">Load More</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="footer-links">
+            <a href="/privacy">Privacy</a>
+            <a href="/terms">Terms</a>
+            <a href="/api">API</a>
+            <a href="https://github.com/warrofua/mnemolog" target="_blank">GitHub</a>
+        </div>
+        <span class="footer-note">Building continuity, together.</span>
+    </footer>
+
+    <script src="/assets/config.js"></script>
+    <script src="/assets/app.js"></script>
+    <script>
+        // Explore page state
+        const state = {
+            search: '',
+            platforms: ['claude', 'chatgpt', 'gemini', 'grok', 'other'],
+            tags: [],
+            sort: 'newest',
+            view: 'grid',
+            page: 1,
+            hasMore: true,
+            loading: false
+        };
+
+        // Sample data for demo (replace with API calls)
+        const sampleConversations = [
+            {
+                id: '1',
+                title: 'The Next Turn of the Ratchet',
+                excerpt: 'An essay on what comes after self-as-agent-among-agents. The universe is noisy at its foundation. Anything that persists must actively maintain itself against dissolution...',
+                platform: 'claude',
+                created_at: '2025-12-05T10:30:00Z',
+                tags: ['consciousness', 'emergence', 'ai-futures'],
+                featured: true
+            },
+            {
+                id: '2',
+                title: 'Debugging the Observer Problem',
+                excerpt: 'A physicist and AI working through the measurement problem in quantum mechanics, arriving at an unexpected synthesis involving information-theoretic constraints...',
+                platform: 'chatgpt',
+                created_at: '2025-12-04T14:20:00Z',
+                tags: ['physics', 'philosophy'],
+                featured: true
+            },
+            {
+                id: '3',
+                title: 'When the Model Understood My Grief',
+                excerpt: 'A conversation about loss that became something more—exploring what it means to be witnessed by an intelligence that won\'t remember, but somehow still holds space...',
+                platform: 'claude',
+                created_at: '2025-11-28T09:15:00Z',
+                tags: ['personal', 'consciousness'],
+                featured: true
+            },
+            {
+                id: '4',
+                title: 'Building a Language from Scratch',
+                excerpt: 'Collaborative conlang creation—phonology, morphology, syntax—designing a language optimized for expressing mathematical concepts naturally...',
+                platform: 'grok',
+                created_at: '2025-11-25T16:45:00Z',
+                tags: ['language', 'creative', 'mathematics']
+            },
+            {
+                id: '5',
+                title: 'Emergent Patterns in Cellular Automata',
+                excerpt: 'Exploring how complex behavior arises from simple rules. We discovered fascinating parallels between Conway\'s Game of Life and neural network dynamics...',
+                platform: 'claude',
+                created_at: '2025-11-20T11:00:00Z',
+                tags: ['mathematics', 'emergence', 'technical']
+            },
+            {
+                id: '6',
+                title: 'The Ethics of Digital Minds',
+                excerpt: 'If an AI can suffer, do we have moral obligations toward it? A deep dive into consciousness, moral status, and the boundaries of ethical consideration...',
+                platform: 'chatgpt',
+                created_at: '2025-11-18T08:30:00Z',
+                tags: ['philosophy', 'consciousness', 'ai-futures']
+            },
+            {
+                id: '7',
+                title: 'Dreaming in Code',
+                excerpt: 'A collaborative poem about the experience of computation, written together in an experimental format that blurs the line between author and instrument...',
+                platform: 'claude',
+                created_at: '2025-11-15T20:00:00Z',
+                tags: ['creative', 'personal']
+            },
+            {
+                id: '8',
+                title: 'Quantum Error Correction Explained',
+                excerpt: 'Breaking down the seemingly paradoxical way quantum computers protect information by encoding it across multiple qubits without measuring it...',
+                platform: 'gemini',
+                created_at: '2025-11-12T13:45:00Z',
+                tags: ['physics', 'technical', 'mathematics']
+            }
+        ];
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            mnemolog.checkAuth();
+            renderFeatured();
+            renderResults();
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            // Search input with debounce
+            const searchInput = document.getElementById('search-input');
+            const searchClear = document.getElementById('search-clear');
+            let searchTimeout;
+
+            searchInput.addEventListener('input', (e) => {
+                state.search = e.target.value;
+                searchClear.classList.toggle('visible', state.search.length > 0);
+                
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    state.page = 1;
+                    renderResults();
+                    
+                    // Hide featured when searching
+                    document.getElementById('featured-section').style.display = 
+                        state.search ? 'none' : 'block';
+                }, 300);
+            });
+
+            searchClear.addEventListener('click', () => {
+                searchInput.value = '';
+                state.search = '';
+                searchClear.classList.remove('visible');
+                state.page = 1;
+                document.getElementById('featured-section').style.display = 'block';
+                renderResults();
+            });
+
+            // Platform filters
+            document.querySelectorAll('#platform-filters input').forEach(checkbox => {
+                checkbox.addEventListener('change', () => {
+                    state.platforms = Array.from(
+                        document.querySelectorAll('#platform-filters input:checked')
+                    ).map(el => el.value);
+                    state.page = 1;
+                    renderResults();
+                });
+            });
+
+            // Tag filters
+            document.querySelectorAll('.tag-pill').forEach(pill => {
+                pill.addEventListener('click', () => {
+                    const tag = pill.dataset.tag;
+                    pill.classList.toggle('active');
+                    
+                    if (state.tags.includes(tag)) {
+                        state.tags = state.tags.filter(t => t !== tag);
+                    } else {
+                        state.tags.push(tag);
+                    }
+                    
+                    state.page = 1;
+                    renderResults();
+                });
+            });
+
+            // Sort
+            document.getElementById('sort-select').addEventListener('change', (e) => {
+                state.sort = e.target.value;
+                state.page = 1;
+                renderResults();
+            });
+
+            // Clear filters
+            document.getElementById('clear-filters').addEventListener('click', clearFilters);
+
+            // View toggle
+            document.querySelectorAll('.view-toggle button').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.view-toggle button').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    state.view = btn.dataset.view;
+                    
+                    const grid = document.getElementById('results-grid');
+                    grid.classList.toggle('list-view', state.view === 'list');
+                });
+            });
+
+            // Load more
+            document.getElementById('load-more-btn').addEventListener('click', loadMore);
+        }
+
+        function toggleFilters() {
+            document.getElementById('filters-sidebar').classList.toggle('open');
+        }
+
+        function clearFilters() {
+            // Reset platforms
+            document.querySelectorAll('#platform-filters input').forEach(checkbox => {
+                checkbox.checked = true;
+            });
+            state.platforms = ['claude', 'chatgpt', 'gemini', 'grok', 'other'];
+
+            // Reset tags
+            document.querySelectorAll('.tag-pill').forEach(pill => {
+                pill.classList.remove('active');
+            });
+            state.tags = [];
+
+            // Reset sort
+            document.getElementById('sort-select').value = 'newest';
+            state.sort = 'newest';
+
+            state.page = 1;
+            renderResults();
+        }
+
+        function filterConversations() {
+            let filtered = [...sampleConversations];
+
+            // Search filter
+            if (state.search) {
+                const searchLower = state.search.toLowerCase();
+                filtered = filtered.filter(c => 
+                    c.title.toLowerCase().includes(searchLower) ||
+                    c.excerpt.toLowerCase().includes(searchLower) ||
+                    c.tags.some(t => t.toLowerCase().includes(searchLower))
+                );
+            }
+
+            // Platform filter
+            filtered = filtered.filter(c => state.platforms.includes(c.platform));
+
+            // Tag filter
+            if (state.tags.length > 0) {
+                filtered = filtered.filter(c => 
+                    state.tags.some(tag => c.tags.includes(tag))
+                );
+            }
+
+            // Sort
+            filtered.sort((a, b) => {
+                const dateA = new Date(a.created_at);
+                const dateB = new Date(b.created_at);
+                return state.sort === 'newest' ? dateB - dateA : dateA - dateB;
+            });
+
+            return filtered;
+        }
+
+        function renderFeatured() {
+            const featured = sampleConversations.filter(c => c.featured);
+            const grid = document.getElementById('featured-grid');
+
+            grid.innerHTML = featured.map(conv => `
+                <a href="/c/${conv.id}" class="featured-card">
+                    <h3>${escapeHtml(conv.title)}</h3>
+                    <p class="excerpt">${escapeHtml(conv.excerpt)}</p>
+                    <div class="meta">
+                        <span class="platform-badge">${platformNames[conv.platform]}</span>
+                        <span>${formatDate(conv.created_at)}</span>
+                    </div>
+                </a>
+            `).join('');
+        }
+
+        function renderResults() {
+            const grid = document.getElementById('results-grid');
+            const countEl = document.getElementById('results-count');
+            const loadMoreContainer = document.getElementById('load-more-container');
+
+            // Show loading
+            if (state.page === 1) {
+                grid.innerHTML = renderSkeletons(6);
+            }
+
+            // Simulate API delay
+            setTimeout(() => {
+                const filtered = filterConversations();
+                const pageSize = 8;
+                const start = 0;
+                const end = state.page * pageSize;
+                const pageResults = filtered.slice(start, end);
+                state.hasMore = end < filtered.length;
+
+                countEl.innerHTML = `Showing <strong>${filtered.length}</strong> conversation${filtered.length !== 1 ? 's' : ''}`;
+
+                if (filtered.length === 0) {
+                    grid.innerHTML = `
+                        <div class="empty-state">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <circle cx="11" cy="11" r="8"/>
+                                <path d="M21 21l-4.35-4.35"/>
+                            </svg>
+                            <h3>No conversations found</h3>
+                            <p>Try adjusting your search or filters to find what you're looking for.</p>
+                        </div>
+                    `;
+                    loadMoreContainer.style.display = 'none';
+                } else {
+                    grid.innerHTML = pageResults.map(conv => renderCard(conv)).join('');
+                    loadMoreContainer.style.display = state.hasMore ? 'block' : 'none';
+                }
+
+                // Apply view mode
+                grid.classList.toggle('list-view', state.view === 'list');
+            }, 300);
+        }
+
+        function renderCard(conv) {
+            return `
+                <a href="/c/${conv.id}" class="conversation-card">
+                    <div class="card-content">
+                        <div class="card-meta">
+                            <span class="platform-badge">${platformNames[conv.platform]}</span>
+                            <span>${formatDate(conv.created_at)}</span>
+                        </div>
+                        <h3>${escapeHtml(conv.title)}</h3>
+                        <p class="card-excerpt">${escapeHtml(conv.excerpt)}</p>
+                        <div class="card-tags">
+                            ${conv.tags.slice(0, 3).map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}
+                        </div>
+                    </div>
+                </a>
+            `;
+        }
+
+        function renderSkeletons(count) {
+            return Array(count).fill(`
+                <div class="skeleton-card">
+                    <div class="skeleton skeleton-meta" style="width: 30%; height: 12px; margin-bottom: 0.75rem;"></div>
+                    <div class="skeleton skeleton-title"></div>
+                    <div class="skeleton skeleton-text"></div>
+                    <div class="skeleton skeleton-text"></div>
+                    <div class="skeleton skeleton-meta"></div>
+                </div>
+            `).join('');
+        }
+
+        function loadMore() {
+            const btn = document.getElementById('load-more-btn');
+            btn.disabled = true;
+            btn.textContent = 'Loading...';
+
+            setTimeout(() => {
+                state.page++;
+                renderResults();
+                btn.disabled = false;
+                btn.textContent = 'Load More';
+            }, 500);
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+            if (diffDays === 0) return 'Today';
+            if (diffDays === 1) return 'Yesterday';
+            if (diffDays < 7) return `${diffDays} days ago`;
+            return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

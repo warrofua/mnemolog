@@ -5,11 +5,4 @@ dist
 .DS_Store
 assets/config.js
 frontend/assets/config.js
-samples/chatgpt.txt
-samples/chatgpt_code.txt
-samples/claude.txt
-samples/claude_code.txt
-samples/gemini.txt
-samples/gemini_code.txt
-samples/grok.txt
-samples/grok_code.txt
+/samples

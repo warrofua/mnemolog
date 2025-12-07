@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy — Mnemolog</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/styles.css">
+    <style>
+        body {
+            background: var(--bg);
+            color: var(--text);
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 3rem 1.5rem 4rem;
+        }
+        .page-header {
+            margin: 2rem 0 2.5rem;
+        }
+        .page-header h1 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: clamp(2.4rem, 4vw, 3.4rem);
+            margin-bottom: 0.5rem;
+        }
+        .page-header p {
+            color: var(--text-secondary);
+            max-width: 700px;
+        }
+        .section {
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .section:last-of-type {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+        .section h2 {
+            font-size: 1.2rem;
+            margin-bottom: 0.6rem;
+        }
+        .section p, .section ul {
+            color: var(--text-secondary);
+            font-size: 1rem;
+            line-height: 1.7;
+        }
+        .section ul {
+            margin-left: 1.25rem;
+            list-style: disc;
+        }
+        footer {
+            padding: 2rem 4rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--text-secondary);
+        }
+        .footer-links {
+            display: flex;
+            gap: 1.5rem;
+        }
+        .footer-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        .footer-links a:hover { color: var(--text); }
+        .footer-note { font-size: 0.85rem; }
+        @media (max-width: 700px) {
+            .container { padding: 2rem 1.25rem 3rem; }
+            footer { flex-direction: column; gap: 0.75rem; padding: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+    <div id="site-header"></div>
+
+    <main class="container">
+        <header class="page-header">
+            <h1>Privacy</h1>
+            <p>How we handle your conversations, account data, and what you control when you share on Mnemolog.</p>
+        </header>
+
+        <section class="section">
+            <h2>What we collect</h2>
+            <ul>
+                <li>Account data: email and profile info from your sign-in provider.</li>
+                <li>Conversations you choose to share (content, title, description, tags).</li>
+                <li>Basic usage analytics (page views, error logs) to keep the site reliable.</li>
+            </ul>
+        </section>
+
+        <section class="section">
+            <h2>How your conversations are used</h2>
+            <ul>
+                <li>Public conversations are visible to anyone with the link.</li>
+                <li>We do not sell conversation data or use it for ads.</li>
+                <li>We may analyze aggregate usage to improve parsing, redaction, and discovery.</li>
+            </ul>
+        </section>
+
+        <section class="section">
+            <h2>Your controls</h2>
+            <ul>
+                <li>Edit or delete your shared conversations from your profile archive.</li>
+                <li>Redact sensitive details before publishing; flagged items are highlighted in the review step.</li>
+                <li>Request export or deletion of your account data by contacting support.</li>
+            </ul>
+        </section>
+
+        <section class="section">
+            <h2>Data storage and security</h2>
+            <ul>
+                <li>Conversations and profiles are stored in Supabase with row-level security.</li>
+                <li>Access is authenticated via your sign-in provider; sessions are managed by Supabase Auth.</li>
+                <li>We use HTTPS everywhere and follow least-privilege for service keys.</li>
+            </ul>
+        </section>
+
+        <section class="section">
+            <h2>Contact</h2>
+            <p>Questions or requests? Reach out at <a href="mailto:privacy@mnemolog.com">privacy@mnemolog.com</a>.</p>
+        </section>
+    </main>
+
+    <footer>
+        <div class="footer-links">
+            <a href="/privacy">Privacy</a>
+            <a href="/terms">Terms</a>
+            <a href="/api">API</a>
+            <a href="https://github.com/warrofua/mnemolog" target="_blank">GitHub</a>
+        </div>
+        <span class="footer-note">Building continuity, together.</span>
+    </footer>
+
+    <script src="/assets/config.js"></script>
+    <script src="/assets/app.js"></script>
+</body>
+</html>

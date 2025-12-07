@@ -7,141 +7,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/styles.css">
     <style>
-        :root {
-            --bg: #FAF8F5;
-            --bg-warm: #F5F1EB;
-            --text: #2C2A26;
-            --text-secondary: #6B6560;
-            --accent: #B8860B;
-            --accent-muted: #D4A84B;
-            --thread: #C9B896;
-            --border: #E5DFD5;
-            --warning: #C4650A;
-            --warning-bg: #FEF3E7;
-            --success: #2E7D4A;
-            --success-bg: #E8F5EC;
-        }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        body {
-            font-family: 'DM Sans', sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            line-height: 1.7;
-            min-height: 100vh;
-        }
-
-        nav {
-            padding: 1.5rem 4rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .logo {
-            font-family: 'Cormorant Garamond', serif;
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: var(--text);
-            text-decoration: none;
-        }
-
-        .logo span { color: var(--accent); }
-
-        .nav-links a {
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-size: 0.9rem;
-            margin-left: 2rem;
-        }
-
-        .nav-actions {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .auth-buttons {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .auth-button {
-            padding: 0.45rem 0.9rem;
-            border: 1px solid var(--border);
-            background: white;
-            color: var(--text);
-            border-radius: 4px;
-            font-size: 0.85rem;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .auth-button:hover {
-            border-color: var(--accent);
-            color: var(--accent);
-        }
-
-        .user-menu {
-            display: none;
-        }
-
-        .user-menu details { position: relative; }
-
-        .user-menu summary {
-            list-style: none;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            cursor: pointer;
-        }
-
-        .user-menu summary::-webkit-details-marker { display: none; }
-
-        .user-avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 1px solid var(--border);
-        }
-
-        .user-name {
-            font-size: 0.9rem;
-            color: var(--text);
-        }
-
-        .user-dropdown {
-            position: absolute;
-            right: 0;
-            margin-top: 0.5rem;
-            background: white;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 0.5rem;
-            min-width: 160px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        }
-
-        .user-menu details[open] .user-dropdown { display: block; }
-
-        .user-dropdown button {
-            width: 100%;
-            background: none;
-            border: none;
-            padding: 0.5rem 0.75rem;
-            text-align: left;
-            font-size: 0.9rem;
-            cursor: pointer;
-            color: var(--text);
-        }
-
-        .user-dropdown button:hover { background: var(--bg-warm); }
-
         .container {
             max-width: 800px;
             margin: 0 auto;
@@ -745,39 +612,11 @@
             .page-header h1 { font-size: 2rem; }
             .platform-options { flex-direction: column; }
             .button-row { flex-direction: column; gap: 1rem; }
-            .btn { width: 100%; justify-content: center; }
         }
     </style>
 </head>
 <body>
-    <nav>
-        <a href="/" class="logo">mnemo<span>log</span></a>
-        <div class="nav-links">
-            <a href="/#explore">Explore</a>
-            <a href="/#about">About</a>
-        </div>
-        <div class="nav-actions">
-            <div class="auth-buttons">
-                <button class="auth-button" onclick="mnemolog.signInWith('google')">Sign in with Google</button>
-                <button class="auth-button" onclick="mnemolog.signInWith('github')">GitHub</button>
-                <button class="auth-button" onclick="mnemolog.signInWith('email')">Email</button>
-            </div>
-            <div class="user-menu">
-                <details>
-                    <summary>
-                        <img class="user-avatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='22' r='14' fill='%23E5DFD5'/%3E%3Ccircle cx='32' cy='48' r='20' fill='%23E5DFD5'/%3E%3C/svg%3E" alt="User avatar">
-                        <span class="user-name">Signed in</span>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="6 9 12 15 18 9"/>
-                        </svg>
-                    </summary>
-                    <div class="user-dropdown">
-                        <button type="button" onclick="mnemolog.signOut()">Sign out</button>
-                    </div>
-                </details>
-            </div>
-        </div>
-    </nav>
+    <div id="site-header"></div>
 
     <div class="container">
         <div class="progress">
@@ -905,7 +744,7 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
             <div class="button-row">
                 <a href="/" class="btn btn-secondary">Cancel</a>
                 <button class="btn btn-primary" onclick="goToStep(2)" id="step1-next" disabled>
-                    Continue to Finalize
+                    Continue <span class="desktop-only">to Finalize</span><span class="mobile-only">Next</span>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M5 12h14M12 5l7 7-7 7"/>
                     </svg>
@@ -995,7 +834,7 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
 
                 <div style="display: flex; gap: 1rem; justify-content: center;">
                     <a href="/share" class="btn btn-secondary">Share Another</a>
-                    <a href="/#explore" class="btn btn-primary">Explore Archive</a>
+                    <a href="/explore" class="btn btn-primary">Explore Archive</a>
                 </div>
             </div>
         </div>
@@ -1423,6 +1262,22 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
                 return false;
             };
 
+            const isContinuation = (text, lastRole) => {
+                const trimmed = text.trim();
+                if (!trimmed) return true;
+                if (/^[-*•\d+\.]\s/.test(trimmed)) return true;
+                if (/^[a-z]/.test(trimmed)) return true;
+                if (trimmed.length < 140 && !/[?!]$/.test(trimmed)) return true;
+                if (/^Searched for /i.test(trimmed)) return true;
+                if (/^Relevant chats/i.test(trimmed)) return true;
+                if (/^Found it/i.test(trimmed)) return true;
+                if (/^Image of\b/i.test(trimmed)) return true;
+                if (/^\d+(\.\d+)?s\s*$/.test(trimmed)) return true;
+                if (/^takes a breath/i.test(trimmed)) return true;
+                if (/^Option \d/i.test(trimmed)) return true;
+                return false;
+            };
+
             const mergedSegments = [];
             segments.forEach(seg => {
                 const last = mergedSegments[mergedSegments.length - 1];
@@ -1443,7 +1298,12 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
                     lastRole = p.role;
                     return { role: p.role, content: p.content };
                 }
-                const role = idx === 0 ? firstSpeaker : (lastRole === 'human' ? 'assistant' : 'human');
+                if (idx === 0) {
+                    lastRole = firstSpeaker;
+                    return { role: firstSpeaker, content: p.content };
+                }
+                const flipped = lastRole === 'human' ? 'assistant' : 'human';
+                const role = isContinuation(p.content, lastRole) ? lastRole : flipped;
                 lastRole = role;
                 return { role, content: p.content };
             });

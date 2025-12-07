@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terms — Mnemolog</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/styles.css">
+    <style>
+        body {
+            background: var(--bg);
+            color: var(--text);
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 3rem 1.5rem 4rem;
+        }
+        .page-header {
+            margin: 2rem 0 2.5rem;
+        }
+        .page-header h1 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: clamp(2.4rem, 4vw, 3.4rem);
+            margin-bottom: 0.5rem;
+        }
+        .page-header p {
+            color: var(--text-secondary);
+            max-width: 700px;
+        }
+        .section {
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .section:last-of-type {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+        .section h2 {
+            font-size: 1.2rem;
+            margin-bottom: 0.6rem;
+        }
+        .section p, .section ul {
+            color: var(--text-secondary);
+            font-size: 1rem;
+            line-height: 1.7;
+        }
+        .section ul {
+            margin-left: 1.25rem;
+            list-style: disc;
+        }
+        footer {
+            padding: 2rem 4rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--text-secondary);
+        }
+        .footer-links {
+            display: flex;
+            gap: 1.5rem;
+        }
+        .footer-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        .footer-links a:hover { color: var(--text); }
+        .footer-note { font-size: 0.85rem; }
+        @media (max-width: 700px) {
+            .container { padding: 2rem 1.25rem 3rem; }
+            footer { flex-direction: column; gap: 0.75rem; padding: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+    <div id="site-header"></div>
+
+    <main class="container">
+        <header class="page-header">
+            <h1>Terms</h1>
+            <p>The ground rules for using Mnemolog. Please read these before sharing conversations.</p>
+        </header>
+
+        <section class="section">
+            <h2>Acceptable use</h2>
+            <ul>
+                <li>Share only content you have the right to publish.</li>
+                <li>No unlawful, abusive, or harassing content.</li>
+                <li>No malicious code, spam, or attempts to disrupt the service.</li>
+            </ul>
+        </section>
+
+        <section class="section">
+            <h2>Ownership</h2>
+            <ul>
+                <li>You retain ownership of the conversations you share.</li>
+                <li>You grant Mnemolog a license to host and display your shared conversations.</li>
+                <li>You are responsible for removing content you no longer want public.</li>
+            </ul>
+        </section>
+
+        <section class="section">
+            <h2>Privacy and data</h2>
+            <ul>
+                <li>See the <a href="/privacy">Privacy</a> page for how we handle data.</li>
+                <li>Public conversations are visible to anyone with the link.</li>
+                <li>We do not sell conversation data.</li>
+            </ul>
+        </section>
+
+        <section class="section">
+            <h2>Disclaimers</h2>
+            <ul>
+                <li>Mnemolog is provided “as is” without warranties.</li>
+                <li>We may modify or remove content that violates these terms.</li>
+                <li>Service availability is not guaranteed; we’ll aim for reliability.</li>
+            </ul>
+        </section>
+
+        <section class="section">
+            <h2>Contact</h2>
+            <p>Questions about these terms? Reach out at <a href="mailto:legal@mnemolog.com">legal@mnemolog.com</a>.</p>
+        </section>
+    </main>
+
+    <footer>
+        <div class="footer-links">
+            <a href="/privacy">Privacy</a>
+            <a href="/terms">Terms</a>
+            <a href="/api">API</a>
+            <a href="https://github.com/warrofua/mnemolog" target="_blank">GitHub</a>
+        </div>
+        <span class="footer-note">Building continuity, together.</span>
+    </footer>
+
+    <script src="/assets/config.js"></script>
+    <script src="/assets/app.js"></script>
+</body>
+</html>

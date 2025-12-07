@@ -4,97 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Conversation — Mnemolog</title>
+    <meta property="og:title" content="Conversation — Mnemolog">
+    <meta property="og:description" content="A shared conversation on Mnemolog.">
+    <meta property="og:type" content="article">
+    <meta property="twitter:card" content="summary">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/styles.css">
+    <link rel="stylesheet" href="/assets/styles.css">
     <style>
         :root {
-            --bg: #FAF8F5;
-            --bg-warm: #F5F1EB;
-            --text: #2C2A26;
-            --text-secondary: #6B6560;
-            --accent: #B8860B;
-            --accent-muted: #D4A84B;
-            --thread: #C9B896;
-            --border: #E5DFD5;
             --human-bg: #FDF9F3;
             --assistant-bg: #FFFFFF;
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        body {
-            font-family: 'DM Sans', sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            line-height: 1.7;
-            min-height: 100vh;
-        }
-
         nav {
-            padding: 1.5rem 4rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid var(--border);
             background: var(--bg);
             position: sticky;
             top: 0;
             z-index: 100;
-        }
-
-        .logo {
-            font-family: 'Cormorant Garamond', serif;
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: var(--text);
-            text-decoration: none;
-        }
-
-        .logo span { color: var(--accent); }
-
-        .nav-links {
-            display: flex;
-            align-items: center;
-            gap: 1.5rem;
-        }
-
-        .nav-links a {
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-size: 0.9rem;
-        }
-
-        .nav-links a:hover { color: var(--text); }
-
-        .btn {
-            padding: 0.6rem 1.2rem;
-            border-radius: 4px;
-            font-size: 0.9rem;
-            font-weight: 500;
-            text-decoration: none;
-            transition: all 0.2s;
-            cursor: pointer;
-            border: none;
-            font-family: inherit;
-        }
-
-        .btn-primary {
-            background: var(--accent);
-            color: white;
-        }
-
-        .btn-primary:hover { background: #9A7209; }
-
-        .btn-secondary {
-            background: transparent;
-            border: 1px solid var(--border);
-            color: var(--text);
-        }
-
-        .btn-secondary:hover {
-            border-color: var(--text);
-            background: var(--bg-warm);
         }
 
         .container {
@@ -342,13 +271,7 @@
     </style>
 </head>
 <body>
-    <nav>
-        <a href="/" class="logo">mnemo<span>log</span></a>
-        <div class="nav-links">
-            <a href="/#explore">Explore</a>
-            <a href="/share" class="btn btn-primary">Share</a>
-        </div>
-    </nav>
+    <div id="site-header"></div>
 
     <div class="container">
         <div class="loading" id="loading">
@@ -408,9 +331,13 @@
     </div>
 
     <footer>
-        <a href="/">Mnemolog</a>
-        <a href="/share">Share a Conversation</a>
-        <a href="/#about">About</a>
+        <div class="footer-links">
+            <a href="/privacy">Privacy</a>
+            <a href="/terms">Terms</a>
+            <a href="/api">API</a>
+            <a href="https://github.com/warrofua/mnemolog" target="_blank">GitHub</a>
+        </div>
+        <span class="footer-note">Building continuity, together.</span>
     </footer>
 
     <script src="/assets/config.js"></script>

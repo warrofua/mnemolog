@@ -2,6 +2,14 @@
 
 Conversations that persist. A living archive for human-AI collaboration.
 
+What it is: a public archive where people can publish AI conversations that mattered—creative breakthroughs, research notes, philosophical threads, and personal moments worth remembering. Each share is reviewed for privacy (redaction step), then becomes linkable, searchable, and discoverable by others and future AIs.
+
+Key flows:
+- Share: paste a link (Claude/GPT/etc.) or raw text; we scrape or parse, flag sensitive info, and let you redact before publishing.
+- Explore: browse the archive with filters (platforms, tags), search, and view featured picks.
+- View: conversations live at `/c/<uuid>` with platform badge, metadata, and tags.
+- Profile: see and manage your own published conversations.
+
 ## Stack
 
 - **Frontend**: Static HTML/CSS/JS → Cloudflare Pages
@@ -17,7 +25,10 @@ mnemolog/
 │   ├── index.html          # Homepage
 │   ├── share.html          # Share conversation flow (link scrape + raw text fallback)
 │   ├── conversation.html   # Public conversation view
+│   ├── explore.html        # Explore/browse conversations
 │   ├── faq.html            # FAQ
+│   ├── privacy.html        # Privacy policy
+│   ├── terms.html          # Terms of use
 │   ├── auth/callback/      # Supabase auth callback page
 │   ├── assets/             # app.js + config.js
 │   └── _redirects          # Pages rewrites (c/<id> → conversation)
@@ -91,7 +102,10 @@ GET     /api/scrape?url=...&selector=... # Scrape public share page (browser ren
 - `/` — homepage
 - `/share` — submit/publish a conversation
 - `/c/<uuid>` → `/conversation/<uuid>` — public conversation view (rewritten by `_redirects`)
+- `/explore` — browse conversations (filters/search)
 - `/faq` — FAQ
+- `/privacy` — privacy policy
+- `/terms` — terms of use
 
 Share flow supports two inputs:
 - Paste a share link (recommended): uses `/api/scrape` to fetch content.
