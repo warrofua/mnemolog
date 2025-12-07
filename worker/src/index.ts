@@ -1,11 +1,13 @@
 import { Router, IRequest } from 'itty-router';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import puppeteer from '@cloudflare/puppeteer';
 
 // Types
 interface Env {
   SUPABASE_URL: string;
   SUPABASE_ANON_KEY: string;
   SUPABASE_SERVICE_KEY: string;
+  BROWSER: any;
 }
 
 interface Message {
@@ -63,6 +65,107 @@ const router = Router();
 
 // Health check
 router.get('/api/health', () => json({ status: 'ok', timestamp: new Date().toISOString() }));
+
+// Scrape with browser rendering (handles pages that block bots)
+router.get('/api/scrape', async (request: IRequest, env: Env) => {
+  const url = new URL(request.url);
+  const target = url.searchParams.get('url');
+  let selector = url.searchParams.get('selector') || 'body';
+
+  if (!target) {
+    return json({ error: 'Missing url parameter' }, 400);
+  }
+
+  let targetUrl: string;
+  try {
+    targetUrl = new URL(target).toString();
+  } catch {
+    return json({ error: 'Invalid url parameter' }, 400);
+  }
+
+  if (!env.BROWSER) {
+    return json({ error: 'Browser binding not configured' }, 500);
+  }
+
+  const allowedHosts = ['claude.ai', 'chat.openai.com', 'gemini.google.com', 'poe.com', 'perplexity.ai'];
+  const host = new URL(targetUrl).hostname;
+  if (!allowedHosts.some(d => host.includes(d))) {
+    return json({ error: 'Domain not allowed' }, 403);
+  }
+
+  let browser: any;
+  try {
+    browser = await puppeteer.launch(env.BROWSER);
+    const page = await browser.newPage();
+
+    await page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+    );
+    await page.setExtraHTTPHeaders({
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Upgrade-Insecure-Requests': '1',
+      'Sec-Fetch-Dest': 'document',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-Site': 'none',
+      'Sec-Fetch-User': '?1',
+      'sec-ch-ua': '"Chromium";v="131", "Not_A Brand";v="24"',
+      'sec-ch-ua-mobile': '?0',
+      'sec-ch-ua-platform': '"macOS"',
+      Referer: 'https://claude.ai/',
+    });
+    await page.setViewport({ width: 1280, height: 800 });
+
+    await page.goto(targetUrl, { waitUntil: 'networkidle0', timeout: 45000 });
+
+    // Wait for Claude/other UIs to render messages; don't fail hard if missing
+    if (host.includes('claude.ai')) {
+      await page
+        .waitForSelector('div[class*="Message"], .font-claude-message, [data-message-author-role], .prose, div[p=""]', { timeout: 20000 })
+        .catch(() => {});
+      // Use broader selector for Claude shares
+      selector = 'div[class*=\"Message\"], div[p=\"\"], .prose, [data-message-author-role], .font-claude-message';
+    }
+
+    const content = await page.evaluate((sel) => {
+      const elements = document.querySelectorAll(sel);
+      const texts = Array.from(elements)
+        .map(el => el.textContent?.trim())
+        .filter(Boolean);
+      if (texts.length > 0) {
+        return texts.join('\n\n');
+      }
+      return document.body.innerText || '';
+    }, selector);
+
+    await browser.close();
+
+    const cleaned = (content || '').replace(/\s+/g, ' ').trim();
+
+    // Detect common interstitials/challenges and surface a clearer error
+    const lower = cleaned.toLowerCase();
+    if (lower.includes('verify you are human') || lower.includes('performance & security by cloudflare')) {
+      return json({ error: 'Blocked by site challenge (Cloudflare). Try again later or with a different network.' }, 403);
+    }
+
+    if (!cleaned) {
+      return json({ error: 'No content extracted' }, 404);
+    }
+
+    return json({
+      url: targetUrl,
+      selector,
+      result: cleaned,
+      length: cleaned.length,
+      method: 'browser-rendering-puppeteer',
+    });
+  } catch (err: any) {
+    if (browser) {
+      await browser.close().catch(() => {});
+    }
+    console.error('Browser scrape error:', err);
+    return json({ error: 'Scraping failed: ' + (err?.message || 'unknown') }, 500);
+  }
+});
 
 // Get current user
 router.get('/api/auth/user', async (request: IRequest, env: Env) => {

@@ -267,6 +267,40 @@
             font-size: 0.8rem;
         }
 
+        .input-toggle {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .input-toggle label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .link-input-group, .text-input-group {
+            display: none;
+        }
+
+        .link-input-group input {
+            width: 100%;
+            padding: 0.85rem 1rem;
+            border: 1px dashed var(--border);
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-family: 'DM Sans', sans-serif;
+        }
+        .note {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+        }
+
         /* Platform selector */
         .platform-selector {
             margin-top: 2rem;
@@ -341,6 +375,70 @@
             max-height: 400px;
             overflow-y: auto;
             padding: 1.5rem;
+        }
+
+        /* Display preview (step 3) */
+        .preview-card {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: white;
+            padding: 1.5rem;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.03);
+        }
+
+        .preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .preview-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.6rem;
+            font-weight: 500;
+        }
+
+        .preview-meta {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-top: 0.2rem;
+        }
+
+        .preview-messages {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .preview-message {
+            padding: 1rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .preview-message.human {
+            background: var(--bg-warm);
+            border-left: 3px solid var(--accent);
+        }
+
+        .preview-message.assistant {
+            background: var(--bg);
+            border-left: 3px solid var(--thread);
+        }
+
+        .preview-role {
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .preview-content {
+            font-size: 0.95rem;
+            line-height: 1.7;
+            white-space: pre-wrap;
         }
 
         .message {
@@ -685,43 +783,39 @@
         <div class="progress">
             <div class="progress-step active" data-step="1">
                 <div class="step-dot">1</div>
-                <span>Paste</span>
+                <span>Paste & Review</span>
             </div>
             <div class="progress-line"></div>
             <div class="progress-step" data-step="2">
                 <div class="step-dot">2</div>
-                <span>Review</span>
+                <span>Finalize</span>
             </div>
             <div class="progress-line"></div>
             <div class="progress-step" data-step="3">
                 <div class="step-dot">3</div>
-                <span>Details</span>
-            </div>
-            <div class="progress-line"></div>
-            <div class="progress-step" data-step="4">
-                <div class="step-dot">4</div>
                 <span>Done</span>
             </div>
         </div>
 
-        <!-- Step 1: Paste -->
+        <!-- Step 1: Paste & Review -->
         <div class="step-section active" id="step-1">
             <div class="page-header">
                 <h1>Share a Conversation</h1>
-                <p>Paste your conversation below. We'll help you review it for sensitive information before publishing.</p>
+                <p>Paste your conversation, pick the AI, and review redactions before publishing.</p>
             </div>
 
-            <div class="paste-area">
-                <textarea id="conversation-input" placeholder="Paste your conversation here...
+            <div class="text-input-group" id="text-input-group">
+                <div class="paste-area">
+                    <textarea id="conversation-input" placeholder="Paste your conversation here...
 
 You can copy directly from Claude, ChatGPT, Gemini, or any AI chat interface. We'll automatically detect the format and parse the turns.
 
 Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and paste here."></textarea>
+                </div>
+                <p class="paste-hint">
+                    We accept conversations from <code>Claude</code> <code>ChatGPT</code> <code>Gemini</code> <code>Grok</code> and others
+                </p>
             </div>
-
-            <p class="paste-hint">
-                We accept conversations from <code>Claude</code> <code>ChatGPT</code> <code>Gemini</code> <code>Grok</code> and others
-            </p>
 
             <div class="platform-selector">
                 <label>Which AI was this conversation with?</label>
@@ -748,49 +842,7 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
                     </label>
                 </div>
             </div>
-
-            <div class="button-row">
-                <a href="/" class="btn btn-secondary">Cancel</a>
-                <button class="btn btn-primary" onclick="goToStep(2)" id="step1-next" disabled>
-                    Continue to Review
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M5 12h14M12 5l7 7-7 7"/>
-                    </svg>
-                </button>
-            </div>
-        </div>
-
-        <!-- Step 2: Review -->
-        <div class="step-section" id="step-2">
-            <div class="page-header">
-                <h1>Review for Privacy</h1>
-                <p>We've scanned for potentially sensitive information. Click any highlighted text to redact it.</p>
-            </div>
-
-            <div class="alert alert-warning" id="warning-alert">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"/>
-                    <line x1="12" y1="8" x2="12" y2="12"/>
-                    <line x1="12" y1="16" x2="12.01" y2="16"/>
-                </svg>
-                <div>
-                    <strong>We found some items to review.</strong> 
-                    Click highlighted text to redact it, or continue if you're comfortable sharing.
-                </div>
-            </div>
-
-            <div class="alert alert-success" id="success-alert" style="display: none;">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                    <polyline points="22 4 12 14.01 9 11.01"/>
-                </svg>
-                <div>
-                    <strong>Looking good!</strong> 
-                    No obvious sensitive information detected.
-                </div>
-            </div>
-
-            <div class="review-section">
+            <div class="review-section" style="margin-top: 2rem;">
                 <div class="review-header">
                     <h3>Conversation Preview</h3>
                     <span class="flag-count" id="flag-count">
@@ -798,23 +850,62 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
                             <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
                             <line x1="4" y1="22" x2="4" y2="15"/>
                         </svg>
-                        <span id="flag-number">3</span> items flagged
+                        <span id="flag-number">0</span> items flagged
+                        <button class="btn btn-secondary" id="redact-all-btn" style="margin-left: 0.5rem; display: none; padding: 0.25rem 0.6rem; font-size: 0.75rem;">
+                            Redact all
+                        </button>
                     </span>
                 </div>
+                <div class="form-group" style="margin-top: 1rem; margin-bottom: 1rem;">
+                    <label for="first-speaker">First speaker</label>
+                    <select id="first-speaker">
+                        <option value="human">Human</option>
+                        <option value="assistant">Assistant</option>
+                    </select>
+                    <div id="message-count-warning" class="alert alert-warning" style="display: none; margin-top: 0.75rem;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="12" y1="8" x2="12" y2="12"/>
+                            <line x1="12" y1="16" x2="12.01" y2="16"/>
+                        </svg>
+                        <div>
+                            <strong>Too few messages.</strong> Conversations work best with at least two turns.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert alert-warning" id="warning-alert" style="display:none;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="8" x2="12" y2="12"/>
+                        <line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                    <div>
+                        <strong>We found some items to review.</strong> 
+                        Click highlighted text to redact it, or continue if you're comfortable sharing.
+                    </div>
+                </div>
+
+                <div class="alert alert-success" id="success-alert" style="display: none;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                        <polyline points="22 4 12 14.01 9 11.01"/>
+                    </svg>
+                    <div>
+                        <strong>Looking good!</strong> 
+                        No obvious sensitive information detected.
+                    </div>
+                </div>
+
                 <div class="conversation-preview" id="conversation-preview">
                     <!-- Populated by JS -->
                 </div>
             </div>
 
             <div class="button-row">
-                <button class="btn btn-secondary" onclick="goToStep(1)">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M19 12H5M12 19l-7-7 7-7"/>
-                    </svg>
-                    Back
-                </button>
-                <button class="btn btn-primary" onclick="goToStep(3)">
-                    Continue to Details
+                <a href="/" class="btn btn-secondary">Cancel</a>
+                <button class="btn btn-primary" onclick="goToStep(2)" id="step1-next" disabled>
+                    Continue to Finalize
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M5 12h14M12 5l7 7-7 7"/>
                     </svg>
@@ -822,11 +913,11 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
             </div>
         </div>
 
-        <!-- Step 3: Details -->
-        <div class="step-section" id="step-3">
+        <!-- Step 2: Finalize -->
+        <div class="step-section" id="step-2">
             <div class="page-header">
-                <h1>Add Details</h1>
-                <p>Help others find this conversation by adding a title and tags.</p>
+                <h1>Finalize</h1>
+                <p>Preview and add details before publishing.</p>
             </div>
 
             <div class="form-group">
@@ -857,8 +948,20 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
                 </label>
             </div>
 
+            <div class="preview-card">
+                <div class="preview-header">
+                    <div>
+                        <div class="preview-title" id="preview-title">Untitled conversation</div>
+                        <div class="preview-meta" id="preview-meta">Platform • Today</div>
+                    </div>
+                </div>
+                <div class="preview-messages" id="display-preview">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
             <div class="button-row">
-                <button class="btn btn-secondary" onclick="goToStep(2)">
+                <button class="btn btn-secondary" onclick="goToStep(1)">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M19 12H5M12 19l-7-7 7-7"/>
                     </svg>
@@ -873,8 +976,8 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
             </div>
         </div>
 
-        <!-- Step 4: Success -->
-        <div class="step-section" id="step-4">
+        <!-- Step 3: Success -->
+        <div class="step-section" id="step-3">
             <div class="success-message">
                 <div class="success-icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -906,9 +1009,25 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
         let tags = [];
         let flaggedItems = [];
         let parsedMessages = [];
-
+        let detectedFirstSpeaker = 'human';
+        let userFirstSpeaker = null;
+        let lastRawInput = '';
+        let inputMode = 'text';
+        let parseTimer = null;
+    
         document.getElementById('publish-btn').addEventListener('click', publishConversation);
-
+        document.getElementById('first-speaker').addEventListener('change', () => {
+            userFirstSpeaker = document.getElementById('first-speaker').value;
+            parseAndReviewConversation();
+        });
+        document.getElementById('title').addEventListener('input', renderDisplayPreview);
+        document.querySelectorAll('input[name="platform"]').forEach(input => {
+            input.addEventListener('change', renderDisplayPreview);
+        });
+    
+        // Input mode switching
+        updateInputMode();
+    
         // Platform selection
         document.querySelectorAll('.platform-option').forEach(option => {
             option.addEventListener('click', () => {
@@ -916,132 +1035,441 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
                 option.classList.add('selected');
                 option.querySelector('input').checked = true;
                 checkStep1Valid();
+                // If inputs are valid, re-parse immediately for updated preview
+                const hasText = document.getElementById('conversation-input').value.trim().length > 50;
+                if (hasText) {
+                    if (parseTimer) clearTimeout(parseTimer);
+                    parseAndReviewConversation();
+                }
             });
         });
-
-        // Textarea validation
-        document.getElementById('conversation-input').addEventListener('input', checkStep1Valid);
-
+    
+        // Validation inputs
+        document.getElementById('conversation-input').addEventListener('input', () => {
+            checkStep1Valid();
+        });
+    
+        function updateInputMode() {
+            const textGroup = document.getElementById('text-input-group');
+            textGroup.style.display = 'block';
+        }
+    
         function checkStep1Valid() {
             const hasText = document.getElementById('conversation-input').value.trim().length > 50;
             const hasPlatform = document.querySelector('.platform-option.selected');
-            document.getElementById('step1-next').disabled = !(hasText && hasPlatform);
+            const valid = hasText && hasPlatform;
+            document.getElementById('step1-next').disabled = !valid;
+            if (parseTimer) clearTimeout(parseTimer);
+            if (valid) {
+                parseTimer = setTimeout(() => {
+                    parseAndReviewConversation();
+                }, 200);
+            }
         }
-
+    
         // Step navigation
-        function goToStep(step) {
-            // Update progress indicators
+        async function goToStep(step) {
             document.querySelectorAll('.progress-step').forEach((el, i) => {
                 el.classList.remove('active', 'completed');
                 if (i + 1 < step) el.classList.add('completed');
                 if (i + 1 === step) el.classList.add('active');
             });
-
+    
             document.querySelectorAll('.progress-line').forEach((el, i) => {
                 el.classList.toggle('completed', i + 1 < step);
             });
-
-            // Show/hide sections
+    
             document.querySelectorAll('.step-section').forEach(section => {
                 section.classList.remove('active');
             });
             document.getElementById(`step-${step}`).classList.add('active');
-
-            // Step-specific logic
+    
             if (step === 2) {
-                parseAndReviewConversation();
+                renderDisplayPreview();
             }
-
+    
             currentStep = step;
             window.scrollTo(0, 0);
         }
-
+    
         // Parse conversation and detect sensitive info
-        function parseAndReviewConversation() {
-            const raw = document.getElementById('conversation-input').value;
-            const preview = document.getElementById('conversation-preview');
-            
-            // Simple parsing - detect Human:/Assistant: or similar patterns
-            const lines = raw.split('\n');
-            let messages = [];
-            let currentMessage = null;
+        async function parseAndReviewConversation() {
+            const platformInput = document.querySelector('input[name="platform"]:checked');
+            const platform = platformInput?.value;
+            if (!platform) {
+                alert('Select which AI you used before continuing.');
+                return;
+            }
 
-            // Patterns to detect message boundaries
-            const humanPatterns = [/^(Human|User|Me|You):\s*/i, /^H:\s*/i];
-            const aiPatterns = [/^(Assistant|Claude|ChatGPT|AI|Gemini|Grok):\s*/i, /^A:\s*/i];
+            let raw = document.getElementById('conversation-input').value;
+            if (!raw || raw.trim().length < 2) {
+                alert('Paste your conversation before continuing.');
+                return;
+            }
 
+            lastRawInput = raw;
+    
+            const { messages, metadata } = parseConversation(raw, platform, userFirstSpeaker);
+            parsedMessages = messages;
+            detectedFirstSpeaker = metadata.detectedFirstSpeaker;
+
+            if (!userFirstSpeaker) {
+                const fs = document.getElementById('first-speaker');
+                if (fs) fs.value = detectedFirstSpeaker;
+            }
+
+            renderReviewPreview();
+        }
+    
+        // =============== Conversation Parsing Logic ===============
+    
+        function parseConversation(rawText, platform, overrideFirstSpeaker) {
+            let text = rawText.replace(/\r\n/g, '\n').trim();
+            const selected = platform || 'other';
+
+            if (selected === 'chatgpt') {
+                const chatgptResult = tryParseChatGPT(text);
+                if (chatgptResult) return chatgptResult;
+            }
+
+            if (selected === 'gemini') {
+                const geminiResult = tryParseGemini(text);
+                if (geminiResult) return geminiResult;
+            }
+
+            if (selected === 'claude' || selected === 'grok' || selected === 'other') {
+                const genericResult = parseGeneric(text, overrideFirstSpeaker, selected);
+                return genericResult;
+            }
+
+            // Fallback
+            return parseGeneric(text, overrideFirstSpeaker, selected);
+        }
+
+        // =============== Review Rendering (Step 1) ===============
+        function renderReviewPreview() {
+            const container = document.getElementById('conversation-preview');
+            const flagNumber = document.getElementById('flag-number');
+            const warningAlert = document.getElementById('warning-alert');
+            const successAlert = document.getElementById('success-alert');
+            const messageCountWarning = document.getElementById('message-count-warning');
+            const continueBtn = document.getElementById('step1-next');
+            const redactAllBtn = document.getElementById('redact-all-btn');
+
+            container.innerHTML = '';
+            let totalFlags = 0;
+
+            const escapeHtml = (str) => str
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+
+            const highlightSensitive = (text) => {
+                const flags = window.mnemolog?.detectSensitiveInfo ? window.mnemolog.detectSensitiveInfo(text) : [];
+                if (!flags.length) return { html: escapeHtml(text), count: 0 };
+
+                // Build safe HTML with flagged spans
+                let html = '';
+                let cursor = 0;
+                flags.sort((a, b) => a.start - b.start).forEach(flag => {
+                    html += escapeHtml(text.slice(cursor, flag.start));
+                    const flaggedText = text.slice(flag.start, flag.end);
+                    html += `<span class="flagged-text" data-original="${escapeHtml(flaggedText)}" onclick="redactThis(this)">${escapeHtml(flaggedText)}<span class="flag-tooltip">Click to redact</span></span>`;
+                    cursor = flag.end;
+                });
+                html += escapeHtml(text.slice(cursor));
+                return { html, count: flags.length };
+            };
+
+            parsedMessages.forEach(msg => {
+                const messageEl = document.createElement('div');
+                messageEl.className = `message ${msg.role}`;
+
+                const roleEl = document.createElement('div');
+                roleEl.className = 'message-role';
+                roleEl.textContent = msg.role === 'human' ? 'Human' : 'Assistant';
+
+                const contentEl = document.createElement('div');
+                contentEl.className = 'message-content';
+
+                const { html, count } = highlightSensitive(msg.content || '');
+                totalFlags += count;
+                contentEl.innerHTML = html;
+
+                messageEl.appendChild(roleEl);
+                messageEl.appendChild(contentEl);
+                container.appendChild(messageEl);
+            });
+
+            flagNumber.textContent = totalFlags;
+            if (totalFlags > 0) {
+                warningAlert.style.display = 'flex';
+                successAlert.style.display = 'none';
+                if (redactAllBtn) redactAllBtn.style.display = 'inline-block';
+            } else {
+                warningAlert.style.display = 'none';
+                successAlert.style.display = 'flex';
+                if (redactAllBtn) redactAllBtn.style.display = 'none';
+            }
+
+            if (parsedMessages.length < 2) {
+                messageCountWarning.style.display = 'block';
+            } else {
+                messageCountWarning.style.display = 'none';
+            }
+
+            // Enable continue only when parsed and >=2 messages
+            const canContinue = parsedMessages.length >= 2;
+            if (continueBtn) continueBtn.disabled = !canContinue;
+        }
+
+        // Redact all flagged items
+        document.getElementById('redact-all-btn')?.addEventListener('click', () => {
+            document.querySelectorAll('.flagged-text').forEach(el => {
+                redactThis(el);
+            });
+        });
+    
+        // Utility: strip common UI cruft, respecting code fences
+        function stripCruft(text, platformHint) {
+            const lines = text.split('\n');
+            let inFence = false;
+            const kept = [];
+            const cruftPatterns = [
+                /^Skip to content/i,
+                /^Chat history/i,
+                /^ChatGPT/i,
+                /^Thought for \d+s?/i,
+                /^Searched for /i,
+                /^Image of\b/i,
+                /^No file chosen/i,
+                /^Upgrade to /i,
+                /^Copy\s*$/i,
+                /^Retry\s*$/i,
+                /^Edit\s*$/i,
+                /^\d+(\.\d+)?s\s*$/i,
+            ];
+    
             lines.forEach(line => {
-                let isHuman = humanPatterns.some(p => p.test(line));
-                let isAI = aiPatterns.some(p => p.test(line));
+                if (line.trim().startsWith('```')) {
+                    inFence = !inFence;
+                    kept.push(line);
+                    return;
+                }
+                if (inFence) {
+                    kept.push(line);
+                    return;
+                }
+                if (cruftPatterns.some(p => p.test(line))) return;
+                if (platformHint === 'gemini' && line.trim().match(/^(AI's|Cloudflare|Supabase|Inverting|Poisson|From Randomness|Blake and Rumi|Reality, AI)/)) return;
+                kept.push(line);
+            });
+    
+            return kept.join('\n').trim();
+        }
+    
+        // ============ ChatGPT Parser ============
+        function tryParseChatGPT(text) {
+            if (!text.includes('You said:') && !text.includes('ChatGPT said:')) return null;
+            
+            text = stripCruft(text, 'chatgpt');
+            const messages = [];
+            const parts = text.split(/(?=^You said:$|^ChatGPT said:$)/m);
+            
+            for (const part of parts) {
+                const trimmed = part.trim();
+                if (!trimmed) continue;
+                
+                if (trimmed.startsWith('You said:')) {
+                    const content = trimmed.replace(/^You said:\s*/i, '').trim();
+                    if (content) messages.push({ role: 'human', content });
+                } 
+                else if (trimmed.startsWith('ChatGPT said:')) {
+                    let content = trimmed.replace(/^ChatGPT said:\s*/i, '');
+                    content = content.replace(/^Thought for \d+s?\s*\n?/i, '').trim();
+                    if (content) messages.push({ role: 'assistant', content });
+                }
+            }
+            
+            if (messages.length < 2) return null;
+            
+            return {
+                messages,
+                metadata: {
+                    detectedProvider: 'chatgpt',
+                    detectedFirstSpeaker: messages[0]?.role || 'human',
+                    userOverrodeFirstSpeaker: false,
+                    rawCharacterCount: text.length,
+                    messageCount: messages.length,
+                }
+            };
+        }
+    
+        // ============ Gemini Parser ============
+        function tryParseGemini(text) {
+            // Many Gemini exports lack clean markers; attempt a simple marker split, else fall back.
+            const hasMarkers = /^Gemini$/m.test(text) || /^You$/m.test(text) || /^Model$/m.test(text);
+            if (!hasMarkers) return null;
+    
+            text = stripCruft(text, 'gemini');
+            const messages = [];
+            const parts = text.split(/^(You|Gemini|Model)$/m);
+            
+            let currentRole = null;
+            for (const part of parts) {
+                const trimmed = part.trim();
+                if (trimmed === 'You') currentRole = 'human';
+                else if (trimmed === 'Gemini' || trimmed === 'Model') currentRole = 'assistant';
+                else if (trimmed && currentRole) {
+                    messages.push({ role: currentRole, content: trimmed });
+                    currentRole = null;
+                }
+            }
+            
+            if (messages.length < 2) return null;
+            
+            return {
+                messages,
+                metadata: {
+                    detectedProvider: 'gemini',
+                    detectedFirstSpeaker: messages[0]?.role || 'human',
+                    userOverrodeFirstSpeaker: false,
+                    rawCharacterCount: text.length,
+                    messageCount: messages.length,
+                }
+            };
+        }
+    
+        // ============ Generic/Claude/Grok/Other Parser ============
+        function detectFirstSpeaker(firstSegment) {
+            if (!firstSegment) return 'human';
+            const trimmed = firstSegment.trim();
+            if (trimmed.length < 220 && /[?]$/.test(trimmed)) return 'human';
+            if (/Searched for /i.test(trimmed)) return 'assistant';
+            if (/Thought for \d+s/i.test(trimmed)) return 'assistant';
+            if (/Image of\b/i.test(trimmed)) return 'assistant';
+            const aiFirstPatterns = [
+                /^(hi|hello|hey)[,!]?\s+i'?m\s+(an?\s+)?(ai|assistant|claude|chatgpt|gpt)/i,
+                /^i'?m\s+(an?\s+)?(ai|assistant|claude)/i,
+                /how can i (help|assist) you/i,
+                /^(welcome|greetings)[!,.]?\s/i,
+                /created by (anthropic|openai)/i,
+                /^as an ai/i,
+                /i'?m here to help/i,
+            ];
+            return aiFirstPatterns.some(p => p.test(firstSegment)) ? 'assistant' : 'human';
+        }
+    
+        function parseGeneric(rawText, overrideFirstSpeaker, platformHint) {
+            const text = stripCruft(rawText, platformHint);
 
-                if (isHuman || isAI) {
-                    if (currentMessage) messages.push(currentMessage);
-                    currentMessage = {
-                        role: isHuman ? 'human' : 'assistant',
-                        content: line.replace(/^(Human|User|Me|You|Assistant|Claude|ChatGPT|AI|Gemini|Grok|H|A):\s*/i, '')
-                    };
-                } else if (currentMessage) {
-                    currentMessage.content += '\n' + line;
+            const labelRegex = /^[-*•]?\s*(\*\*|__)?(human|user|you|me|h|assistant|ai|claude|chatgpt|gpt|model|bot|a|system)(\*\*|__)?\s*[:\-–—]\s*/i;
+            const roleFromLabel = (label) => ['human','user','you','me','h'].includes(label.toLowerCase()) ? 'human' : 'assistant';
+    
+            // Build segments with code-fence awareness
+            const lines = text.split(/\r?\n/);
+            const segments = [];
+            let current = { role: null, content: '' };
+            let inFence = false;
+    
+            const push = () => {
+                const trimmed = current.content.trim();
+                if (trimmed.length > 1) segments.push({ ...current, content: trimmed });
+                current = { role: null, content: '' };
+            };
+    
+            lines.forEach(line => {
+                const trimmedLine = line.trim();
+                if (trimmedLine.startsWith('```')) {
+                    inFence = !inFence;
+                    current.content += (current.content ? '\n' : '') + line;
+                    return;
+                }
+    
+                if (!inFence) {
+                    const match = line.match(labelRegex);
+                    if (match) {
+                        push();
+                        current = { role: roleFromLabel(match[2]), content: line.replace(labelRegex, '').trim() };
+                        return;
+                    }
+                    if (trimmedLine === '') {
+                        push();
+                        return;
+                    }
+                }
+    
+                current.content += (current.content ? '\n' : '') + line;
+            });
+            push();
+    
+            if (!segments.length) {
+                rawText.split(/\n{2,}/).map(s => s.trim()).filter(Boolean)
+                    .forEach(content => segments.push({ role: null, content }));
+            }
+
+            // Merge continuation segments (bullets, lowercase starts, short meta)
+            const shouldMerge = (text, lastRole) => {
+                const trimmed = text.trim();
+                if (!trimmed) return true;
+                if (/^[-*•\d+\.]\s/.test(trimmed)) return true;
+                if (/^[a-z]/.test(trimmed)) return true;
+                if (trimmed.length < 120 && !/[?!]$/.test(trimmed)) return true;
+                if (/^Searched for /i.test(trimmed)) return true;
+                if (/^\d+(\.\d+)?s\s*$/.test(trimmed)) return true;
+                if (lastRole && lastRole === 'assistant' && /^Image of\b/i.test(trimmed)) return true;
+                return false;
+            };
+
+            const mergedSegments = [];
+            segments.forEach(seg => {
+                const last = mergedSegments[mergedSegments.length - 1];
+                if (last && (!seg.role || seg.role === last.role) && shouldMerge(seg.content, last.role)) {
+                    last.content += '\n\n' + seg.content;
+                } else {
+                    mergedSegments.push({ ...seg });
                 }
             });
 
-            if (currentMessage) messages.push(currentMessage);
-
-            // If no patterns found, treat as single AI message
-            if (messages.length === 0) {
-                messages = [{ role: 'assistant', content: raw }];
-            }
-
-            // Detect sensitive info patterns
-            const sensitivePatterns = [
-                { pattern: /\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g, type: 'phone number' },
-                { pattern: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, type: 'email' },
-                { pattern: /\b\d{3}[-]?\d{2}[-]?\d{4}\b/g, type: 'possible SSN' },
-                { pattern: /\b\d{1,5}\s+\w+\s+(street|st|avenue|ave|road|rd|drive|dr|lane|ln|way|court|ct)\b/gi, type: 'address' },
-                { pattern: /\$\d{1,3}(,\d{3})*(\.\d{2})?\b/g, type: 'dollar amount' },
-                { pattern: /\b\d{16}\b/g, type: 'possible card number' }
-            ];
-
-            let flagCount = 0;
-
-            parsedMessages = messages;
-
-            // Render messages with highlighted sensitive info
-            preview.innerHTML = messages.map((msg, i) => {
-                let content = msg.content;
-
-                sensitivePatterns.forEach(({ pattern, type }) => {
-                    content = content.replace(pattern, match => {
-                        flagCount++;
-                        return `<span class="flagged-text" onclick="redactThis(this)" data-original="${match}">${match}<span class="flag-tooltip">Click to redact ${type}</span></span>`;
-                    });
-                });
-
-                return `
-                    <div class="message">
-                        <div class="message-role ${msg.role}">${msg.role}</div>
-                        <div class="message-content">${content}</div>
-                    </div>
-                `;
-            }).join('');
-
-            // Update flag count
-            document.getElementById('flag-number').textContent = flagCount;
-            document.getElementById('warning-alert').style.display = flagCount > 0 ? 'flex' : 'none';
-            document.getElementById('success-alert').style.display = flagCount === 0 ? 'flex' : 'none';
-            
-            if (flagCount === 0) {
-                document.getElementById('flag-count').classList.add('clear');
-                document.getElementById('flag-count').innerHTML = `
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                        <polyline points="22 4 12 14.01 9 11.01"/>
-                    </svg>
-                    No issues found
-                `;
-            }
+            const firstLabeled = mergedSegments.find(p => p.role);
+            const detected = firstLabeled?.role || detectFirstSpeaker(mergedSegments[0]?.content || '');
+            const firstSpeaker = overrideFirstSpeaker || detected;
+    
+            let lastRole = firstSpeaker;
+            const messages = mergedSegments.map((p, idx) => {
+                if (p.role) {
+                    lastRole = p.role;
+                    return { role: p.role, content: p.content };
+                }
+                const role = idx === 0 ? firstSpeaker : (lastRole === 'human' ? 'assistant' : 'human');
+                lastRole = role;
+                return { role, content: p.content };
+            });
+    
+            const merged = [];
+            messages.forEach(msg => {
+                const last = merged[merged.length - 1];
+                if (last && last.role === msg.role) {
+                    last.content += '\n\n' + msg.content;
+                } else {
+                    merged.push({ ...msg });
+                }
+            });
+    
+            return {
+                messages: merged,
+                metadata: {
+                    detectedProvider: platformHint || 'generic',
+                    detectedFirstSpeaker: detected,
+                    userOverrodeFirstSpeaker: Boolean(overrideFirstSpeaker),
+                    rawCharacterCount: rawText.length,
+                    messageCount: merged.length,
+                },
+            };
         }
-
+    
         // Redact flagged text
         function redactThis(el) {
             const redacted = document.createElement('span');
@@ -1049,7 +1477,6 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
             redacted.onclick = () => unredact(redacted, el.dataset.original);
             el.replaceWith(redacted);
             
-            // Update count
             const count = document.querySelectorAll('.flagged-text').length;
             document.getElementById('flag-number').textContent = count;
             if (count === 0) {
@@ -1057,7 +1484,7 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
                 document.getElementById('success-alert').style.display = 'flex';
             }
         }
-
+    
         function unredact(el, original) {
             const flagged = document.createElement('span');
             flagged.className = 'flagged-text';
@@ -1070,11 +1497,11 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
             document.getElementById('warning-alert').style.display = 'flex';
             document.getElementById('success-alert').style.display = 'none';
         }
-
+    
         // Tag input
         const tagInput = document.getElementById('tag-input');
         const tagContainer = document.getElementById('tag-container');
-
+    
         tagInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && tagInput.value.trim()) {
                 e.preventDefault();
@@ -1082,7 +1509,7 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
                 tagInput.value = '';
             }
         });
-
+    
         function addTag(text) {
             if (tags.includes(text.toLowerCase())) return;
             tags.push(text.toLowerCase());
@@ -1092,19 +1519,19 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
             tag.innerHTML = `${text}<span class="tag-remove" onclick="removeTag(this, '${text.toLowerCase()}')">&times;</span>`;
             tagContainer.insertBefore(tag, tagInput);
         }
-
+    
         function removeTag(el, text) {
             tags = tags.filter(t => t !== text);
             el.parentElement.remove();
         }
-
+    
         // Copy link
         function copyLink() {
             const input = document.getElementById('share-url');
             input.select();
             document.execCommand('copy');
         }
-
+    
         function getRedactedMessages() {
             const previewMessages = document.querySelectorAll('.conversation-preview .message');
             return Array.from(previewMessages).map((el, idx) => {
@@ -1114,23 +1541,57 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
             }).filter(m => m.content.length > 0);
         }
 
+        function renderDisplayPreview() {
+            const titleEl = document.getElementById('preview-title');
+            const metaEl = document.getElementById('preview-meta');
+            const previewContainer = document.getElementById('display-preview');
+
+            const title = document.getElementById('title').value.trim() || 'Untitled conversation';
+            const platformInput = document.querySelector('input[name="platform"]:checked');
+            const platform = platformInput ? platformInput.value.charAt(0).toUpperCase() + platformInput.value.slice(1) : 'Unknown';
+
+            titleEl.textContent = title;
+            metaEl.textContent = `${platform} • Today`;
+
+            // Clear previous preview
+            previewContainer.innerHTML = '';
+
+            // Render messages
+            parsedMessages.forEach(msg => {
+                const messageEl = document.createElement('div');
+                messageEl.className = `preview-message ${msg.role}`;
+                
+                const roleEl = document.createElement('div');
+                roleEl.className = 'preview-role';
+                roleEl.textContent = msg.role === 'human' ? 'Human' : 'Assistant';
+                
+                const contentEl = document.createElement('div');
+                contentEl.className = 'preview-content';
+                contentEl.textContent = msg.content;
+                
+                messageEl.appendChild(roleEl);
+                messageEl.appendChild(contentEl);
+                previewContainer.appendChild(messageEl);
+            });
+        }
+        // =============== Publish Conversation Logic ===============
         async function publishConversation() {
             if (!window.mnemolog?.isLoggedIn) {
                 sessionStorage.setItem('auth_redirect', '/share');
                 alert('Please sign in to publish your conversation.');
                 return;
             }
-
+    
             const publishBtn = document.getElementById('publish-btn');
             const originalPublishHtml = publishBtn.innerHTML;
-
+    
             const platformInput = document.querySelector('input[name="platform"]:checked');
             const platform = platformInput?.value;
             const title = document.getElementById('title').value.trim();
             const description = document.getElementById('description').value.trim();
             const showAuthor = document.getElementById('show-name').checked;
             const messages = getRedactedMessages();
-
+    
             if (!platform) {
                 alert('Select a platform before publishing.');
                 return;
@@ -1139,14 +1600,14 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
                 alert('Add a title before publishing.');
                 return;
             }
-            if (messages.length === 0) {
-                alert('Add a conversation before publishing.');
+            if (messages.length < 2) {
+                alert('Conversations need at least two messages.');
                 return;
             }
-
+    
             publishBtn.disabled = true;
             publishBtn.innerHTML = 'Publishing...';
-
+    
             try {
                 const { conversation } = await mnemolog.createConversation({
                     title,
@@ -1157,10 +1618,10 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
                     is_public: true,
                     show_author: showAuthor,
                 });
-
+    
                 const shareUrl = `${window.location.origin}/c/${conversation.id}`;
                 document.getElementById('share-url').value = shareUrl;
-                goToStep(4);
+                goToStep(3);
             } catch (err) {
                 console.error('Publish error:', err);
                 alert(err?.message || 'Failed to publish conversation. Please try again.');
@@ -1170,5 +1631,5 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
             }
         }
     </script>
-  </body>
-  </html>
+    </body>
+    </html>

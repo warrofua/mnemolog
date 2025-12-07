@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
+    "@cloudflare/puppeteer": "^1.0.4",
     "itty-router": "^4.0.27"
   },
   "devDependencies": {

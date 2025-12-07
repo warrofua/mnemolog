@@ -15,7 +15,7 @@ Conversations that persist. A living archive for human-AI collaboration.
 mnemolog/
 ├── frontend/               # Static site → Cloudflare Pages
 │   ├── index.html          # Homepage
-│   ├── share.html          # Share conversation flow
+│   ├── share.html          # Share conversation flow (link scrape + raw text fallback)
 │   ├── conversation.html   # Public conversation view
 │   ├── faq.html            # FAQ
 │   ├── auth/callback/      # Supabase auth callback page
@@ -23,7 +23,7 @@ mnemolog/
 │   └── _redirects          # Pages rewrites (c/<id> → conversation)
 ├── worker/                 # API → Cloudflare Workers
 │   ├── src/index.ts        # Main router (all endpoints)
-│   ├── wrangler.toml
+│   ├── wrangler.toml       # Includes browser binding for scrape
 │   └── package.json
 └── supabase/
     └── schema.sql      # Database schema
@@ -43,11 +43,19 @@ mnemolog/
 ```bash
 cd worker
 npm install
-cp wrangler.toml.example wrangler.toml
-# Add your Supabase credentials to wrangler.toml
+# Ensure wrangler.toml has:
+# compatibility_date = "2025-12-06"
+# compatibility_flags = ["nodejs_compat"]
+# [browser] binding = "BROWSER"
+# Add your Supabase credentials under [vars] or via `wrangler secret put`
 npm run dev    # Local development
 npm run deploy # Deploy to Cloudflare
 ```
+
+Browser rendering for `/api/scrape`:
+- Add a Browser Rendering binding named `BROWSER` in the Cloudflare dashboard (Workers & Pages → mnemolog-api → Settings → Browser Rendering).
+- The binding requires `compatibility_flags = ["nodejs_compat"]` in `wrangler.toml`.
+- Install the runtime SDK: `npm install @cloudflare/puppeteer`.
 
 ### 3. Frontend
 
@@ -75,6 +83,7 @@ GET     /api/conversations/:id        # Get single conversation (public or owner
 PUT     /api/conversations/:id        # Update (owner)
 DELETE  /api/conversations/:id        # Delete (owner)
 GET     /api/users/:userId/conversations # User’s conversations (public unless owner)
+GET     /api/scrape?url=...&selector=... # Scrape public share page (browser rendering)
 ```
 
 ## Frontend Routes
@@ -84,6 +93,11 @@ GET     /api/users/:userId/conversations # User’s conversations (public unless
 - `/c/<uuid>` → `/conversation/<uuid>` — public conversation view (rewritten by `_redirects`)
 - `/faq` — FAQ
 
+Share flow supports two inputs:
+- Paste a share link (recommended): uses `/api/scrape` to fetch content.
+- Paste raw text (fallback): client-side parser + preview.
+
 **Deployment notes**
 - Pages: `cd frontend && npx wrangler pages deploy . --project-name=mnemolog` (ensure `_redirects` ships so `/c/<id>` works).
 - Worker: `cd worker && npm install && npm run deploy` after API changes.
+- Scrape: browser rendering requires the `BROWSER` binding, `compatibility_flags = ["nodejs_compat"]`, and the `@cloudflare/puppeteer` dependency. Once configured, `/api/scrape` launches a headless browser to execute JS and extract rendered text.
