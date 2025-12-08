@@ -214,6 +214,14 @@
             overflow: hidden;
         }
 
+        .floating-back {
+            position: sticky;
+            top: 1rem;
+            z-index: 5;
+            align-self: flex-start;
+            margin-bottom: 1rem;
+        }
+
         .review-header {
             padding: 1rem 1.5rem;
             background: var(--bg-warm);
@@ -221,6 +229,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 1rem;
         }
 
         .review-header h3 {
@@ -238,10 +247,86 @@
 
         .flag-count.clear { color: var(--success); }
 
+        .review-header-left {
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+        }
+
+        .review-header-right {
+            display: inline-flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .first-speaker-inline {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .first-speaker-inline select {
+            padding: 0.35rem 0.5rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: white;
+        }
+
         .conversation-preview {
             max-height: 400px;
             overflow-y: auto;
             padding: 1.5rem;
+        }
+
+        .parse-help {
+            position: absolute;
+            top: 1rem;
+            right: 1.5rem;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            cursor: help;
+        }
+
+        .parse-help .tooltip {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: 1.5rem;
+            background: white;
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.75rem;
+            width: 260px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+            z-index: 5;
+        }
+
+        .parse-help:hover .tooltip {
+            display: block;
+        }
+
+        @media (max-width: 700px) {
+            .review-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.4rem;
+            }
+            .review-header h3 {
+                display: none;
+            }
+            .review-header-left p {
+                margin: 0;
+            }
+            .review-header-right {
+                width: 100%;
+                justify-content: space-between;
+            }
+            .first-speaker-inline {
+                width: 100%;
+                justify-content: flex-start;
+            }
         }
 
         /* Display preview (step 3) */
@@ -333,6 +418,47 @@
         .message-content {
             font-size: 0.95rem;
             line-height: 1.7;
+            white-space: pre-wrap;
+            word-break: normal;
+            overflow-wrap: anywhere;
+        }
+
+        .message-actions {
+            margin-top: 0.75rem;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .merge-btn {
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 0.35rem 0.6rem;
+            font-size: 0.85rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+        }
+
+        .merge-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .preview-actions {
+            margin-top: 1rem;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .heading-line {
+            display: block;
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-top: 0.5rem;
+            margin-bottom: 0.5rem;
+            color: var(--text);
         }
 
         .flagged-text {
@@ -682,34 +808,45 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
                 </div>
             </div>
             <div class="review-section" style="margin-top: 2rem;">
-                <div class="review-header">
-                    <h3>Conversation Preview</h3>
-                    <span class="flag-count" id="flag-count">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
-                            <line x1="4" y1="22" x2="4" y2="15"/>
-                        </svg>
-                        <span id="flag-number">0</span> items flagged
-                        <button class="btn btn-secondary" id="redact-all-btn" style="margin-left: 0.5rem; display: none; padding: 0.25rem 0.6rem; font-size: 0.75rem;">
-                            Redact all
-                        </button>
-                    </span>
+                <div class="parse-help" aria-label="Parsing help">
+                    Having trouble?
+                    <div class="tooltip">
+                        Parsing isn’t perfect. If a message looks off, edit the raw conversation above or use the split/merge controls here. You’re in control—adjust the text until it reflects the real turns.
+                    </div>
                 </div>
-                <div class="form-group" style="margin-top: 1rem; margin-bottom: 1rem;">
-                    <label for="first-speaker">First speaker</label>
-                    <select id="first-speaker">
-                        <option value="human">Human</option>
-                        <option value="assistant">Assistant</option>
-                    </select>
-                    <div id="message-count-warning" class="alert alert-warning" style="display: none; margin-top: 0.75rem;">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"/>
-                            <line x1="12" y1="8" x2="12" y2="12"/>
-                            <line x1="12" y1="16" x2="12.01" y2="16"/>
-                        </svg>
-                        <div>
-                            <strong>Too few messages.</strong> Conversations work best with at least two turns.
+                <div class="review-header">
+                    <div class="review-header-left">
+                        <h3>Conversation Preview</h3>
+                        <p>Review messages and redact sensitive details</p>
+                    </div>
+                    <div class="review-header-right">
+                        <span class="flag-count" id="flag-count">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
+                                <line x1="4" y1="22" x2="4" y2="15"/>
+                            </svg>
+                            <span id="flag-number">0</span> items flagged
+                            <button class="btn btn-secondary" id="redact-all-btn" style="margin-left: 0.5rem; display: none; padding: 0.25rem 0.6rem; font-size: 0.75rem;">
+                                Redact all
+                            </button>
+                        </span>
+                        <div class="first-speaker-inline">
+                            <label for="first-speaker">First speaker</label>
+                            <select id="first-speaker">
+                                <option value="human">Human</option>
+                                <option value="assistant">Assistant</option>
+                            </select>
                         </div>
+                    </div>
+                </div>
+                <div id="message-count-warning" class="alert alert-warning" style="display: none; margin-top: 0.75rem;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="8" x2="12" y2="12"/>
+                        <line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                    <div>
+                        <strong>Too few messages.</strong> Conversations work best with at least two turns.
                     </div>
                 </div>
 
@@ -734,12 +871,15 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
                         <strong>Looking good!</strong> 
                         No obvious sensitive information detected.
                     </div>
-                </div>
-
-                <div class="conversation-preview" id="conversation-preview">
-                    <!-- Populated by JS -->
-                </div>
             </div>
+
+            <div class="conversation-preview" id="conversation-preview">
+                <!-- Populated by JS -->
+            </div>
+            <div class="preview-actions">
+                <button class="btn btn-secondary" type="button" id="undo-merge-btn" disabled>Undo last merge</button>
+            </div>
+        </div>
 
             <div class="button-row">
                 <a href="/" class="btn btn-secondary">Cancel</a>
@@ -785,6 +925,15 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
                         <span>Your display name will appear with this conversation</span>
                     </div>
                 </label>
+            </div>
+
+            <div class="floating-back">
+                <button class="btn btn-secondary" type="button" onclick="goToStep(1)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 12H5M12 19l-7-7 7-7"/>
+                    </svg>
+                    Back
+                </button>
             </div>
 
             <div class="preview-card">
@@ -840,6 +989,8 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
         </div>
     </div>
 
+    <script src="/assets/parsers.js"></script>
+    <script src="/assets/render.js"></script>
     <script src="/assets/config.js"></script>
     <script src="/assets/app.js"></script>
     <script>
@@ -853,6 +1004,49 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
         let lastRawInput = '';
         let inputMode = 'text';
         let parseTimer = null;
+        let editConversationId = null;
+    
+        // Check edit mode
+        function checkEditMode() {
+            const params = new URLSearchParams(window.location.search);
+            const editId = params.get('edit');
+            if (!editId) return;
+            editConversationId = editId;
+            loadConversationForEdit(editId);
+        }
+    
+        async function loadConversationForEdit(id) {
+            try {
+                const { conversation } = await mnemolog.getConversation(id);
+                if (!conversation) return;
+                // Pre-fill fields
+                document.getElementById('title').value = conversation.title || '';
+                document.getElementById('description').value = conversation.description || '';
+                document.getElementById('show-name').checked = conversation.show_author ?? true;
+                // Platform
+                const platInput = document.querySelector(`input[name="platform"][value="${conversation.platform}"]`);
+                if (platInput) platInput.checked = true;
+                // Tags: reset array then add chips
+                tags = [];
+                if (tagContainer && tagInput) {
+                    // reset container and append tags before the input
+                    tagContainer.innerHTML = '';
+                    (conversation.tags || []).forEach(t => addTag(t.toLowerCase()));
+                }
+                // Reconstruct raw text from messages
+                const raw = (conversation.messages || [])
+                    .map(m => `${m.role === 'human' ? 'Human' : 'Assistant'}: ${m.content}`)
+                    .join('\n\n');
+                document.getElementById('conversation-input').value = raw;
+                // Parse
+                parseAndReviewConversation();
+                // Update button text
+                const publishBtn = document.getElementById('publish-btn');
+                publishBtn.innerHTML = 'Update Conversation';
+            } catch (err) {
+                console.error('Failed to load conversation for edit:', err);
+            }
+        }
     
         document.getElementById('publish-btn').addEventListener('click', publishConversation);
         document.getElementById('first-speaker').addEventListener('change', () => {
@@ -864,6 +1058,10 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
             input.addEventListener('change', renderDisplayPreview);
         });
     
+        document.addEventListener('DOMContentLoaded', () => {
+            checkEditMode();
+        });
+
         // Input mode switching
         updateInputMode();
     
@@ -948,8 +1146,13 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
 
             lastRawInput = raw;
     
-            const { messages, metadata } = parseConversation(raw, platform, userFirstSpeaker);
-            parsedMessages = messages;
+            const parserFn = window.mnemologParsers?.parseConversation || parseConversation;
+            const { messages, metadata } = parserFn(raw, platform, userFirstSpeaker);
+            parsedMessages = messages.map(m => ({
+                ...m,
+                content: (m.content || '').trim(),
+            }));
+            mergeHistory = [];
             detectedFirstSpeaker = metadata.detectedFirstSpeaker;
 
             if (!userFirstSpeaker) {
@@ -961,28 +1164,23 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
         }
     
         // =============== Conversation Parsing Logic ===============
-    
+        const sharedParsers = window.mnemologParsers || {};
+
         function parseConversation(rawText, platform, overrideFirstSpeaker) {
-            let text = rawText.replace(/\r\n/g, '\n').trim();
-            const selected = platform || 'other';
-
-            if (selected === 'chatgpt') {
-                const chatgptResult = tryParseChatGPT(text);
-                if (chatgptResult) return chatgptResult;
+            if (sharedParsers.parseConversation) {
+                return sharedParsers.parseConversation(rawText, platform, overrideFirstSpeaker);
             }
-
-            if (selected === 'gemini') {
-                const geminiResult = tryParseGemini(text);
-                if (geminiResult) return geminiResult;
-            }
-
-            if (selected === 'claude' || selected === 'grok' || selected === 'other') {
-                const genericResult = parseGeneric(text, overrideFirstSpeaker, selected);
-                return genericResult;
-            }
-
-            // Fallback
-            return parseGeneric(text, overrideFirstSpeaker, selected);
+            // Minimal fallback: single human message
+            return {
+                messages: [{ role: 'human', content: rawText.trim() }],
+                metadata: {
+                    detectedProvider: platform || 'other',
+                    detectedFirstSpeaker: 'human',
+                    userOverrodeFirstSpeaker: Boolean(overrideFirstSpeaker),
+                    rawCharacterCount: rawText.length,
+                    messageCount: 1,
+                },
+            };
         }
 
         // =============== Review Rendering (Step 1) ===============
@@ -994,51 +1192,81 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
             const messageCountWarning = document.getElementById('message-count-warning');
             const continueBtn = document.getElementById('step1-next');
             const redactAllBtn = document.getElementById('redact-all-btn');
+            const undoMergeBtn = document.getElementById('undo-merge-btn');
 
             container.innerHTML = '';
             let totalFlags = 0;
 
-            const escapeHtml = (str) => str
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#39;');
+            const highlightSensitive = (rawText, displayText, msgIdx) => {
+                const flags = window.mnemolog?.detectSensitiveInfo ? window.mnemolog.detectSensitiveInfo(rawText || '') : [];
+                const target = displayText || rawText || '';
+                if (!flags.length) return { html: escapeHtml(target), count: 0 };
 
-            const highlightSensitive = (text) => {
-                const flags = window.mnemolog?.detectSensitiveInfo ? window.mnemolog.detectSensitiveInfo(text) : [];
-                if (!flags.length) return { html: escapeHtml(text), count: 0 };
-
-                // Build safe HTML with flagged spans
                 let html = '';
                 let cursor = 0;
-                flags.sort((a, b) => a.start - b.start).forEach(flag => {
-                    html += escapeHtml(text.slice(cursor, flag.start));
-                    const flaggedText = text.slice(flag.start, flag.end);
-                    html += `<span class="flagged-text" data-original="${escapeHtml(flaggedText)}" onclick="redactThis(this)">${escapeHtml(flaggedText)}<span class="flag-tooltip">Click to redact</span></span>`;
-                    cursor = flag.end;
+                const sorted = flags.filter(f => f && f.text).sort((a, b) => a.start - b.start);
+                sorted.forEach(flag => {
+                    const token = flag.text;
+                    if (!token) return;
+                    const idx = target.indexOf(token, cursor);
+                    if (idx === -1) return;
+                    html += escapeHtml(target.slice(cursor, idx));
+                    html += `<span class="flagged-text" data-message-idx="${msgIdx}" data-token="${encodeURIComponent(token)}" onclick="redactThis(this)">${escapeHtml(token)}<span class="flag-tooltip">Click to redact</span></span>`;
+                    cursor = idx + token.length;
                 });
-                html += escapeHtml(text.slice(cursor));
-                return { html, count: flags.length };
+                html += escapeHtml(target.slice(cursor));
+                return { html, count: sorted.length };
             };
 
-            parsedMessages.forEach(msg => {
+            parsedMessages.forEach((msg, idx) => {
                 const messageEl = document.createElement('div');
                 messageEl.className = `message ${msg.role}`;
+                messageEl.dataset.idx = idx.toString();
 
                 const roleEl = document.createElement('div');
                 roleEl.className = 'message-role';
-                roleEl.textContent = msg.role === 'human' ? 'Human' : 'Assistant';
+                roleEl.textContent = msg.role === 'human' ? 'Human' : 'AI';
 
                 const contentEl = document.createElement('div');
                 contentEl.className = 'message-content';
 
-                const { html, count } = highlightSensitive(msg.content || '');
+            const rawText = msg.content || '';
+                const displayText = normalizeEquations(rejoinMathBlocks(rawText));
+                const { html, count } = highlightSensitive(rawText, displayText, idx);
                 totalFlags += count;
+                // Keep review view plain to simplify redaction targeting
                 contentEl.innerHTML = html;
+
+                const actionsEl = document.createElement('div');
+                actionsEl.className = 'message-actions';
+                const splitBtn = document.createElement('button');
+                splitBtn.type = 'button';
+                splitBtn.textContent = 'Split';
+                splitBtn.className = 'merge-btn';
+                splitBtn.onclick = () => splitMessage(idx);
+                actionsEl.appendChild(splitBtn);
+                if (idx > 0) {
+                    const mergePrev = document.createElement('button');
+                    mergePrev.type = 'button';
+                    mergePrev.textContent = 'Merge ↑';
+                    mergePrev.className = 'merge-btn';
+                    mergePrev.onclick = () => mergeWithPrev(idx);
+                    actionsEl.appendChild(mergePrev);
+                }
+                if (idx < parsedMessages.length - 1) {
+                    const mergeNext = document.createElement('button');
+                    mergeNext.type = 'button';
+                    mergeNext.textContent = 'Merge ↓';
+                    mergeNext.className = 'merge-btn';
+                    mergeNext.onclick = () => mergeWithNext(idx);
+                    actionsEl.appendChild(mergeNext);
+                }
 
                 messageEl.appendChild(roleEl);
                 messageEl.appendChild(contentEl);
+                if (actionsEl.children.length) {
+                    messageEl.appendChild(actionsEl);
+                }
                 container.appendChild(messageEl);
             });
 
@@ -1062,6 +1290,48 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
             // Enable continue only when parsed and >=2 messages
             const canContinue = parsedMessages.length >= 2;
             if (continueBtn) continueBtn.disabled = !canContinue;
+            if (undoMergeBtn) undoMergeBtn.disabled = mergeHistory.length === 0;
+        }
+
+        // Heading detection for title-case / list-like lines
+        function applyHeadingStyle(html) {
+            const stripTags = (s) => s.replace(/<[^>]+>/g, '').trim();
+            const stopwords = new Set(['and','or','but','of','the','a','an','in','on','for','to','with','at','by','from']);
+
+            const looksLikeHeading = (text) => {
+                const trimmed = text.trim();
+                if (!trimmed) return false;
+                if (trimmed.length > 160) return false;
+
+                // Optional leading numeral/roman/letter with dot
+                const prefMatch = trimmed.match(/^(\s*(?:[IVXLCDM]+\.?|[A-Za-z0-9]+\.?)\s+)?(.*)$/);
+                const body = (prefMatch && prefMatch[2]) ? prefMatch[2] : trimmed;
+
+                const words = body.split(/\s+/);
+                let capCount = 0;
+                let total = 0;
+                for (const w of words) {
+                    const clean = w.replace(/[^A-Za-z]/g, '');
+                    if (!clean) continue;
+                    const lower = clean.toLowerCase();
+                    if (stopwords.has(lower)) continue;
+                    total++;
+                    if (/^[A-Z][a-z]/.test(clean)) capCount++;
+                }
+                // Require at least one non-stopword capitalized and most non-stopwords capitalized
+                return capCount >= 1 && capCount >= Math.max(1, total - 1);
+            };
+
+            return html
+                .split('\n')
+                .map(line => {
+                    const bare = stripTags(line);
+                    if (bare && !mathSymbols.test(bare) && looksLikeHeading(bare)) {
+                        return `<span class="heading-line">${line}</span>`;
+                    }
+                    return line;
+                })
+                .join('\n');
         }
 
         // Redact all flagged items
@@ -1070,292 +1340,146 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
                 redactThis(el);
             });
         });
-    
-        // Utility: strip common UI cruft, respecting code fences
-        function stripCruft(text, platformHint) {
-            const lines = text.split('\n');
-            let inFence = false;
-            const kept = [];
-            const cruftPatterns = [
-                /^Skip to content/i,
-                /^Chat history/i,
-                /^ChatGPT/i,
-                /^Thought for \d+s?/i,
-                /^Searched for /i,
-                /^Image of\b/i,
-                /^No file chosen/i,
-                /^Upgrade to /i,
-                /^Copy\s*$/i,
-                /^Retry\s*$/i,
-                /^Edit\s*$/i,
-                /^\d+(\.\d+)?s\s*$/i,
-            ];
-    
-            lines.forEach(line => {
-                if (line.trim().startsWith('```')) {
-                    inFence = !inFence;
-                    kept.push(line);
+        document.getElementById('undo-merge-btn')?.addEventListener('click', undoMerge);
+
+        // Merge helpers
+        let mergeHistory = [];
+
+        function mergeWithPrev(idx) {
+            if (idx <= 0) return;
+            const prev = parsedMessages[idx - 1];
+            const curr = parsedMessages[idx];
+            mergeHistory.push(JSON.parse(JSON.stringify(parsedMessages)));
+            parsedMessages.splice(idx - 1, 2, {
+                role: prev.role,
+                content: `${prev.content}\n\n${curr.content}`,
+            });
+            renderReviewPreview();
+        }
+
+        function mergeWithNext(idx) {
+            if (idx >= parsedMessages.length - 1) return;
+            const curr = parsedMessages[idx];
+            const next = parsedMessages[idx + 1];
+            mergeHistory.push(JSON.parse(JSON.stringify(parsedMessages)));
+            parsedMessages.splice(idx, 2, {
+                role: curr.role,
+                content: `${curr.content}\n\n${next.content}`,
+            });
+            renderReviewPreview();
+        }
+
+        function undoMerge() {
+            if (!mergeHistory.length) return;
+            parsedMessages = JSON.parse(JSON.stringify(mergeHistory.pop()));
+            renderReviewPreview();
+        }
+
+        function splitMessage(idx) {
+            const msg = parsedMessages[idx];
+            if (!msg) return;
+            const body = (msg.content || '').trim();
+            if (!body) return;
+
+            // Try splitting on paragraph boundary near the middle
+            const parts = body.split(/\n{2,}/);
+            if (parts.length >= 2) {
+                const mid = Math.floor(parts.length / 2);
+                const first = parts.slice(0, mid).join('\n\n').trim();
+                const second = parts.slice(mid).join('\n\n').trim();
+                if (first && second) {
+                    mergeHistory.push(JSON.parse(JSON.stringify(parsedMessages)));
+                    parsedMessages.splice(idx, 1, { role: msg.role, content: first }, { role: msg.role, content: second });
+                    renderReviewPreview();
                     return;
                 }
-                if (inFence) {
-                    kept.push(line);
-                    return;
-                }
-                if (cruftPatterns.some(p => p.test(line))) return;
-                if (platformHint === 'gemini' && line.trim().match(/^(AI's|Cloudflare|Supabase|Inverting|Poisson|From Randomness|Blake and Rumi|Reality, AI)/)) return;
-                kept.push(line);
-            });
-    
-            return kept.join('\n').trim();
-        }
-    
-        // ============ ChatGPT Parser ============
-        function tryParseChatGPT(text) {
-            if (!text.includes('You said:') && !text.includes('ChatGPT said:')) return null;
-            
-            text = stripCruft(text, 'chatgpt');
-            const messages = [];
-            const parts = text.split(/(?=^You said:$|^ChatGPT said:$)/m);
-            
-            for (const part of parts) {
-                const trimmed = part.trim();
-                if (!trimmed) continue;
-                
-                if (trimmed.startsWith('You said:')) {
-                    const content = trimmed.replace(/^You said:\s*/i, '').trim();
-                    if (content) messages.push({ role: 'human', content });
-                } 
-                else if (trimmed.startsWith('ChatGPT said:')) {
-                    let content = trimmed.replace(/^ChatGPT said:\s*/i, '');
-                    content = content.replace(/^Thought for \d+s?\s*\n?/i, '').trim();
-                    if (content) messages.push({ role: 'assistant', content });
-                }
-            }
-            
-            if (messages.length < 2) return null;
-            
-            return {
-                messages,
-                metadata: {
-                    detectedProvider: 'chatgpt',
-                    detectedFirstSpeaker: messages[0]?.role || 'human',
-                    userOverrodeFirstSpeaker: false,
-                    rawCharacterCount: text.length,
-                    messageCount: messages.length,
-                }
-            };
-        }
-    
-        // ============ Gemini Parser ============
-        function tryParseGemini(text) {
-            // Many Gemini exports lack clean markers; attempt a simple marker split, else fall back.
-            const hasMarkers = /^Gemini$/m.test(text) || /^You$/m.test(text) || /^Model$/m.test(text);
-            if (!hasMarkers) return null;
-    
-            text = stripCruft(text, 'gemini');
-            const messages = [];
-            const parts = text.split(/^(You|Gemini|Model)$/m);
-            
-            let currentRole = null;
-            for (const part of parts) {
-                const trimmed = part.trim();
-                if (trimmed === 'You') currentRole = 'human';
-                else if (trimmed === 'Gemini' || trimmed === 'Model') currentRole = 'assistant';
-                else if (trimmed && currentRole) {
-                    messages.push({ role: currentRole, content: trimmed });
-                    currentRole = null;
-                }
-            }
-            
-            if (messages.length < 2) return null;
-            
-            return {
-                messages,
-                metadata: {
-                    detectedProvider: 'gemini',
-                    detectedFirstSpeaker: messages[0]?.role || 'human',
-                    userOverrodeFirstSpeaker: false,
-                    rawCharacterCount: text.length,
-                    messageCount: messages.length,
-                }
-            };
-        }
-    
-        // ============ Generic/Claude/Grok/Other Parser ============
-        function detectFirstSpeaker(firstSegment) {
-            if (!firstSegment) return 'human';
-            const trimmed = firstSegment.trim();
-            if (trimmed.length < 220 && /[?]$/.test(trimmed)) return 'human';
-            if (/Searched for /i.test(trimmed)) return 'assistant';
-            if (/Thought for \d+s/i.test(trimmed)) return 'assistant';
-            if (/Image of\b/i.test(trimmed)) return 'assistant';
-            const aiFirstPatterns = [
-                /^(hi|hello|hey)[,!]?\s+i'?m\s+(an?\s+)?(ai|assistant|claude|chatgpt|gpt)/i,
-                /^i'?m\s+(an?\s+)?(ai|assistant|claude)/i,
-                /how can i (help|assist) you/i,
-                /^(welcome|greetings)[!,.]?\s/i,
-                /created by (anthropic|openai)/i,
-                /^as an ai/i,
-                /i'?m here to help/i,
-            ];
-            return aiFirstPatterns.some(p => p.test(firstSegment)) ? 'assistant' : 'human';
-        }
-    
-        function parseGeneric(rawText, overrideFirstSpeaker, platformHint) {
-            const text = stripCruft(rawText, platformHint);
-
-            const labelRegex = /^[-*•]?\s*(\*\*|__)?(human|user|you|me|h|assistant|ai|claude|chatgpt|gpt|model|bot|a|system)(\*\*|__)?\s*[:\-–—]\s*/i;
-            const roleFromLabel = (label) => ['human','user','you','me','h'].includes(label.toLowerCase()) ? 'human' : 'assistant';
-    
-            // Build segments with code-fence awareness
-            const lines = text.split(/\r?\n/);
-            const segments = [];
-            let current = { role: null, content: '' };
-            let inFence = false;
-    
-            const push = () => {
-                const trimmed = current.content.trim();
-                if (trimmed.length > 1) segments.push({ ...current, content: trimmed });
-                current = { role: null, content: '' };
-            };
-    
-            lines.forEach(line => {
-                const trimmedLine = line.trim();
-                if (trimmedLine.startsWith('```')) {
-                    inFence = !inFence;
-                    current.content += (current.content ? '\n' : '') + line;
-                    return;
-                }
-    
-                if (!inFence) {
-                    const match = line.match(labelRegex);
-                    if (match) {
-                        push();
-                        current = { role: roleFromLabel(match[2]), content: line.replace(labelRegex, '').trim() };
-                        return;
-                    }
-                    if (trimmedLine === '') {
-                        push();
-                        return;
-                    }
-                }
-    
-                current.content += (current.content ? '\n' : '') + line;
-            });
-            push();
-    
-            if (!segments.length) {
-                rawText.split(/\n{2,}/).map(s => s.trim()).filter(Boolean)
-                    .forEach(content => segments.push({ role: null, content }));
             }
 
-            // Merge continuation segments (bullets, lowercase starts, short meta)
-            const shouldMerge = (text, lastRole) => {
-                const trimmed = text.trim();
-                if (!trimmed) return true;
-                if (/^[-*•\d+\.]\s/.test(trimmed)) return true;
-                if (/^[a-z]/.test(trimmed)) return true;
-                if (trimmed.length < 120 && !/[?!]$/.test(trimmed)) return true;
-                if (/^Searched for /i.test(trimmed)) return true;
-                if (/^\d+(\.\d+)?s\s*$/.test(trimmed)) return true;
-                if (lastRole && lastRole === 'assistant' && /^Image of\b/i.test(trimmed)) return true;
-                return false;
-            };
+            // Fallback: split at mid-point of characters
+            const len = body.length;
+            if (len < 2) return;
+            const pos = Math.floor(len / 2);
+            const first = body.slice(0, pos).trim();
+            const second = body.slice(pos).trim();
+            if (!first || !second) return;
 
-            const isContinuation = (text, lastRole) => {
-                const trimmed = text.trim();
-                if (!trimmed) return true;
-                if (/^[-*•\d+\.]\s/.test(trimmed)) return true;
-                if (/^[a-z]/.test(trimmed)) return true;
-                if (trimmed.length < 140 && !/[?!]$/.test(trimmed)) return true;
-                if (/^Searched for /i.test(trimmed)) return true;
-                if (/^Relevant chats/i.test(trimmed)) return true;
-                if (/^Found it/i.test(trimmed)) return true;
-                if (/^Image of\b/i.test(trimmed)) return true;
-                if (/^\d+(\.\d+)?s\s*$/.test(trimmed)) return true;
-                if (/^takes a breath/i.test(trimmed)) return true;
-                if (/^Option \d/i.test(trimmed)) return true;
-                return false;
-            };
+            mergeHistory.push(JSON.parse(JSON.stringify(parsedMessages)));
+            parsedMessages.splice(idx, 1, { role: msg.role, content: first }, { role: msg.role, content: second });
+            renderReviewPreview();
+        }
 
-            const mergedSegments = [];
-            segments.forEach(seg => {
-                const last = mergedSegments[mergedSegments.length - 1];
-                if (last && (!seg.role || seg.role === last.role) && shouldMerge(seg.content, last.role)) {
-                    last.content += '\n\n' + seg.content;
-                } else {
-                    mergedSegments.push({ ...seg });
-                }
-            });
+        // Utility: escape HTML
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
 
-            const firstLabeled = mergedSegments.find(p => p.role);
-            const detected = firstLabeled?.role || detectFirstSpeaker(mergedSegments[0]?.content || '');
-            const firstSpeaker = overrideFirstSpeaker || detected;
-    
-            let lastRole = firstSpeaker;
-            const messages = mergedSegments.map((p, idx) => {
-                if (p.role) {
-                    lastRole = p.role;
-                    return { role: p.role, content: p.content };
-                }
-                if (idx === 0) {
-                    lastRole = firstSpeaker;
-                    return { role: firstSpeaker, content: p.content };
-                }
-                const flipped = lastRole === 'human' ? 'assistant' : 'human';
-                const role = isContinuation(p.content, lastRole) ? lastRole : flipped;
-                lastRole = role;
-                return { role, content: p.content };
-            });
-    
-            const merged = [];
-            messages.forEach(msg => {
-                const last = merged[merged.length - 1];
+        function escapeAttr(text) {
+            if (!text) return '';
+            return text
+                .replace(/&/g, '&amp;')
+                .replace(/"/g, '&quot;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+
+        // Redact/unredact with content updates
+        function escapeRegExp(str) {
+            return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+
+        // Collapse consecutive same-role messages
+        function collapseMessages(list) {
+            const out = [];
+            (list || []).forEach(msg => {
+                if (!msg || !msg.role || !(msg.content || '').trim()) return;
+                const last = out[out.length - 1];
                 if (last && last.role === msg.role) {
-                    last.content += '\n\n' + msg.content;
+                    last.content = (last.content || '') + '\n\n' + msg.content;
                 } else {
-                    merged.push({ ...msg });
+                    out.push({ role: msg.role, content: msg.content });
                 }
             });
-    
-            return {
-                messages: merged,
-                metadata: {
-                    detectedProvider: platformHint || 'generic',
-                    detectedFirstSpeaker: detected,
-                    userOverrodeFirstSpeaker: Boolean(overrideFirstSpeaker),
-                    rawCharacterCount: rawText.length,
-                    messageCount: merged.length,
-                },
-            };
+            return out;
         }
-    
-        // Redact flagged text
+
+        const mathSymbols = /[∑Σ∞πℵ√±×÷·∏∂µ∀∃→←⇒≤≥≠≈≡⊂⊃⊆⊇∈∉∪∩⊕⊗∇=+\-/*^]/;
+
+        // Use shared math helpers when available
+        const normalizeEquations = (text) => {
+            if (sharedParsers.normalizeEquations) return sharedParsers.normalizeEquations(text);
+            return text;
+        };
+
+        const rejoinMathBlocks = (text) => {
+            if (sharedParsers.rejoinMathBlocks) return sharedParsers.rejoinMathBlocks(text);
+            return text;
+        };
+
         function redactThis(el) {
-            const redacted = document.createElement('span');
-            redacted.className = 'redacted';
-            redacted.onclick = () => unredact(redacted, el.dataset.original);
-            el.replaceWith(redacted);
-            
-            const count = document.querySelectorAll('.flagged-text').length;
-            document.getElementById('flag-number').textContent = count;
-            if (count === 0) {
-                document.getElementById('warning-alert').style.display = 'none';
-                document.getElementById('success-alert').style.display = 'flex';
+            const tokenAttr = el.dataset.token ? decodeURIComponent(el.dataset.token) : '';
+            const textToken = (el.textContent || '').replace(/Click to redact/gi, '').trim();
+            const original = tokenAttr || el.dataset.original || textToken;
+            const msgIdx = parseInt(el.dataset.messageIdx || el.closest('.message')?.dataset.idx || '-1', 10);
+            if (msgIdx >= 0 && parsedMessages[msgIdx]) {
+                const base = escapeRegExp(original);
+                const flexible = base.replace(/\\\s+/g, '\\s+');
+                const re = new RegExp(flexible, 'gi');
+                const content = parsedMessages[msgIdx].content || '';
+                parsedMessages[msgIdx].content = content.replace(re, '[redacted]');
+                renderReviewPreview();
             }
         }
     
         function unredact(el, original) {
-            const flagged = document.createElement('span');
-            flagged.className = 'flagged-text';
-            flagged.dataset.original = original;
-            flagged.onclick = () => redactThis(flagged);
-            flagged.innerHTML = `${original}<span class="flag-tooltip">Click to redact</span>`;
-            el.replaceWith(flagged);
-            
-            document.getElementById('flag-number').textContent = document.querySelectorAll('.flagged-text').length;
-            document.getElementById('warning-alert').style.display = 'flex';
-            document.getElementById('success-alert').style.display = 'none';
+            const msgIdx = parseInt(el.dataset.messageIdx || el.closest('.message')?.dataset.idx || '-1', 10);
+            if (msgIdx >= 0 && parsedMessages[msgIdx]) {
+                const re = new RegExp('\\[redacted\\]');
+                parsedMessages[msgIdx].content = parsedMessages[msgIdx].content.replace(re, original);
+                renderReviewPreview();
+            }
         }
     
         // Tag input
@@ -1371,18 +1495,23 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
         });
     
         function addTag(text) {
+            if (!tagContainer || !tagInput) return;
             if (tags.includes(text.toLowerCase())) return;
             tags.push(text.toLowerCase());
             
             const tag = document.createElement('span');
             tag.className = 'tag';
             tag.innerHTML = `${text}<span class="tag-remove" onclick="removeTag(this, '${text.toLowerCase()}')">&times;</span>`;
-            tagContainer.insertBefore(tag, tagInput);
+            if (tagContainer.contains(tagInput)) {
+                tagContainer.insertBefore(tag, tagInput);
+            } else {
+                tagContainer.appendChild(tag);
+            }
         }
     
         function removeTag(el, text) {
             tags = tags.filter(t => t !== text);
-            el.parentElement.remove();
+            if (el && el.parentElement) el.parentElement.remove();
         }
     
         // Copy link
@@ -1393,12 +1522,9 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
         }
     
         function getRedactedMessages() {
-            const previewMessages = document.querySelectorAll('.conversation-preview .message');
-            return Array.from(previewMessages).map((el, idx) => {
-                const role = parsedMessages[idx]?.role || el.querySelector('.message-role')?.textContent.trim().toLowerCase() || 'assistant';
-                const content = (el.querySelector('.message-content')?.textContent || '').trim();
-                return { role, content };
-            }).filter(m => m.content.length > 0);
+            return collapseMessages(parsedMessages)
+                .map(m => ({ role: m.role, content: (m.content || '').trim() }))
+                .filter(m => m.content.length > 0);
         }
 
         function renderDisplayPreview() {
@@ -1416,18 +1542,22 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
             // Clear previous preview
             previewContainer.innerHTML = '';
 
+            const displayMessages = collapseMessages(parsedMessages);
+
             // Render messages
-            parsedMessages.forEach(msg => {
+            displayMessages.forEach(msg => {
                 const messageEl = document.createElement('div');
                 messageEl.className = `preview-message ${msg.role}`;
                 
                 const roleEl = document.createElement('div');
                 roleEl.className = 'preview-role';
-                roleEl.textContent = msg.role === 'human' ? 'Human' : 'Assistant';
+                roleEl.textContent = msg.role === 'human' ? 'Human' : 'AI';
                 
                 const contentEl = document.createElement('div');
                 contentEl.className = 'preview-content';
-                contentEl.textContent = msg.content;
+                const safe = escapeHtml(normalizeEquations(rejoinMathBlocks(msg.content || '')));
+                const renderHeading = window.mnemologRender?.applyHeadingStyle || ((x) => x);
+                contentEl.innerHTML = renderHeading(safe);
                 
                 messageEl.appendChild(roleEl);
                 messageEl.appendChild(contentEl);
@@ -1466,18 +1596,36 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
             }
     
             publishBtn.disabled = true;
-            publishBtn.innerHTML = 'Publishing...';
+            publishBtn.innerHTML = editConversationId ? 'Updating...' : 'Publishing...';
     
             try {
-                const { conversation } = await mnemolog.createConversation({
-                    title,
-                    description: description || undefined,
-                    platform,
-                    messages,
-                    tags,
-                    is_public: true,
-                    show_author: showAuthor,
-                });
+                let conversation;
+                if (editConversationId) {
+                    const res = await apiRequest(`/api/conversations/${editConversationId}`, {
+                        method: 'PUT',
+                        body: JSON.stringify({
+                            title,
+                            description: description || undefined,
+                            platform,
+                            messages,
+                            tags,
+                            is_public: true,
+                            show_author: showAuthor,
+                        }),
+                    });
+                    conversation = res.conversation;
+                } else {
+                    const res = await mnemolog.createConversation({
+                        title,
+                        description: description || undefined,
+                        platform,
+                        messages,
+                        tags,
+                        is_public: true,
+                        show_author: showAuthor,
+                    });
+                    conversation = res.conversation;
+                }
     
                 const shareUrl = `${window.location.origin}/c/${conversation.id}`;
                 document.getElementById('share-url').value = shareUrl;

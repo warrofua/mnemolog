@@ -12,7 +12,6 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/assets/styles.css">
-    <link rel="stylesheet" href="/assets/styles.css">
     <style>
         :root {
             --human-bg: #FDF9F3;
@@ -308,6 +307,9 @@
                         <div class="author-label">Shared this conversation</div>
                     </div>
                 </div>
+                <div style="margin-top: 1rem;">
+                    <a id="edit-btn" href="#" class="btn btn-secondary" style="display:none;">Edit / Re-parse</a>
+                </div>
             </header>
 
             <div class="messages" id="messages"></div>
@@ -343,6 +345,7 @@
     <script src="/assets/config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="/assets/app.js"></script>
+    <script src="/assets/render.js"></script>
     <script>
         function getConversationId() {
             const path = window.location.pathname;
@@ -369,11 +372,16 @@
 
         function formatContent(text) {
             let html = escapeHtml(text);
+            // Apply heading detection early while newlines remain
+            const renderHeading = window.mnemologRender?.applyHeadingStyle || ((x) => x);
+            html = renderHeading(html);
+            // Basic formatting
             html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
             html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
             html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
             html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-            html = html.split('\n\n').map(p => `<p>${p}</p>`).join('');
+            // Preserve paragraph breaks and line breaks
+            html = html.replace(/\n\n/g, '<br><br>');
             html = html.replace(/\n/g, '<br>');
             return html;
         }
@@ -428,9 +436,18 @@
                 }
             }
 
+            // Owner edit link
+            const editBtn = document.getElementById('edit-btn');
+            if (window.mnemolog?.currentUser && window.mnemolog.currentUser.id === data.user_id) {
+                editBtn.style.display = 'inline-flex';
+                editBtn.href = `/share?edit=${data.id}`;
+            } else {
+                editBtn.style.display = 'none';
+            }
+
             document.getElementById('messages').innerHTML = data.messages.map(msg => `
                 <div class="message ${msg.role}">
-                    <div class="message-role">${msg.role === 'human' ? 'Human' : 'Assistant'}</div>
+                    <div class="message-role">${msg.role === 'human' ? 'Human' : 'AI'}</div>
                     <div class="message-content">${formatContent(msg.content)}</div>
                 </div>
             `).join('');

@@ -248,6 +248,77 @@ router.post('/api/conversations', async (request: IRequest, env: Env) => {
   return json({ conversation: data }, 201);
 });
 
+// Update conversation (owner only)
+router.put('/api/conversations/:id', async (request: IRequest, env: Env) => {
+  const authHeader = request.headers.get('Authorization') || undefined;
+  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+    global: {
+      headers: authHeader ? { Authorization: authHeader } : {},
+    },
+  });
+  const user = await getUser(request, supabase);
+  if (!user) return json({ error: 'Unauthorized' }, 401);
+
+  const { id } = request.params;
+  let body: Partial<CreateConversationBody> & { is_public?: boolean; show_author?: boolean; messages?: any[] };
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: 'Invalid JSON' }, 400);
+  }
+
+  // Verify ownership
+  const { data: existing, error: fetchErr } = await supabase
+    .from('conversations')
+    .select('id, user_id')
+    .eq('id', id)
+    .single();
+  if (fetchErr || !existing) return json({ error: 'Conversation not found' }, 404);
+  if (existing.user_id !== user.id) return json({ error: 'Forbidden' }, 403);
+
+  const updates: any = {};
+  if (body.title !== undefined) updates.title = body.title;
+  if (body.description !== undefined) updates.description = body.description;
+  if (body.platform !== undefined) updates.platform = body.platform;
+  if (body.tags !== undefined) updates.tags = body.tags;
+  if (body.show_author !== undefined) updates.show_author = body.show_author;
+  if (body.is_public !== undefined) updates.is_public = body.is_public;
+  if (body.messages !== undefined) updates.messages = body.messages;
+
+  const { data, error } = await supabase
+    .from('conversations')
+    .update(updates)
+    .eq('id', id)
+    .select(
+      `
+      id,
+      title,
+      description,
+      platform,
+      tags,
+      created_at,
+      view_count,
+      show_author,
+      is_public,
+      messages,
+      user_id,
+      profiles (
+        id,
+        display_name,
+        avatar_url
+      )
+    `
+    )
+    .single();
+
+  if (error) {
+    console.error('Update error:', error);
+    return json({ error: 'Failed to update conversation' }, 500);
+  }
+
+  return json({ conversation: data });
+});
+
 // List public conversations
 router.get('/api/conversations', async (request: IRequest, env: Env) => {
   const authHeader = request.headers.get('Authorization') || undefined;
@@ -258,11 +329,20 @@ router.get('/api/conversations', async (request: IRequest, env: Env) => {
   });
   const url = new URL(request.url);
   
-  const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 100);
-  const offset = parseInt(url.searchParams.get('offset') || '0');
-  const platform = url.searchParams.get('platform');
-  const tag = url.searchParams.get('tag');
+  const limit = Math.min(parseInt(url.searchParams.get('limit') || '20', 10), 100);
+  const offset = parseInt(url.searchParams.get('offset') || '0', 10);
+  const sortParam = url.searchParams.get('sort');
+  const sort = sortParam === 'oldest' ? 'oldest' : sortParam === 'views' ? 'views' : 'newest';
+  const platformParam = url.searchParams.get('platform');
+  const tagParam = url.searchParams.get('tag');
   const search = url.searchParams.get('q');
+
+  const platforms = platformParam
+    ? platformParam.split(',').map(p => p.trim()).filter(Boolean)
+    : [];
+  const tags = tagParam
+    ? tagParam.split(',').map(t => t.trim()).filter(Boolean)
+    : [];
 
   let query = supabase
     .from('conversations')
@@ -284,19 +364,36 @@ router.get('/api/conversations', async (request: IRequest, env: Env) => {
     `,
       { count: 'exact' }
     )
-    .eq('is_public', true)
-    .order('created_at', { ascending: false })
-    .range(offset, offset + limit - 1);
+    .eq('is_public', true);
 
-  // Filters
-  if (platform) {
-    query = query.eq('platform', platform);
+  if (sort === 'oldest') {
+    query = query.order('created_at', { ascending: true });
+  } else if (sort === 'views') {
+    query = query.order('view_count', { ascending: false }).order('created_at', { ascending: false });
+  } else {
+    query = query.order('created_at', { ascending: false });
   }
-  if (tag) {
-    query = query.contains('tags', [tag]);
+
+  query = query.range(offset, offset + limit - 1);
+
+  if (platforms.length) {
+    query = query.in('platform', platforms);
+  }
+  if (tags.length) {
+    query = query.overlaps('tags', tags);
   }
   if (search) {
-    query = query.textSearch('fts', search);
+    const sanitized = search.replace(/'/g, "''");
+    const tagTerms = search
+      .split(/\s+/)
+      .map(t => t.trim().toLowerCase())
+      .filter(Boolean);
+    if (tagTerms.length) {
+      const tagList = tagTerms.join(',');
+      query = query.or(`fts.wfts.${sanitized},tags.cs.{${tagList}}`);
+    } else {
+      query = query.textSearch('fts', search, { type: 'websearch', config: 'english' });
+    }
   }
 
   const { data, error, count } = await query;
@@ -306,7 +403,6 @@ router.get('/api/conversations', async (request: IRequest, env: Env) => {
     return json({ error: 'Failed to fetch conversations' }, 500);
   }
 
-  // Hide author info where show_author is false
   const conversations = data?.map(c => ({
     ...c,
     profiles: c.show_author ? c.profiles : null,
@@ -348,8 +444,15 @@ router.get('/api/conversations/:id', async (request: IRequest, env: Env) => {
     return json({ error: 'Conversation not found' }, 404);
   }
 
-  // Increment view count (fire and forget)
-  supabase.rpc('increment_view_count', { conversation_id: id });
+  // Increment view count (best-effort)
+  try {
+    const { error: viewErr } = await supabase.rpc('increment_view_count', { conversation_id: id });
+    if (viewErr) {
+      console.error('increment_view_count failed', viewErr);
+    }
+  } catch (err) {
+    console.error('increment_view_count exception', err);
+  }
 
   // Hide author if requested
   const conversation = {

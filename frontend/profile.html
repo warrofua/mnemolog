@@ -140,6 +140,73 @@
             opacity: 0.6;
         }
 
+        .profile-bio {
+            margin-top: 0.75rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .profile-website a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .profile-website a:hover {
+            text-decoration: underline;
+        }
+
+        .edit-profile-actions {
+            margin-top: 0.75rem;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .edit-link {
+            font-size: 0.85rem;
+            color: var(--accent);
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+        }
+
+        .profile-edit-form {
+            display: none;
+            margin-top: 1rem;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1rem;
+            gap: 0.75rem;
+            flex-direction: column;
+        }
+
+        .profile-edit-form label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .profile-edit-form input,
+        .profile-edit-form textarea {
+            width: 100%;
+            padding: 0.6rem 0.8rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 0.95rem;
+        }
+
+        .profile-edit-form textarea {
+            min-height: 90px;
+            resize: vertical;
+        }
+
+        .profile-edit-actions {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: flex-end;
+        }
+
         /* Section */
         .section-header {
             display: flex;
@@ -563,6 +630,30 @@
                             — conversations shared
                         </span>
                     </div>
+                    <div class="profile-bio" id="profile-bio" style="display: none;"></div>
+                    <div class="profile-website" id="profile-website" style="display: none;"></div>
+                    <div class="edit-profile-actions">
+                        <button class="edit-link" type="button" onclick="openEditProfile()">Edit profile</button>
+                        <span id="profile-save-status" style="font-size: 0.85rem; color: var(--text-secondary); display: none;"></span>
+                    </div>
+                    <div class="profile-edit-form" id="profile-edit-form">
+                        <label>
+                            Display name
+                            <input type="text" id="edit-display-name" placeholder="Your name">
+                        </label>
+                        <label>
+                            Bio
+                            <textarea id="edit-bio" placeholder="A short note about you"></textarea>
+                        </label>
+                        <label>
+                            Website
+                            <input type="url" id="edit-website" placeholder="https://example.com">
+                        </label>
+                        <div class="profile-edit-actions">
+                            <button class="btn btn-secondary" type="button" onclick="closeEditProfile()">Cancel</button>
+                            <button class="btn" type="button" onclick="saveProfile()">Save</button>
+                        </div>
+                    </div>
                 </div>
             </header>
 
@@ -670,6 +761,9 @@
             const avatar = document.getElementById('profile-avatar');
             const name = document.getElementById('profile-name');
             const joined = document.getElementById('profile-joined');
+            const bioEl = document.getElementById('profile-bio');
+            const websiteEl = document.getElementById('profile-website');
+            const statusEl = document.getElementById('profile-save-status');
 
             if (user.profile?.avatar_url) {
                 avatar.src = user.profile.avatar_url;
@@ -691,6 +785,20 @@
                     Member since ${date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                 `;
             }
+
+            bioEl.style.display = user.profile?.bio ? 'block' : 'none';
+            bioEl.textContent = user.profile?.bio || '';
+
+            if (user.profile?.website) {
+                websiteEl.style.display = 'block';
+                const safeUrl = user.profile.website.startsWith('http') ? user.profile.website : `https://${user.profile.website}`;
+                websiteEl.innerHTML = `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${safeUrl}</a>`;
+            } else {
+                websiteEl.style.display = 'none';
+                websiteEl.innerHTML = '';
+            }
+
+            statusEl.style.display = 'none';
         }
 
         async function loadConversations() {
@@ -775,6 +883,42 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        function openEditProfile() {
+            const form = document.getElementById('profile-edit-form');
+            const user = mnemolog.currentUser;
+            document.getElementById('edit-display-name').value = user?.profile?.display_name || '';
+            document.getElementById('edit-bio').value = user?.profile?.bio || '';
+            document.getElementById('edit-website').value = user?.profile?.website || '';
+            form.style.display = 'flex';
+        }
+
+        function closeEditProfile() {
+            const form = document.getElementById('profile-edit-form');
+            form.style.display = 'none';
+        }
+
+        async function saveProfile() {
+            const form = document.getElementById('profile-edit-form');
+            const statusEl = document.getElementById('profile-save-status');
+            const display_name = document.getElementById('edit-display-name').value.trim();
+            const bio = document.getElementById('edit-bio').value.trim();
+            const website = document.getElementById('edit-website').value.trim();
+
+            statusEl.style.display = 'inline';
+            statusEl.textContent = 'Saving...';
+
+            try {
+                await mnemolog.updateProfile({ display_name, bio, website });
+                await initProfile();
+                statusEl.textContent = 'Saved';
+                form.style.display = 'none';
+                setTimeout(() => { statusEl.style.display = 'none'; }, 2000);
+            } catch (err) {
+                console.error('Profile update failed:', err);
+                statusEl.textContent = 'Error saving profile';
+            }
         }
 
         function confirmDelete(id, title) {

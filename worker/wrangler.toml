@@ -3,9 +3,6 @@ main = "src/index.ts"
 compatibility_date = "2025-12-06"
 compatibility_flags = ["nodejs_compat"]
 
-[browser]
-binding = "BROWSER"
-
 [vars]
 ENVIRONMENT = "production"
 

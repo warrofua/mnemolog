@@ -57,10 +57,34 @@ async function checkAuth() {
 // Update UI based on auth state
 function updateAuthUI() {
   const authButtons = document.querySelectorAll('.auth-buttons');
+  const authToggles = document.querySelectorAll('[data-auth-toggle]');
   const userMenus = document.querySelectorAll('.user-menu');
+  const isMobile = window.matchMedia('(max-width: 600px)').matches;
   
   authButtons.forEach(el => {
-    el.style.display = currentUser ? 'none' : 'flex';
+    // Default desktop: visible; mobile: collapsed when logged out
+    if (currentUser) {
+      el.classList.remove('collapsed');
+      el.style.setProperty('display', 'none', 'important');
+    } else if (isMobile) {
+      el.classList.add('collapsed');
+      el.style.removeProperty('display');
+    } else {
+      el.classList.remove('collapsed');
+      el.style.removeProperty('display');
+    }
+  });
+  
+  authToggles.forEach(btn => {
+    if (currentUser || !isMobile) {
+      btn.style.display = 'none';
+      btn.onclick = null;
+      return;
+    }
+    btn.style.display = '';
+    btn.onclick = () => {
+      document.querySelectorAll('.auth-buttons').forEach(el => el.classList.toggle('collapsed'));
+    };
   });
   
   userMenus.forEach(el => {
@@ -81,6 +105,7 @@ function updateAuthUI() {
 // Sign in with provider
 async function signInWith(provider) {
   const sb = await initSupabase();
+
   const { error } = await sb.auth.signInWithOAuth({
     provider,
     options: {
@@ -158,13 +183,39 @@ async function deleteConversation(id) {
   });
 }
 
-// Parse conversation text into messages
-function parseConversation(text, platform) {
+// Update profile (display_name, bio, website)
+async function updateProfile(updates) {
+  const sb = await initSupabase();
+  const { data, error } = await sb
+    .from('profiles')
+    .update(updates)
+    .eq('id', currentUser?.id)
+    .select()
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  if (currentUser) {
+    currentUser.profile = { ...currentUser.profile, ...data };
+  }
+
+  return data;
+}
+
+// Parse conversation text into messages (delegates to shared parser if present)
+function parseConversation(text, platform, overrideFirstSpeaker) {
+  if (window.mnemologParsers?.parseConversation) {
+    const { messages } = window.mnemologParsers.parseConversation(text, platform, overrideFirstSpeaker);
+    return messages;
+  }
+
+  // Fallback: simple label-based parser
   const lines = text.split('\n');
   const messages = [];
   let currentMessage = null;
 
-  // Platform-specific patterns
   const patterns = {
     claude: {
       human: [/^(Human|H):\s*/i, /^You:\s*/i],
@@ -199,7 +250,6 @@ function parseConversation(text, platform) {
         messages.push(currentMessage);
       }
       
-      // Remove the prefix
       let content = line;
       [...humanPatterns, ...assistantPatterns].forEach(p => {
         content = content.replace(p, '');
@@ -218,24 +268,38 @@ function parseConversation(text, platform) {
     messages.push(currentMessage);
   }
 
-  // Trim content
   messages.forEach(m => {
     m.content = m.content.trim();
   });
 
-  // Filter empty messages
   return messages.filter(m => m.content.length > 0);
 }
 
 // Detect sensitive information
 function detectSensitiveInfo(text) {
   const patterns = [
-    { pattern: /\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g, type: 'phone number' },
+    // Phone numbers: (123) 456-7890, 123-456-7890, 123.456.7890, 1234567890, 555-0123
+    { pattern: /\b\+?\d{1,2}[\s.-]?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\b/g, type: 'phone number' },
+    { pattern: /\b\d{3}[-.\s]?\d{4}\b/g, type: 'phone number' }, // 7-digit fallback
     { pattern: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, type: 'email' },
     { pattern: /\b\d{3}[-]?\d{2}[-]?\d{4}\b/g, type: 'possible SSN' },
     { pattern: /\b\d{1,5}\s+\w+\s+(street|st|avenue|ave|road|rd|drive|dr|lane|ln|way|court|ct|boulevard|blvd)\b/gi, type: 'address' },
     { pattern: /\b\d{16}\b/g, type: 'possible card number' },
     { pattern: /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/g, type: 'possible card number' },
+    { pattern: /\b(?:card|visa|mastercard|amex|card number)\b/gi, type: 'card reference' },
+    // API keys / secrets (common prefixes)
+    { pattern: /\bsk_live_[A-Za-z0-9]{20,}\b/g, type: 'possible API key' },
+    { pattern: /\bsk_test_[A-Za-z0-9]{20,}\b/g, type: 'possible API key' },
+    { pattern: /\bxox[abp]-[A-Za-z0-9-]{10,}\b/g, type: 'possible API key' }, // Slack
+    { pattern: /\bAIza[0-9A-Za-z\-_]{30,}\b/g, type: 'possible API key' }, // Google
+    { pattern: /\bpk_live_[A-Za-z0-9]{20,}\b/g, type: 'possible API key' }, // Stripe publishable
+    { pattern: /\bghp_[A-Za-z0-9]{20,}\b/g, type: 'possible API key' }, // GitHub
+    // Credit card CVC (basic 3–4 digit near card keywords)
+    { pattern: /\b(?:cvc|cvv|csc)\s*[:=]?\s*\d{3,4}\b/gi, type: 'possible CVC' },
+    // Names/titles flagged explicitly
+    { pattern: /\bName\b/gi, type: 'name' },
+    { pattern: /\bFull\s+Name\b/gi, type: 'name' },
+    { pattern: /\bAccount\s+Name\b/gi, type: 'name' },
   ];
 
   const flags = [];
@@ -296,6 +360,7 @@ window.mnemolog = {
   detectSensitiveInfo,
   formatDate,
   platformNames,
+  updateProfile,
   get currentUser() { return currentUser; },
   get isLoggedIn() { return !!currentUser; },
 };
@@ -320,13 +385,13 @@ function buildHeaderHTML() {
             <a href="/explore">Explore</a>
             <a href="/#about">About</a>
             <a href="/faq">FAQ</a>
-            <a href="/profile">Profile</a>
+            <a href="/profile">Your Archive</a>
           </div>
           <div class="nav-actions">
-            <div class="auth-buttons">
+            <button class="auth-toggle" data-auth-toggle type="button">Sign in</button>
+            <div class="auth-buttons collapsed">
               <button class="auth-button" onclick="mnemolog.signInWith('google')">Google</button>
               <button class="auth-button" onclick="mnemolog.signInWith('github')">GitHub</button>
-              <button class="auth-button" onclick="mnemolog.signInWith('email')">Email</button>
             </div>
             <div class="user-menu">
               <details>

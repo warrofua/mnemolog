@@ -96,10 +96,54 @@ nav {
   gap: 1rem;
 }
 
+.heading-line {
+  display: block;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.1em;
+  margin: 0.5rem 0;
+}
+
+.heading-1 {
+  font-size: 1.35em;
+  font-weight: 600;
+}
+
+.heading-2 {
+  font-size: 1.2em;
+  font-weight: 600;
+}
+
+.heading-3 {
+  font-size: 1.1em;
+  font-weight: 600;
+}
+
 .auth-buttons {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  transition: all 0.2s;
+}
+
+.auth-buttons.collapsed {
+  display: none !important;
+}
+
+.auth-toggle {
+  display: none;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--border);
+  background: white;
+  color: var(--text);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.auth-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .auth-button {
@@ -273,13 +317,13 @@ nav {
     padding: 1rem;
     border: 1px solid var(--border);
     border-radius: 6px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-    z-index: 20;
-  }
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  z-index: 20;
+}
 
-  .nav-dropdown.active {
-    display: flex;
-  }
+.nav-dropdown.active {
+  display: flex;
+}
 
   .nav-links,
   .nav-actions {
@@ -299,6 +343,9 @@ nav {
   .auth-buttons {
     flex-direction: column;
     width: 100%;
+  }
+  .auth-toggle {
+    display: inline-flex;
   }
 
   .btn {

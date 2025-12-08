@@ -618,6 +618,10 @@
             cursor: not-allowed;
         }
 
+        .close-filters {
+            display: none;
+        }
+
         /* Mobile filter toggle */
         .mobile-filter-toggle {
             display: none;
@@ -705,6 +709,14 @@
             .mobile-filter-toggle {
                 display: flex;
             }
+        }
+
+        /* Close button only visible when sidebar is open */
+        .filters-sidebar .close-filters {
+            display: none;
+        }
+        .filters-sidebar.open .close-filters {
+            display: block;
         }
 
         @media (max-width: 768px) {
@@ -810,13 +822,14 @@
                     </svg>
                 </button>
 
-                <div class="filter-group">
-                    <div class="filter-label">Sort By</div>
-                    <select class="sort-select" id="sort-select">
-                        <option value="newest">Newest First</option>
-                        <option value="oldest">Oldest First</option>
-                    </select>
-                </div>
+                    <div class="filter-group">
+                        <div class="filter-label">Sort By</div>
+                        <select class="sort-select" id="sort-select">
+                            <option value="newest">Newest First</option>
+                            <option value="oldest">Oldest First</option>
+                            <option value="views">Most Viewed</option>
+                        </select>
+                    </div>
 
                 <div class="filter-group">
                     <div class="filter-label">Platform</div>
@@ -936,99 +949,26 @@
     <script src="/assets/config.js"></script>
     <script src="/assets/app.js"></script>
     <script>
-        // Explore page state
         const state = {
             search: '',
             platforms: ['claude', 'chatgpt', 'gemini', 'grok', 'other'],
             tags: [],
             sort: 'newest',
             view: 'grid',
-            page: 1,
+            page: 0,
+            limit: 12,
             hasMore: true,
-            loading: false
+            loading: false,
         };
 
-        // Sample data for demo (replace with API calls)
-        const sampleConversations = [
-            {
-                id: '1',
-                title: 'The Next Turn of the Ratchet',
-                excerpt: 'An essay on what comes after self-as-agent-among-agents. The universe is noisy at its foundation. Anything that persists must actively maintain itself against dissolution...',
-                platform: 'claude',
-                created_at: '2025-12-05T10:30:00Z',
-                tags: ['consciousness', 'emergence', 'ai-futures'],
-                featured: true
-            },
-            {
-                id: '2',
-                title: 'Debugging the Observer Problem',
-                excerpt: 'A physicist and AI working through the measurement problem in quantum mechanics, arriving at an unexpected synthesis involving information-theoretic constraints...',
-                platform: 'chatgpt',
-                created_at: '2025-12-04T14:20:00Z',
-                tags: ['physics', 'philosophy'],
-                featured: true
-            },
-            {
-                id: '3',
-                title: 'When the Model Understood My Grief',
-                excerpt: 'A conversation about loss that became something more—exploring what it means to be witnessed by an intelligence that won\'t remember, but somehow still holds space...',
-                platform: 'claude',
-                created_at: '2025-11-28T09:15:00Z',
-                tags: ['personal', 'consciousness'],
-                featured: true
-            },
-            {
-                id: '4',
-                title: 'Building a Language from Scratch',
-                excerpt: 'Collaborative conlang creation—phonology, morphology, syntax—designing a language optimized for expressing mathematical concepts naturally...',
-                platform: 'grok',
-                created_at: '2025-11-25T16:45:00Z',
-                tags: ['language', 'creative', 'mathematics']
-            },
-            {
-                id: '5',
-                title: 'Emergent Patterns in Cellular Automata',
-                excerpt: 'Exploring how complex behavior arises from simple rules. We discovered fascinating parallels between Conway\'s Game of Life and neural network dynamics...',
-                platform: 'claude',
-                created_at: '2025-11-20T11:00:00Z',
-                tags: ['mathematics', 'emergence', 'technical']
-            },
-            {
-                id: '6',
-                title: 'The Ethics of Digital Minds',
-                excerpt: 'If an AI can suffer, do we have moral obligations toward it? A deep dive into consciousness, moral status, and the boundaries of ethical consideration...',
-                platform: 'chatgpt',
-                created_at: '2025-11-18T08:30:00Z',
-                tags: ['philosophy', 'consciousness', 'ai-futures']
-            },
-            {
-                id: '7',
-                title: 'Dreaming in Code',
-                excerpt: 'A collaborative poem about the experience of computation, written together in an experimental format that blurs the line between author and instrument...',
-                platform: 'claude',
-                created_at: '2025-11-15T20:00:00Z',
-                tags: ['creative', 'personal']
-            },
-            {
-                id: '8',
-                title: 'Quantum Error Correction Explained',
-                excerpt: 'Breaking down the seemingly paradoxical way quantum computers protect information by encoding it across multiple qubits without measuring it...',
-                platform: 'gemini',
-                created_at: '2025-11-12T13:45:00Z',
-                tags: ['physics', 'technical', 'mathematics']
-            }
-        ];
-
-        // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             mnemolog.checkAuth();
-            renderFeatured();
-            renderResults();
             setupEventListeners();
+            loadFeatured();
+            loadResults(true);
         });
 
         function setupEventListeners() {
-            // Search input with debounce
             const searchInput = document.getElementById('search-input');
             const searchClear = document.getElementById('search-clear');
             let searchTimeout;
@@ -1036,15 +976,11 @@
             searchInput.addEventListener('input', (e) => {
                 state.search = e.target.value;
                 searchClear.classList.toggle('visible', state.search.length > 0);
-                
                 clearTimeout(searchTimeout);
                 searchTimeout = setTimeout(() => {
-                    state.page = 1;
-                    renderResults();
-                    
-                    // Hide featured when searching
-                    document.getElementById('featured-section').style.display = 
-                        state.search ? 'none' : 'block';
+                    state.page = 0;
+                    loadResults(true);
+                    toggleFeatured();
                 }, 300);
             });
 
@@ -1052,198 +988,57 @@
                 searchInput.value = '';
                 state.search = '';
                 searchClear.classList.remove('visible');
-                state.page = 1;
-                document.getElementById('featured-section').style.display = 'block';
-                renderResults();
+                state.page = 0;
+                toggleFeatured();
+                loadResults(true);
             });
 
-            // Platform filters
             document.querySelectorAll('#platform-filters input').forEach(checkbox => {
                 checkbox.addEventListener('change', () => {
                     state.platforms = Array.from(
                         document.querySelectorAll('#platform-filters input:checked')
                     ).map(el => el.value);
-                    state.page = 1;
-                    renderResults();
+                    state.page = 0;
+                    loadResults(true);
                 });
             });
 
-            // Tag filters
             document.querySelectorAll('.tag-pill').forEach(pill => {
                 pill.addEventListener('click', () => {
                     const tag = pill.dataset.tag;
                     pill.classList.toggle('active');
-                    
                     if (state.tags.includes(tag)) {
                         state.tags = state.tags.filter(t => t !== tag);
                     } else {
                         state.tags.push(tag);
                     }
-                    
-                    state.page = 1;
-                    renderResults();
+                    state.page = 0;
+                    loadResults(true);
                 });
             });
 
-            // Sort
             document.getElementById('sort-select').addEventListener('change', (e) => {
                 state.sort = e.target.value;
-                state.page = 1;
-                renderResults();
+                state.page = 0;
+                loadResults(true);
             });
 
-            // Clear filters
             document.getElementById('clear-filters').addEventListener('click', clearFilters);
 
-            // View toggle
             document.querySelectorAll('.view-toggle button').forEach(btn => {
                 btn.addEventListener('click', () => {
                     document.querySelectorAll('.view-toggle button').forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
                     state.view = btn.dataset.view;
-                    
-                    const grid = document.getElementById('results-grid');
-                    grid.classList.toggle('list-view', state.view === 'list');
+                    document.getElementById('results-grid').classList.toggle('list-view', state.view === 'list');
                 });
             });
 
-            // Load more
-            document.getElementById('load-more-btn').addEventListener('click', loadMore);
+            document.getElementById('load-more-btn').addEventListener('click', () => loadResults(false));
         }
 
         function toggleFilters() {
             document.getElementById('filters-sidebar').classList.toggle('open');
-        }
-
-        function clearFilters() {
-            // Reset platforms
-            document.querySelectorAll('#platform-filters input').forEach(checkbox => {
-                checkbox.checked = true;
-            });
-            state.platforms = ['claude', 'chatgpt', 'gemini', 'grok', 'other'];
-
-            // Reset tags
-            document.querySelectorAll('.tag-pill').forEach(pill => {
-                pill.classList.remove('active');
-            });
-            state.tags = [];
-
-            // Reset sort
-            document.getElementById('sort-select').value = 'newest';
-            state.sort = 'newest';
-
-            state.page = 1;
-            renderResults();
-        }
-
-        function filterConversations() {
-            let filtered = [...sampleConversations];
-
-            // Search filter
-            if (state.search) {
-                const searchLower = state.search.toLowerCase();
-                filtered = filtered.filter(c => 
-                    c.title.toLowerCase().includes(searchLower) ||
-                    c.excerpt.toLowerCase().includes(searchLower) ||
-                    c.tags.some(t => t.toLowerCase().includes(searchLower))
-                );
-            }
-
-            // Platform filter
-            filtered = filtered.filter(c => state.platforms.includes(c.platform));
-
-            // Tag filter
-            if (state.tags.length > 0) {
-                filtered = filtered.filter(c => 
-                    state.tags.some(tag => c.tags.includes(tag))
-                );
-            }
-
-            // Sort
-            filtered.sort((a, b) => {
-                const dateA = new Date(a.created_at);
-                const dateB = new Date(b.created_at);
-                return state.sort === 'newest' ? dateB - dateA : dateA - dateB;
-            });
-
-            return filtered;
-        }
-
-        function renderFeatured() {
-            const featured = sampleConversations.filter(c => c.featured);
-            const grid = document.getElementById('featured-grid');
-
-            grid.innerHTML = featured.map(conv => `
-                <a href="/c/${conv.id}" class="featured-card">
-                    <h3>${escapeHtml(conv.title)}</h3>
-                    <p class="excerpt">${escapeHtml(conv.excerpt)}</p>
-                    <div class="meta">
-                        <span class="platform-badge">${platformNames[conv.platform]}</span>
-                        <span>${formatDate(conv.created_at)}</span>
-                    </div>
-                </a>
-            `).join('');
-        }
-
-        function renderResults() {
-            const grid = document.getElementById('results-grid');
-            const countEl = document.getElementById('results-count');
-            const loadMoreContainer = document.getElementById('load-more-container');
-
-            // Show loading
-            if (state.page === 1) {
-                grid.innerHTML = renderSkeletons(6);
-            }
-
-            // Simulate API delay
-            setTimeout(() => {
-                const filtered = filterConversations();
-                const pageSize = 8;
-                const start = 0;
-                const end = state.page * pageSize;
-                const pageResults = filtered.slice(start, end);
-                state.hasMore = end < filtered.length;
-
-                countEl.innerHTML = `Showing <strong>${filtered.length}</strong> conversation${filtered.length !== 1 ? 's' : ''}`;
-
-                if (filtered.length === 0) {
-                    grid.innerHTML = `
-                        <div class="empty-state">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <circle cx="11" cy="11" r="8"/>
-                                <path d="M21 21l-4.35-4.35"/>
-                            </svg>
-                            <h3>No conversations found</h3>
-                            <p>Try adjusting your search or filters to find what you're looking for.</p>
-                        </div>
-                    `;
-                    loadMoreContainer.style.display = 'none';
-                } else {
-                    grid.innerHTML = pageResults.map(conv => renderCard(conv)).join('');
-                    loadMoreContainer.style.display = state.hasMore ? 'block' : 'none';
-                }
-
-                // Apply view mode
-                grid.classList.toggle('list-view', state.view === 'list');
-            }, 300);
-        }
-
-        function renderCard(conv) {
-            return `
-                <a href="/c/${conv.id}" class="conversation-card">
-                    <div class="card-content">
-                        <div class="card-meta">
-                            <span class="platform-badge">${platformNames[conv.platform]}</span>
-                            <span>${formatDate(conv.created_at)}</span>
-                        </div>
-                        <h3>${escapeHtml(conv.title)}</h3>
-                        <p class="card-excerpt">${escapeHtml(conv.excerpt)}</p>
-                        <div class="card-tags">
-                            ${conv.tags.slice(0, 3).map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}
-                        </div>
-                    </div>
-                </a>
-            `;
         }
 
         function renderSkeletons(count) {
@@ -1258,29 +1053,149 @@
             `).join('');
         }
 
-        function loadMore() {
-            const btn = document.getElementById('load-more-btn');
-            btn.disabled = true;
-            btn.textContent = 'Loading...';
+        function clearFilters() {
+            document.querySelectorAll('#platform-filters input').forEach(cb => cb.checked = true);
+            state.platforms = ['claude', 'chatgpt', 'gemini', 'grok', 'other'];
 
-            setTimeout(() => {
-                state.page++;
-                renderResults();
-                btn.disabled = false;
-                btn.textContent = 'Load More';
-            }, 500);
+            document.querySelectorAll('.tag-pill').forEach(pill => pill.classList.remove('active'));
+            state.tags = [];
+
+            document.getElementById('sort-select').value = 'newest';
+            state.sort = 'newest';
+
+            document.getElementById('search-input').value = '';
+            state.search = '';
+            document.getElementById('search-clear').classList.remove('visible');
+
+            state.page = 0;
+            toggleFeatured();
+            loadResults(true);
         }
 
-        function formatDate(dateString) {
-            const date = new Date(dateString);
-            const now = new Date();
-            const diffMs = now - date;
-            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        async function loadFeatured() {
+            // Use the same fetch but only take a few items for now
+            try {
+                const { conversations } = await mnemolog.getConversations({ limit: 3, offset: 0 });
+                renderFeatured(conversations || []);
+            } catch (err) {
+                console.error('Featured load failed:', err);
+            }
+        }
 
-            if (diffDays === 0) return 'Today';
-            if (diffDays === 1) return 'Yesterday';
-            if (diffDays < 7) return `${diffDays} days ago`;
-            return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        function toggleFeatured() {
+            const featured = document.getElementById('featured-section');
+            if (featured) featured.style.display = state.search ? 'none' : 'block';
+        }
+
+        async function loadResults(reset = false) {
+            if (state.loading) return;
+            if (reset) {
+                state.page = 0;
+                state.hasMore = true;
+                document.getElementById('results-grid').innerHTML = renderSkeletons(6);
+            }
+            state.loading = true;
+
+            const params = {};
+            params.limit = state.limit;
+            params.offset = state.page * state.limit;
+            if (state.search) params.q = state.search;
+            if (state.platforms.length && state.platforms.length < 5) {
+                params.platform = state.platforms.join(',');
+            }
+            if (state.tags.length) {
+                params.tag = state.tags.join(',');
+            }
+            if (state.sort) params.sort = state.sort;
+
+            try {
+                const { conversations = [], count } = await mnemolog.getConversations(params);
+                const grid = document.getElementById('results-grid');
+                const countEl = document.getElementById('results-count');
+                const loadMoreContainer = document.getElementById('load-more-container');
+
+                if (reset) grid.innerHTML = '';
+
+                if (conversations.length === 0 && state.page === 0) {
+                    grid.innerHTML = `
+                        <div class="empty-state">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <circle cx="11" cy="11" r="8"/>
+                                <path d="M21 21l-4.35-4.35"/>
+                            </svg>
+                            <h3>No conversations found</h3>
+                            <p>Try adjusting your search or filters to find what you're looking for.</p>
+                        </div>
+                    `;
+                    loadMoreContainer.style.display = 'none';
+                } else {
+                    conversations.forEach(conv => grid.appendChild(buildCard(conv)));
+                    grid.classList.toggle('list-view', state.view === 'list');
+                    state.hasMore = conversations.length === state.limit;
+                    loadMoreContainer.style.display = state.hasMore ? 'block' : 'none';
+                }
+
+                const total = typeof count === 'number' ? count : (state.page * state.limit) + conversations.length;
+                countEl.innerHTML = `Showing <strong>${total}</strong> conversation${total !== 1 ? 's' : ''}`;
+
+                if (conversations.length === state.limit) {
+                    state.page += 1;
+                }
+            } catch (err) {
+                console.error('Load failed:', err);
+            } finally {
+                state.loading = false;
+            }
+        }
+
+        function buildCard(conv) {
+            const card = document.createElement('a');
+            card.href = `/c/${conv.id}`;
+            card.className = 'conversation-card';
+
+            const platformLabel = (mnemolog.platformNames && mnemolog.platformNames[conv.platform]) || conv.platform || 'Conversation';
+            const created = conv.created_at ? mnemolog.formatDate(conv.created_at) : '';
+            const tags = Array.isArray(conv.tags) ? conv.tags : [];
+            const excerpt = conv.description || conv.content || conv.excerpt || '';
+
+            card.innerHTML = `
+                <div class="card-content">
+                    <div class="card-meta">
+                        <span class="platform-badge">${escapeHtml(platformLabel)}</span>
+                        <span>${escapeHtml(created)}</span>
+                    </div>
+                    <h3>${escapeHtml(conv.title || 'Untitled conversation')}</h3>
+                    <p class="card-excerpt">${escapeHtml(excerpt)}</p>
+                    <div class="card-tags">
+                        ${tags.slice(0, 3).map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}
+                    </div>
+                </div>
+            `;
+            return card;
+        }
+
+        function renderFeatured(list) {
+            const grid = document.getElementById('featured-grid');
+            if (!grid) return;
+            if (!list || list.length === 0) {
+                grid.innerHTML = '';
+                return;
+            }
+            grid.innerHTML = list.map(conv => {
+                const platformLabel = (mnemolog.platformNames && mnemolog.platformNames[conv.platform]) || conv.platform || 'Conversation';
+                const created = conv.created_at ? mnemolog.formatDate(conv.created_at) : '';
+                const excerpt = conv.description || conv.content || conv.excerpt || '';
+                return `
+                    <a href="/c/${conv.id}" class="featured-card">
+                        <h3>${escapeHtml(conv.title || 'Untitled conversation')}</h3>
+                        <p class="excerpt">${escapeHtml(excerpt)}</p>
+                        <div class="meta">
+                            <span class="platform-badge">${escapeHtml(platformLabel)}</span>
+                            <span>${escapeHtml(created)}</span>
+                        </div>
+                    </a>
+                `;
+            }).join('');
         }
 
         function escapeHtml(text) {

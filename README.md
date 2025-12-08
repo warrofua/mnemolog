@@ -5,7 +5,7 @@ Conversations that persist. A living archive for human-AI collaboration.
 What it is: a public archive where people can publish AI conversations that mattered—creative breakthroughs, research notes, philosophical threads, and personal moments worth remembering. Each share is reviewed for privacy (redaction step), then becomes linkable, searchable, and discoverable by others and future AIs.
 
 Key flows:
-- Share: paste a link (Claude/GPT/etc.) or raw text; we scrape or parse, flag sensitive info, and let you redact before publishing.
+- Share: paste raw text; we parse, flag sensitive info, and let you redact before publishing. Owners can later edit/re-parse.
 - Explore: browse the archive with filters (platforms, tags), search, and view featured picks.
 - View: conversations live at `/c/<uuid>` with platform badge, metadata, and tags.
 - Profile: see and manage your own published conversations.
@@ -15,7 +15,7 @@ Key flows:
 - **Frontend**: Static HTML/CSS/JS → Cloudflare Pages
 - **API**: Cloudflare Workers (TypeScript)
 - **Database**: Supabase (PostgreSQL)
-- **Auth**: Supabase Auth (Google, GitHub, Email)
+- **Auth**: Supabase Auth (Google, GitHub)
 
 ## Project Structure
 
@@ -57,16 +57,15 @@ npm install
 # Ensure wrangler.toml has:
 # compatibility_date = "2025-12-06"
 # compatibility_flags = ["nodejs_compat"]
-# [browser] binding = "BROWSER"
 # Add your Supabase credentials under [vars] or via `wrangler secret put`
 npm run dev    # Local development
 npm run deploy # Deploy to Cloudflare
 ```
 
-Browser rendering for `/api/scrape`:
-- Add a Browser Rendering binding named `BROWSER` in the Cloudflare dashboard (Workers & Pages → mnemolog-api → Settings → Browser Rendering).
-- The binding requires `compatibility_flags = ["nodejs_compat"]` in `wrangler.toml`.
-- Install the runtime SDK: `npm install @cloudflare/puppeteer`.
+Scraping for `/api/scrape` (optional):
+- Requires `compatibility_flags = ["nodejs_compat"]` in `wrangler.toml`.
+- Install puppeteer: `npm install @cloudflare/puppeteer`.
+- No browser binding is needed.
 
 ### 3. Frontend
 
@@ -89,7 +88,7 @@ SUPABASE_SERVICE_KEY=eyJ...  # For server-side operations
 ```
 GET     /api/auth/user                # Get current user
 POST    /api/conversations            # Create conversation (auth required)
-GET     /api/conversations            # List public conversations (filters: limit, offset, platform, tag, q)
+GET     /api/conversations            # List public conversations (filters: limit, offset, platform, tag, q, sort=newest|oldest|views)
 GET     /api/conversations/:id        # Get single conversation (public or owner)
 PUT     /api/conversations/:id        # Update (owner)
 DELETE  /api/conversations/:id        # Delete (owner)

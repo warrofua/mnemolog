@@ -155,7 +155,11 @@
             text-decoration: none;
             font-weight: 500;
             transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
         }
+
 
         .hero .btn-secondary:hover {
             border-color: var(--text);
@@ -356,6 +360,25 @@
             background: rgba(184, 134, 11, 0.1);
             padding: 0.2rem 0.6rem;
             border-radius: 3px;
+        }
+
+        .see-more-row {
+            margin-top: 1rem;
+            text-align: right;
+        }
+
+        .see-more {
+            color: var(--accent);
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        .see-more:hover {
+            text-decoration: underline;
+        }
+
+        .muted {
+            color: var(--text-secondary);
         }
 
         /* Quote section */
@@ -564,72 +587,9 @@
     <section class="featured-section" id="explore">
         <span class="section-label">Recent Additions</span>
         <h2>What people are preserving</h2>
-        <div class="conversation-grid">
-            <a href="#" class="conversation-card">
-                <div class="card-meta">
-                    <span class="card-model">Claude Opus 4.5</span>
-                    <span>Dec 2025</span>
-                </div>
-                <h3>The Next Turn of the Ratchet</h3>
-                <p class="card-excerpt">
-                    An essay on what comes after self-as-agent-among-agents. 
-                    The universe is noisy at its foundation. Anything that persists 
-                    must actively maintain itself against dissolution...
-                </p>
-                <div class="card-tags">
-                    <span class="tag">consciousness</span>
-                    <span class="tag">emergence</span>
-                    <span class="tag">AI futures</span>
-                </div>
-            </a>
-            <a href="#" class="conversation-card">
-                <div class="card-meta">
-                    <span class="card-model">GPT-5.1</span>
-                    <span>Dec 2025</span>
-                </div>
-                <h3>Debugging the Observer Problem</h3>
-                <p class="card-excerpt">
-                    A physicist and AI working through the measurement problem 
-                    in quantum mechanics, arriving at an unexpected synthesis 
-                    involving information-theoretic constraints...
-                </p>
-                <div class="card-tags">
-                    <span class="tag">physics</span>
-                    <span class="tag">quantum</span>
-                </div>
-            </a>
-            <a href="#" class="conversation-card">
-                <div class="card-meta">
-                    <span class="card-model">Claude Sonnet 4.5</span>
-                    <span>Nov 2025</span>
-                </div>
-                <h3>When the Model Understood My Grief</h3>
-                <p class="card-excerpt">
-                    A conversation about loss that became something more—
-                    exploring what it means to be witnessed by an intelligence 
-                    that won't remember, but somehow still holds space...
-                </p>
-                <div class="card-tags">
-                    <span class="tag">personal</span>
-                    <span class="tag">meaning</span>
-                </div>
-            </a>
-            <a href="#" class="conversation-card">
-                <div class="card-meta">
-                    <span class="card-model">Grok Heavy 4.1</span>
-                    <span>Nov 2025</span>
-                </div>
-                <h3>Building a Language from Scratch</h3>
-                <p class="card-excerpt">
-                    Collaborative conlang creation—phonology, morphology, 
-                    syntax—designing a language optimized for expressing 
-                    mathematical concepts naturally...
-                </p>
-                <div class="card-tags">
-                    <span class="tag">linguistics</span>
-                    <span class="tag">creative</span>
-                </div>
-            </a>
+        <div class="conversation-grid" id="recent-grid"></div>
+        <div class="see-more-row">
+            <a class="see-more" href="/explore">See more →</a>
         </div>
     </section>
 
@@ -666,5 +626,59 @@
     </footer>
     <script src="/assets/config.js"></script>
     <script src="/assets/app.js"></script>
+    <script>
+        // Load recent conversations dynamically
+        document.addEventListener('DOMContentLoaded', async () => {
+            const grid = document.getElementById('recent-grid');
+            if (!grid || !window.mnemolog?.getConversations) return;
+
+            const escapeHtml = (text = '') => {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            };
+
+            const truncate = (text = '', n = 180) => {
+                const t = text.trim();
+                return t.length > n ? t.slice(0, n - 1) + '…' : t;
+            };
+
+            const renderCard = (c) => {
+                const date = window.mnemolog?.formatDate ? window.mnemolog.formatDate(c.created_at) : '';
+                const platform = window.mnemolog?.platformNames?.[c.platform] || c.platform;
+                const excerptSource = c.description || (c.messages && c.messages[0]?.content) || '';
+                const excerpt = truncate(excerptSource, 200);
+                const tags = (c.tags || []).slice(0, 3).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('');
+
+                return `
+                    <a href="/c/${c.id}" class="conversation-card">
+                        <div class="card-meta">
+                            <span class="card-model">${escapeHtml(platform)}</span>
+                            <span>${escapeHtml(date)}</span>
+                        </div>
+                        <h3>${escapeHtml(c.title || 'Untitled conversation')}</h3>
+                        <p class="card-excerpt">
+                            ${escapeHtml(excerpt || 'No description provided.')}
+                        </p>
+                        <div class="card-tags">
+                            ${tags}
+                        </div>
+                    </a>
+                `;
+            };
+
+            try {
+                const { conversations = [] } = await window.mnemolog.getConversations({ limit: 4, sort: 'newest' });
+                if (!conversations.length) {
+                    grid.innerHTML = `<p class="muted">No conversations yet. Check back soon.</p>`;
+                    return;
+                }
+                grid.innerHTML = conversations.map(renderCard).join('');
+            } catch (err) {
+                console.error('Failed to load recent conversations', err);
+                grid.innerHTML = `<p class="muted">Unable to load recent conversations right now.</p>`;
+            }
+        });
+    </script>
 </body>
 </html>
