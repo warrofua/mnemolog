@@ -55,7 +55,9 @@ export async function onRequest(context) {
     `<meta property="twitter:card" content="summary">`
   );
 
-  return new Response(html, {
-    headers: { 'Content-Type': 'text/html; charset=UTF-8' },
-  });
+  const headers = new Headers(baseResp.headers);
+  headers.set('Content-Type', 'text/html; charset=UTF-8');
+  headers.set('x-og-generated', '1');
+
+  return new Response(html, { headers });
 }

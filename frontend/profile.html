@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Your Archive — Mnemolog</title>
+    <link rel="icon" href="/assets/mnemolog-fav-icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/assets/mnemolog-logo-light.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
@@ -642,6 +644,10 @@
                             <input type="text" id="edit-display-name" placeholder="Your name">
                         </label>
                         <label>
+                            Avatar image URL
+                            <input type="url" id="edit-avatar-url" placeholder="https://example.com/me.jpg">
+                        </label>
+                        <label>
                             Bio
                             <textarea id="edit-bio" placeholder="A short note about you"></textarea>
                         </label>
@@ -889,6 +895,7 @@
             const form = document.getElementById('profile-edit-form');
             const user = mnemolog.currentUser;
             document.getElementById('edit-display-name').value = user?.profile?.display_name || '';
+            document.getElementById('edit-avatar-url').value = user?.profile?.avatar_url || '';
             document.getElementById('edit-bio').value = user?.profile?.bio || '';
             document.getElementById('edit-website').value = user?.profile?.website || '';
             form.style.display = 'flex';
@@ -903,6 +910,7 @@
             const form = document.getElementById('profile-edit-form');
             const statusEl = document.getElementById('profile-save-status');
             const display_name = document.getElementById('edit-display-name').value.trim();
+            const avatar_url = document.getElementById('edit-avatar-url').value.trim();
             const bio = document.getElementById('edit-bio').value.trim();
             const website = document.getElementById('edit-website').value.trim();
 
@@ -910,7 +918,7 @@
             statusEl.textContent = 'Saving...';
 
             try {
-                await mnemolog.updateProfile({ display_name, bio, website });
+                await mnemolog.updateProfile({ display_name, bio, website, avatar_url });
                 await initProfile();
                 statusEl.textContent = 'Saved';
                 form.style.display = 'none';

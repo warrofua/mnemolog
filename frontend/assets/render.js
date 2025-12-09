@@ -37,11 +37,12 @@
           const level = mdMatch[1].length;
           const content = mdMatch[2].trim();
           if (looksLikeHeading(content)) {
-            return `<span class="heading-line heading-${level}">${escapeHtml(content)}</span>`;
+            const cls = level === 1 ? 'heading-1' : level === 2 ? 'heading-2' : 'heading-3';
+            return `<span class="heading-line ${cls}">${escapeHtml(content)}</span>`;
           }
         }
         if (bare && !mathSymbols.test(bare) && looksLikeHeading(bare)) {
-          return `<span class="heading-line">${line}</span>`;
+          return `<span class="heading-line heading-4">${escapeHtml(bare)}</span>`;
         }
         return line;
       })

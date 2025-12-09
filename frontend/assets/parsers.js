@@ -2,125 +2,75 @@
 // Exposes window.mnemologParsers.parseConversation(rawText, platform, overrideFirstSpeaker?)
 // Designed to be loaded before assets/app.js and used by share.html and other pages.
 (function () {
-  const mathSymbols = /[∑Σ∞πℵ√±×÷·∏∂µ∀∃→←⇒≤≥≠≈≡⊂⊃⊆⊇∈∉∪∩⊕⊗∇=+\-/*^]/;
-
-  const isMathLine = (line, maxLen = 80) => {
-    const t = line.trim().replace(/[\u200b-\u200f]/g, '');
-    if (!t) return false;
-    if (t.length > maxLen) return false;
-    if (/^[a-zA-Z0-9]$/.test(t)) return true;
-    if (/^[+\-*/=^√π∑∞∫∂∀∃≤≥≠≈≡⊂⊃∈∉∪∩⊕⊗∇]$/.test(t)) return true;
-    if (/^[a-zA-Z]+\^?\d*$/.test(t)) return true;
-    if (/^[\d\.]+$/.test(t)) return true;
-    if (/^e\^/.test(t)) return true;
-    if (/^-\w+$/.test(t)) return true;
-    const mathChars = t.match(/[+\-*/=^√π∑∞∫∂∀∃≤≥≠≈≡⊂⊃∈∉∪∩⊕⊗∇]/g) || [];
-    return mathChars.length >= 1 && t.length <= 20;
-  };
-
-  const isMathishLine = (line, maxLen = 300) => {
-    const t = line.trim().replace(/[\u200b-\u200f]/g, '');
-    if (!t) return false;
-    if (t.length > maxLen) return false;
-    if (/^[\dIVXLCDM]+$/.test(t)) return true;
-    if (mathSymbols.test(t)) return true;
-    const nonWord = (t.match(/[^\w\s]/g) || []).length;
-    return nonWord > 1 && (nonWord / Math.max(1, t.length)) > 0.2;
-  };
-
-  function rejoinMathBlocks(text) {
+  // Simplified math preservation: join likely math lines into single lines
+  function preserveMathBlocks(text) {
     const lines = text.split('\n');
     const result = [];
-    let buffer = [];
+    let mathBuffer = [];
 
-    const flush = () => {
-      if (buffer.length) {
-        result.push(buffer.join('').replace(/\s+/g, ' ').trim());
-        buffer = [];
-      }
+    const isLikelyMath = (line) => {
+      const t = line.trim();
+      if (!t || t.length > 200) return false;
+      const mathDensity = (t.match(/[±×÷√∏∑∂∫∞πµ∀∃≤≥≠≈≡⊂⊃⊆⊇∈∉⊕⊗∇^/*+\-]/g) || []).length;
+      return mathDensity >= 2 || /^[\d\w\^√π∑∞∫∂]+\s*[=±×÷]\s*.+$/.test(t);
     };
 
-    lines.forEach(line => {
+    for (const line of lines) {
       const trimmed = line.trim();
-      if (isMathLine(line) || (buffer.length > 0 && trimmed === '')) {
-        buffer.push(trimmed || ' ');
+      if (isLikelyMath(line) && trimmed !== '') {
+        mathBuffer.push(trimmed);
       } else {
-        flush();
+        if (mathBuffer.length) {
+          result.push(mathBuffer.join(' '));
+          mathBuffer = [];
+        }
         result.push(line);
       }
-    });
-    flush();
-
+    }
+    if (mathBuffer.length) result.push(mathBuffer.join(' '));
     return result.join('\n');
+  }
+
+  // Legacy aliases — prefer preserveMathBlocks in new code
+  function rejoinMathBlocks(text) {
+    return preserveMathBlocks(text);
   }
 
   function normalizeEquations(text) {
-    const lines = text.split('\n').map(l => l.replace(/[\u200b-\u200f]/g, ''));
-    const result = [];
-    let buffer = [];
-
-    const flush = () => {
-      if (buffer.length) {
-        result.push(buffer.join(' ').replace(/\s+/g, ' ').trim());
-        buffer = [];
-      }
-    };
-
-    lines.forEach(line => {
-      if (isMathishLine(line, 120)) {
-        buffer.push(line.trim());
-      } else {
-        flush();
-        result.push(line);
-      }
-    });
-    flush();
-    return result.join('\n');
+    return preserveMathBlocks(text);
   }
 
-  function stripCruft(text, platformHint) {
-    const lines = text.split('\n');
-    let inFence = false;
-    const kept = [];
-    const cruftPatterns = [
+  function stripCruft(text) {
+    const CRUFT_PATTERNS = [
       /^Skip to content/i,
       /^Chat history/i,
-      /^ChatGPT\s*$/i,
       /^Thought for \d+s?/i,
-      /^Searched for /i,
-      /^Image of\b/i,
-      /^No file chosen/i,
-      /^Upgrade to /i,
-      /^Copy\s*$/i,
-      /^Retry\s*$/i,
-      /^Edit\s*$/i,
-      /^\d+(\.\d+)?s\s*$/i,
-      /^ChatGPT can make mistakes\. Check important info\./i,
+      /^Searched \d+ web/i,
+      /^Image of/i,
+      /^Upgrade to/i,
+      /^Copy$/i,
+      /^Retry$/i,
+      /^Edit$/i,
+      /^\d+(\.\d+)?s?$/i,
+      /^ChatGPT can make mistakes/i,
     ];
-
-    lines.forEach(line => {
-      if (line.trim().startsWith('```')) {
-        inFence = !inFence;
-        kept.push(line);
-        return;
-      }
-      if (inFence) {
-        kept.push(line);
-        return;
-      }
-      if (cruftPatterns.some(p => p.test(line))) return;
-      if (platformHint === 'gemini' && line.trim().match(/^(AI's|Cloudflare|Supabase|Inverting|Poisson|From Randomness|Blake and Rumi|Reality, AI)/)) return;
-      kept.push(line);
-    });
-
-    return kept.join('\n').trim();
+    return text
+      .split('\n')
+      .filter(line => {
+        const t = line.trim();
+        if (t.startsWith('```')) return true;
+        if (CRUFT_PATTERNS.some(p => p.test(t))) return false;
+        return true;
+      })
+      .join('\n')
+      .trim();
   }
 
   // ===== ChatGPT =====
   function tryParseChatGPT(text) {
     if (!text.includes('You said:') && !text.includes('ChatGPT said:')) return null;
 
-    text = stripCruft(text, 'chatgpt');
+    text = stripCruft(text);
     const messages = [];
     const parts = text.split(/(?=^You said:$|^ChatGPT said:$)/m);
 
@@ -142,11 +92,12 @@
     if (messages.length < 2) return null;
 
     return {
-      messages,
+      messages: messages.map(m => ({ ...m, content: preserveMathBlocks(m.content) })),
       metadata: {
         detectedProvider: 'chatgpt',
         detectedFirstSpeaker: messages[0]?.role || 'human',
         userOverrodeFirstSpeaker: false,
+        hasLabels: true,
         rawCharacterCount: text.length,
         messageCount: messages.length,
       }
@@ -155,6 +106,18 @@
 
   // ===== Gemini =====
   function tryParseGemini(text) {
+    // Handle common Gemini export headers:
+    // "Gemini" (logo line), "<conversation title>", "Conversation with Gemini"
+    const lines = text.split('\n');
+    const headerIdx = lines.findIndex(l => /conversation with gemini/i.test(l.trim()));
+    if (headerIdx !== -1) {
+      const trimmed = lines.slice(headerIdx + 1).join('\n').trim();
+      if (trimmed) {
+        // Defer to generic parsing after header removal
+        return parseGeneric(trimmed, null, 'gemini');
+      }
+    }
+    // If no explicit header, fallback to generic
     return null;
   }
 
@@ -167,227 +130,145 @@
     if (/Thought for \d+s/i.test(trimmed)) return 'assistant';
     if (/Image of\b/i.test(trimmed)) return 'assistant';
     const aiFirstPatterns = [
-      /^(hi|hello|hey)[,!]?\s+i'?m\s+(an?\s+)?(ai|assistant|claude|chatgpt|gpt)/i,
-      /^i'?m\s+(an?\s+)?(ai|assistant|claude)/i,
-      /how can i (help|assist) you/i,
-      /^(welcome|greetings)[!,.]?\s/i,
-      /created by (anthropic|openai)/i,
+      /^i'?m\s+(an?\s+)?(ai|assistant|claude|grok|chatgpt|gpt)/i,
+      /how can i (help|assist)/i,
+      /^(hi|hello|hey|greetings|welcome)/i,
+      /created by (anthropic|openai|xai)/i,
       /^as an ai/i,
-      /i'?m here to help/i,
     ];
-    return aiFirstPatterns.some(p => p.test(firstSegment)) ? 'assistant' : 'human';
-  }
-
-  function isContinuation(content, lastRole) {
-    const trimmed = content.trim();
-    if (!trimmed) return true;
-    if (/^[-*•]/.test(trimmed)) return true;
-    if (/^[a-z]/.test(trimmed)) return true;
-    if (/^(and|but|or|so|then|also|yet|however|here's|meanwhile|plus|from|the|this feels|what)/i.test(trimmed)) return true;
-    if (/takes a breath|exhales|sitting with|let me think|let me/i.test(trimmed)) return true;
-    if (lastRole === 'assistant' && !/[?!]$/.test(trimmed)) return true;
-    return false;
+    return aiFirstPatterns.some(p => p.test(trimmed)) ? 'assistant' : 'human';
   }
 
   function parseGeneric(rawText, overrideFirstSpeaker, platformHint) {
-    const text = stripCruft(rawText, platformHint);
+    let text = stripCruft(rawText);
+    text = preserveMathBlocks(text);
 
-    const labelRegex = /^[-*•]?\s*(\*\*|__)?(human|user|you|me|h|assistant|ai|claude|chatgpt|gpt|model|bot|a|system)\s*[:\-–—]\s*/i;
-    const markerOnlyRegex = /^(human|user|you|me|h|assistant|ai|claude|chatgpt|gpt|model|bot|a|system)$/i;
-    const roleFromLabel = (label) => ['human','user','you','me','h'].includes(label.toLowerCase()) ? 'human' : 'assistant';
-
-    const lines = text.split(/\r?\n/);
+    const ROLE_LABEL = /^[\s-*•>]*\s*(You|Human|User|Me|H|Assistant|AI|Claude|ChatGPT|Grok|Bot|Model|A|System)[\s:–—-]+/i;
+    const ROLE_MARKER_ONLY = /^[\s-*•>]*\s*(You|Human|User|Me|H|Assistant|AI|Claude|ChatGPT|Grok|Bot|Model|A|System)\s*$/i;
+    const lines = text.split('\n');
+    
     const segments = [];
     let current = { role: null, content: '' };
-    let inFence = false;
+    let sawLabel = false;
 
     const push = () => {
-      const trimmed = current.content.trim();
-      if (trimmed.length > 1) segments.push({ ...current, content: trimmed });
+      if (current.content.trim()) {
+        segments.push({
+          role: current.role,
+          content: current.content.trim()
+        });
+      }
       current = { role: null, content: '' };
     };
 
-    lines.forEach(line => {
-      const trimmedLine = line.trim();
-      if (trimmedLine.startsWith('```')) {
-        inFence = !inFence;
-        current.content += (current.content ? '\n' : '') + line;
-        return;
+    for (let line of lines) {
+      const match = line.match(ROLE_LABEL);
+      if (match) {
+        sawLabel = true;
+        push();
+        const label = match[1].toLowerCase();
+        current.role = /(you|human|user|me|h)/i.test(label) ? 'human' : 'assistant';
+        current.content = line.replace(ROLE_LABEL, '').trim();
+        continue;
       }
 
-      if (!inFence) {
-        const match = line.match(labelRegex);
-        if (match) {
-          push();
-          const label = match[2] || '';
-          current = { role: roleFromLabel(label), content: line.replace(labelRegex, '').trim() };
-          return;
-        }
-        const markerOnly = trimmedLine.match(markerOnlyRegex);
-        if (markerOnly) {
-          push();
-          current = { role: roleFromLabel(markerOnly[1]), content: '' };
-          return;
-        }
-        if (trimmedLine === '') {
-          push();
-          return;
-        }
+      const markerOnly = line.match(ROLE_MARKER_ONLY);
+      if (markerOnly) {
+        sawLabel = true;
+        push();
+        const label = markerOnly[1].toLowerCase();
+        current.role = /(you|human|user|me|h)/i.test(label) ? 'human' : 'assistant';
+        current.content = '';
+        continue;
       }
+
+      // Skip leading blank lines before first content
+      if (!current.content && !line.trim()) continue;
 
       current.content += (current.content ? '\n' : '') + line;
-    });
+    }
     push();
 
-    if (!segments.length) {
-      rawText.split(/\n{2,}/).map(s => s.trim()).filter(Boolean)
-        .forEach(content => segments.push({ role: null, content }));
+    // Fallback: if no labels, split on double newlines
+    if (!sawLabel && segments.length === 1 && !segments[0].role) {
+      const parts = text.split(/\n{2,}/).filter(p => p.trim());
+      segments.length = 0;
+      parts.forEach(p => segments.push({ role: null, content: p.trim() }));
     }
 
-    const isConjunctionStart = (s) => /^(and|but|or|so|then|also|yet|however|here's|meanwhile|plus|from|the|this feels|what)/i.test(s.trim());
-    const isListish = (s) => /^[-*•]/.test(s.trim()) || /^(\d+\.|[ivxlcdm]+\.)\s/i.test(s.trim());
-    const isMetaBeat = (s) => /(takes a breath|exhales|sitting with|let me think|let me)/i.test(s.trim());
-    const shortish = (s, n = 150) => s.trim().length < n;
+    // Assign roles with simple alternation, honoring explicit labels
+    const firstLabeled = segments.find(s => s.role)?.role || null;
+    let firstSpeaker = overrideFirstSpeaker || firstLabeled || detectFirstSpeaker(segments[0]?.content || '');
 
-    const shouldMerge = (text, lastRole) => {
-      const trimmed = text.trim();
-      if (!trimmed) return true;
-      if (isListish(trimmed)) return true;
-      if (/^(I|II|III|IV|V|VI|VII|VIII|IX|X)\.\s/.test(trimmed)) return true;
-      if (/^(∫|∑|π|∂|∇|∀|∃|lim|log|sin|cos|tan)/i.test(trimmed)) return true;
-      if (isConjunctionStart(trimmed)) return true;
-      if (isMetaBeat(trimmed)) return true;
-      // Claude: keep human paragraphs separate; avoid merging long assistant prose
-      if (platformHint === 'claude') {
-        if (lastRole === 'human') return false;
-        if (lastRole === 'assistant' && trimmed.length > 180) return false;
-      }
-      if (shortish(trimmed, 150)) return true;
-      // For non-chatgpt (e.g., Claude/Grok/other), avoid aggressive assistant merging
-      if (platformHint !== 'chatgpt' && lastRole === 'assistant') return false;
-      if (lastRole === 'assistant' && !/[?!]$/.test(trimmed)) return true;
-      return false;
-    };
-
-    const mergedSegments = [];
-    segments.forEach(seg => {
-      const last = mergedSegments[mergedSegments.length - 1];
-      if (last && (!seg.role || seg.role === last.role) && shouldMerge(seg.content, last.role)) {
-        last.content += '\n\n' + seg.content;
-      } else {
-        mergedSegments.push({ ...seg });
-      }
-    });
-
-    const firstLabeled = mergedSegments.find(p => p.role);
-    const detected = firstLabeled?.role || detectFirstSpeaker(mergedSegments[0]?.content || '');
-    const firstSpeaker = overrideFirstSpeaker || detected;
-
-    const useLongAssistantBias = platformHint === 'chatgpt';
-    let lastRole = firstSpeaker;
-    let inLongAssistant = firstSpeaker === 'assistant';
-    let assistantCharCount = 0;
+    let currentRole = firstSpeaker;
     const messages = [];
-    let claudeHumanBias = platformHint === 'claude' ? 2 : 0;
-    let assistantSeen = firstSpeaker === 'assistant';
-    let humanSeen = firstSpeaker === 'human';
 
-    mergedSegments.forEach((seg, idx) => {
+    segments.forEach((seg, idx) => {
       const content = (seg.content || '').trim();
       if (!content) return;
 
-      const looksHuman = content.length < 200 ||
-        /\?/.test(content) ||
-        /^(What|How|Why|Do you|Can you|Tell me|I think|I feel|That )/i.test(content);
-
-      if (idx === 0) {
-        const role = seg.role || firstSpeaker;
-        messages.push({ role, content });
-        lastRole = role;
-        if (role === 'assistant') {
-          inLongAssistant = true;
-          assistantCharCount = content.length;
-          assistantSeen = true;
-        }
-        return;
-      }
-
-      if (platformHint === 'claude' && !assistantSeen && lastRole === 'human' && claudeHumanBias > 0) {
-        claudeHumanBias--;
-        messages.push({ role: 'human', content });
-        lastRole = 'human';
-        return;
-      }
-
-      if (platformHint === 'claude' && lastRole === 'assistant' && !assistantSeen && humanSeen && looksHuman) {
-        lastRole = 'human';
-        humanSeen = true;
-        inLongAssistant = false;
-        assistantCharCount = 0;
-        messages.push({ role: 'human', content });
-        return;
-      }
-
-      if (useLongAssistantBias && lastRole === 'assistant') {
-        const safeMerge = !looksHuman && content.length < 500;
-        const inLongMode = inLongAssistant && assistantCharCount > 1000 && !looksHuman;
-        if (safeMerge || inLongMode) {
-          const last = messages[messages.length - 1];
-          if (last) {
-            last.content += '\n\n' + content;
-            assistantCharCount += content.length;
-          }
-          return;
-        }
-      }
-
-      const role = seg.role || (isContinuation(seg.content, lastRole) ? lastRole : (lastRole === 'human' ? 'assistant' : 'human'));
-      lastRole = role;
-      if (role === 'assistant') {
-        inLongAssistant = true;
-        assistantCharCount = content.length;
-        assistantSeen = true;
+      if (seg.role) {
+        currentRole = seg.role;
+      } else if (idx === 0) {
+        currentRole = firstSpeaker;
       } else {
-        inLongAssistant = false;
-        assistantCharCount = 0;
+        currentRole = currentRole === 'human' ? 'assistant' : 'human';
       }
-      messages.push({ role, content });
+
+      const last = messages[messages.length - 1];
+      const isContinuation = (() => {
+        const t = content.trim();
+        if (/^[-*•]/.test(t)) return true;
+        if (/^\d+\.\s/.test(t)) return true; // numbered list
+        if (/^[a-z]/.test(t)) return true;
+        if (/^(and|but|also|however|so|yes|no|additionally|moreover|furthermore|that said)/i.test(t)) return true;
+        return false;
+      })();
+
+      if (last && last.role === currentRole && isContinuation) {
+        last.content += '\n\n' + content;
+      } else {
+        messages.push({ role: currentRole, content });
+      }
     });
 
     return {
       messages,
       metadata: {
         detectedProvider: platformHint || 'generic',
-        detectedFirstSpeaker: detected,
-        userOverrodeFirstSpeaker: Boolean(overrideFirstSpeaker),
-        rawCharacterCount: rawText.length,
+        detectedFirstSpeaker: firstSpeaker,
+        userOverrodeFirstSpeaker: !!overrideFirstSpeaker,
+        hasLabels: sawLabel,
+        rawCharacterCount: text.length,
         messageCount: messages.length,
-      },
+      }
     };
   }
 
   function parseConversation(rawText, platform, overrideFirstSpeaker) {
-    let text = rawText.replace(/\r\n/g, '\n');
-    text = rejoinMathBlocks(text);
-    text = text.trim();
+    let text = rawText.replace(/\r\n/g, '\n').trim();
     const selected = (platform || 'other').toLowerCase();
 
     if (selected === 'chatgpt') {
       const chatgptResult = tryParseChatGPT(text);
       if (chatgptResult) {
-        chatgptResult.messages = chatgptResult.messages.map(m => ({ ...m, content: normalizeEquations(m.content) }));
         return chatgptResult;
       }
     }
 
-    const genericResult = parseGeneric(text, overrideFirstSpeaker, selected);
-    genericResult.messages = genericResult.messages.map(m => ({ ...m, content: normalizeEquations(m.content) }));
-    return genericResult;
+    // Gemini: strip common header if present
+    if (selected === 'gemini') {
+      const geminiResult = tryParseGemini(text);
+      if (geminiResult) return geminiResult;
+    }
+
+    return parseGeneric(text, overrideFirstSpeaker, selected);
   }
 
   window.mnemologParsers = {
     parseConversation,
     normalizeEquations,
-    rejoinMathBlocks,
+    rejoinMathBlocks: preserveMathBlocks,
+    preserveMathBlocks,
   };
 })();

@@ -383,14 +383,18 @@ router.get('/api/conversations', async (request: IRequest, env: Env) => {
     query = query.overlaps('tags', tags);
   }
   if (search) {
-    const sanitized = search.replace(/'/g, "''");
-    const tagTerms = search
+    const terms = search
+      .trim()
       .split(/\s+/)
-      .map(t => t.trim().toLowerCase())
+      .map(t => t.replace(/[^a-zA-Z0-9]/g, '').toLowerCase())
       .filter(Boolean);
-    if (tagTerms.length) {
-      const tagList = tagTerms.join(',');
-      query = query.or(`fts.wfts.${sanitized},tags.cs.{${tagList}}`);
+    const lexeme = terms.join('&');
+    const tagList = terms.join(',');
+    if (lexeme || tagList) {
+      const filters = [];
+      if (lexeme) filters.push(`fts.wfts.${lexeme}`);
+      if (tagList) filters.push(`tags.cs.{${tagList}}`);
+      query = query.or(filters.join(','));
     } else {
       query = query.textSearch('fts', search, { type: 'websearch', config: 'english' });
     }

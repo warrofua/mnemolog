@@ -16,6 +16,7 @@ Key flows:
 - **API**: Cloudflare Workers (TypeScript)
 - **Database**: Supabase (PostgreSQL)
 - **Auth**: Supabase Auth (Google, GitHub)
+- **Link previews**: Pages `_worker.js` injects dynamic OpenGraph tags for `/c/<uuid>` by fetching metadata from the API worker.
 
 ## Project Structure
 
@@ -23,12 +24,13 @@ Key flows:
 mnemolog/
 ├── frontend/               # Static site → Cloudflare Pages
 │   ├── index.html          # Homepage
-│   ├── share.html          # Share conversation flow (link scrape + raw text fallback)
+│   ├── share.html          # Share conversation flow (raw text parsing + redaction)
 │   ├── conversation.html   # Public conversation view
 │   ├── explore.html        # Explore/browse conversations
 │   ├── faq.html            # FAQ
 │   ├── privacy.html        # Privacy policy
 │   ├── terms.html          # Terms of use
+│   ├── _worker.js          # Pages worker for dynamic OG tags on /c/<id>
 │   ├── auth/callback/      # Supabase auth callback page
 │   ├── assets/             # app.js + config.js
 │   └── _redirects          # Pages rewrites (c/<id> → conversation)
@@ -62,22 +64,24 @@ npm run dev    # Local development
 npm run deploy # Deploy to Cloudflare
 ```
 
-Scraping for `/api/scrape` (optional):
-- Requires `compatibility_flags = ["nodejs_compat"]` in `wrangler.toml`.
-- Install puppeteer: `npm install @cloudflare/puppeteer`.
-- No browser binding is needed.
+Note: The browser rendering binding was removed; the API worker now runs with standard `nodejs_compat` only. If you reintroduce scraping that needs a headless browser, add the binding and dependency explicitly.
 
 ### 3. Frontend
 
 ```bash
 cd frontend
 # Deploy to Cloudflare Pages via dashboard or:
-npx wrangler pages deploy . --project-name=mnemolog
+npx wrangler pages deploy . --project-name mnemolog --branch main --commit-dirty=true
 ```
 
-## Environment Variables (Worker)
+## Environment Variables
 
 ```
+# Pages (_worker.js for OG tags does not require secrets, but the API URL is in config.js)
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_ANON_KEY=eyJ...
+
+# Worker (API)
 SUPABASE_URL=https://xxx.supabase.co
 SUPABASE_ANON_KEY=eyJ...
 SUPABASE_SERVICE_KEY=eyJ...  # For server-side operations
@@ -106,11 +110,14 @@ GET     /api/scrape?url=...&selector=... # Scrape public share page (browser ren
 - `/privacy` — privacy policy
 - `/terms` — terms of use
 
-Share flow supports two inputs:
-- Paste a share link (recommended): uses `/api/scrape` to fetch content.
-- Paste raw text (fallback): client-side parser + preview.
+Share flow:
+- Paste raw text: client-side parser + preview/redaction.
+- First-speaker toggle and merge/split tools to fix roles.
+- Owners can re-parse/edit existing conversations via the “Edit / Re-parse” button on their conversation page.
 
 **Deployment notes**
 - Pages: `cd frontend && npx wrangler pages deploy . --project-name=mnemolog` (ensure `_redirects` ships so `/c/<id>` works).
 - Worker: `cd worker && npm install && npm run deploy` after API changes.
-- Scrape: browser rendering requires the `BROWSER` binding, `compatibility_flags = ["nodejs_compat"]`, and the `@cloudflare/puppeteer` dependency. Once configured, `/api/scrape` launches a headless browser to execute JS and extract rendered text.
+- Link previews: `_worker.js` injects OG/Twitter tags on `/c/<id>` by fetching conversation metadata from the API worker.
+- Icons: favicons/logos live in `frontend/assets/mnemolog-fav-icon.svg`, `mnemolog-logo-light.svg`, `mnemolog-logo-dark.svg`; OG previews use the dark logo.
+- Profiles: users can set an avatar image URL on `profile.html`; any publicly hosted image URL works (e.g., an image you host under `/assets/`).

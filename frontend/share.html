@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Share a Conversation — Mnemolog</title>
+    <link rel="icon" href="/assets/mnemolog-fav-icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/assets/mnemolog-logo-light.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
@@ -264,6 +266,7 @@
             display: inline-flex;
             align-items: center;
             gap: 0.4rem;
+            margin-top: 0.25rem;
         }
 
         .first-speaker-inline select {
@@ -271,6 +274,10 @@
             border: 1px solid var(--border);
             border-radius: 4px;
             background: white;
+        }
+
+        .review-section {
+            position: relative;
         }
 
         .conversation-preview {
@@ -281,9 +288,9 @@
 
         .parse-help {
             position: absolute;
-            top: 1rem;
+            top: 0.6rem;
             right: 1.5rem;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             color: var(--text-secondary);
             cursor: help;
         }
@@ -303,7 +310,8 @@
             z-index: 5;
         }
 
-        .parse-help:hover .tooltip {
+        .parse-help:hover .tooltip,
+        .parse-help.open .tooltip {
             display: block;
         }
 
@@ -326,6 +334,17 @@
             .first-speaker-inline {
                 width: 100%;
                 justify-content: flex-start;
+            }
+            .parse-help {
+                position: absolute;
+                top: 0.35rem;
+                right: 1rem;
+                font-size: 0.75rem;
+            }
+            .parse-help .tooltip {
+                top: 1.5rem;
+                right: 0;
+                position: absolute;
             }
         }
 
@@ -454,10 +473,10 @@
         .heading-line {
             display: block;
             font-family: 'Cormorant Garamond', serif;
-            font-size: 1.2rem;
+            font-size: 1.15em;
             font-weight: 600;
-            margin-top: 0.5rem;
-            margin-bottom: 0.5rem;
+            margin-top: 0.25rem;
+            margin-bottom: 0.25rem;
             color: var(--text);
         }
 
@@ -808,7 +827,7 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
                 </div>
             </div>
             <div class="review-section" style="margin-top: 2rem;">
-                <div class="parse-help" aria-label="Parsing help">
+                <div class="parse-help" id="parse-help" tabindex="0" aria-label="Parsing help">
                     Having trouble?
                     <div class="tooltip">
                         Parsing isn’t perfect. If a message looks off, edit the raw conversation above or use the split/merge controls here. You’re in control—adjust the text until it reflects the real turns.
@@ -1005,6 +1024,7 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
         let inputMode = 'text';
         let parseTimer = null;
         let editConversationId = null;
+        let lastMetadata = null;
     
         // Check edit mode
         function checkEditMode() {
@@ -1029,8 +1049,9 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
                 // Tags: reset array then add chips
                 tags = [];
                 if (tagContainer && tagInput) {
-                    // reset container and append tags before the input
+                    // reset container and re-attach the input before adding tags
                     tagContainer.innerHTML = '';
+                    tagContainer.appendChild(tagInput);
                     (conversation.tags || []).forEach(t => addTag(t.toLowerCase()));
                 }
                 // Reconstruct raw text from messages
@@ -1051,7 +1072,23 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
         document.getElementById('publish-btn').addEventListener('click', publishConversation);
         document.getElementById('first-speaker').addEventListener('change', () => {
             userFirstSpeaker = document.getElementById('first-speaker').value;
-            parseAndReviewConversation();
+            // If current parse had labels, re-parse to honor them; otherwise just reassign roles in place
+            if (lastMetadata && lastMetadata.hasLabels) {
+                parseAndReviewConversation();
+            } else {
+                if (parsedMessages && parsedMessages.length) {
+                    const start = userFirstSpeaker || 'human';
+                    const swap = start === 'human' ? 'assistant' : 'human';
+                    parsedMessages = parsedMessages.map((m, idx) => ({
+                        role: idx === 0 ? start : (idx % 2 === 0 ? start : swap),
+                        content: m.content
+                    }));
+                    detectedFirstSpeaker = start;
+                    renderReviewPreview();
+                } else {
+                    parseAndReviewConversation();
+                }
+            }
         });
         document.getElementById('title').addEventListener('input', renderDisplayPreview);
         document.querySelectorAll('input[name="platform"]').forEach(input => {
@@ -1060,6 +1097,17 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
     
         document.addEventListener('DOMContentLoaded', () => {
             checkEditMode();
+            // Tooltip toggle for parse help (works on hover and click)
+            const parseHelp = document.getElementById('parse-help');
+            if (parseHelp) {
+                parseHelp.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    parseHelp.classList.toggle('open');
+                });
+                document.addEventListener('click', () => {
+                    parseHelp.classList.remove('open');
+                });
+            }
         });
 
         // Input mode switching
@@ -1148,6 +1196,7 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
     
             const parserFn = window.mnemologParsers?.parseConversation || parseConversation;
             const { messages, metadata } = parserFn(raw, platform, userFirstSpeaker);
+            lastMetadata = metadata || null;
             parsedMessages = messages.map(m => ({
                 ...m,
                 content: (m.content || '').trim(),
@@ -1158,6 +1207,18 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
             if (!userFirstSpeaker) {
                 const fs = document.getElementById('first-speaker');
                 if (fs) fs.value = detectedFirstSpeaker;
+            }
+
+            // If the user selected a first speaker and the parser had no labels,
+            // force alternation starting from the user's choice.
+            if (userFirstSpeaker && lastMetadata && lastMetadata.hasLabels === false) {
+                const start = userFirstSpeaker;
+                const swap = start === 'human' ? 'assistant' : 'human';
+                parsedMessages = parsedMessages.map((m, idx) => ({
+                    role: idx === 0 ? start : (idx % 2 === 0 ? start : swap),
+                    content: m.content
+                }));
+                detectedFirstSpeaker = start;
             }
 
             renderReviewPreview();
@@ -1231,7 +1292,7 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
                 contentEl.className = 'message-content';
 
             const rawText = msg.content || '';
-                const displayText = normalizeEquations(rejoinMathBlocks(rawText));
+                const displayText = preserveMathBlocks(rawText);
                 const { html, count } = highlightSensitive(rawText, displayText, idx);
                 totalFlags += count;
                 // Keep review view plain to simplify redaction targeting
@@ -1430,31 +1491,16 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
             return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         }
 
-        // Collapse consecutive same-role messages
+        // Return shallow copy; do not auto-merge same-role messages to preserve user edits/roles
         function collapseMessages(list) {
-            const out = [];
-            (list || []).forEach(msg => {
-                if (!msg || !msg.role || !(msg.content || '').trim()) return;
-                const last = out[out.length - 1];
-                if (last && last.role === msg.role) {
-                    last.content = (last.content || '') + '\n\n' + msg.content;
-                } else {
-                    out.push({ role: msg.role, content: msg.content });
-                }
-            });
-            return out;
+            return (list || []).map(msg => ({ role: msg.role, content: msg.content }));
         }
 
         const mathSymbols = /[∑Σ∞πℵ√±×÷·∏∂µ∀∃→←⇒≤≥≠≈≡⊂⊃⊆⊇∈∉∪∩⊕⊗∇=+\-/*^]/;
 
         // Use shared math helpers when available
-        const normalizeEquations = (text) => {
-            if (sharedParsers.normalizeEquations) return sharedParsers.normalizeEquations(text);
-            return text;
-        };
-
-        const rejoinMathBlocks = (text) => {
-            if (sharedParsers.rejoinMathBlocks) return sharedParsers.rejoinMathBlocks(text);
+        const preserveMathBlocks = (text) => {
+            if (sharedParsers.preserveMathBlocks) return sharedParsers.preserveMathBlocks(text);
             return text;
         };
 
@@ -1522,7 +1568,7 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
         }
     
         function getRedactedMessages() {
-            return collapseMessages(parsedMessages)
+            return (parsedMessages || [])
                 .map(m => ({ role: m.role, content: (m.content || '').trim() }))
                 .filter(m => m.content.length > 0);
         }
@@ -1555,7 +1601,8 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
                 
                 const contentEl = document.createElement('div');
                 contentEl.className = 'preview-content';
-                const safe = escapeHtml(normalizeEquations(rejoinMathBlocks(msg.content || '')));
+                const processed = preserveMathBlocks(msg.content || '');
+                const safe = escapeHtml(processed);
                 const renderHeading = window.mnemologRender?.applyHeadingStyle || ((x) => x);
                 contentEl.innerHTML = renderHeading(safe);
                 

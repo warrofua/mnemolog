@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="gold" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#8B6508"/>
+      <stop offset="30%" stop-color="#B8860B"/>
+      <stop offset="70%" stop-color="#D4A84B"/>
+      <stop offset="100%" stop-color="#E5C77A"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="64" height="64" fill="#FAF8F5"/>
+  
+  <!-- Logo Mark: M flowing into spiral -->
+  <g transform="translate(32, 34)">
+    <path 
+      d="M-20,18 
+         L-20,-10 
+         C-20,-16 -17,-19 -13,-19
+         L0,2
+         L13,-19
+         C17,-19 20,-16 20,-10
+         L20,12
+         C20,18 14,21 9,18
+         C4,15 3,10 5,6
+         C7,2 13,2 15,6
+         C16,9 15,11 12,11"
+      fill="none" 
+      stroke="url(#gold)" 
+      stroke-width="4"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <!-- Terminal node -->
+    <circle cx="12" cy="11" r="3" fill="#B8860B"/>
+  </g>
+</svg>
