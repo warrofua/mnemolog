@@ -20,6 +20,7 @@ Key flows:
 - **Theme**: User-selectable light/dark mode (persists via local storage) exposed in the site header.
 - **Extension archive API**: `/api/archive` accepts structured JSON from the browser extension (includes attribution, model IDs, and PII flags).
 - **Attribution fields**: Conversations store `model_id`, `model_display_name`, `platform_conversation_id`, `attribution_confidence` (verified/inferred/claimed), `attribution_source` (network_intercept/page_state/dom_scrape/user_reported), PII flags, and `source` (extension/web/api) to display provenance badges.
+- **Browser extension (in development)**: capture conversations directly from Claude/Gemini/Grok/ChatGPT DOM, preserve ordered turns/roles, run PII scan, and archive via `/api/archive` with attribution metadata.
 
 ## Project Structure
 
@@ -39,7 +40,7 @@ mnemolog/
 │   └── _redirects          # Pages rewrites (c/<id> → conversation)
 ├── worker/                 # API → Cloudflare Workers
 │   ├── src/index.ts        # Main router (all endpoints)
-│   ├── wrangler.toml       # Includes browser binding for scrape
+│   ├── wrangler.toml       # Worker config (nodejs_compat)
 │   └── package.json
 └── supabase/
     └── schema.sql      # Database schema
@@ -101,7 +102,6 @@ GET     /api/conversations/:id        # Get single conversation (public or owner
 PUT     /api/conversations/:id        # Update (owner)
 DELETE  /api/conversations/:id        # Delete (owner)
 GET     /api/users/:userId/conversations # User’s conversations (public unless owner)
-GET     /api/scrape?url=...&selector=... # Scrape public share page (browser rendering)
 ```
 
 ## Frontend Routes
