@@ -408,7 +408,7 @@ function buildHeaderHTML() {
       <div class="nav-left">
         <a href="/" class="logo">
           <img src="/assets/mnemolog-fav-icon.svg" alt="" class="brand-mark">
-          mnemo<span>log</span>
+          nemo<span>log</span>
         </a>
       </div>
       <div class="nav-center">

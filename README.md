@@ -21,6 +21,27 @@ Key flows:
 - **Extension archive API**: `/api/archive` accepts structured JSON from the browser extension (includes attribution, model IDs, and PII flags).
 - **Attribution fields**: Conversations store `model_id`, `model_display_name`, `platform_conversation_id`, `attribution_confidence` (verified/inferred/claimed), `attribution_source` (network_intercept/page_state/dom_scrape/user_reported), PII flags, and `source` (extension/web/api) to display provenance badges.
 - **Browser extension (in development)**: capture conversations directly from Claude/Gemini/Grok/ChatGPT DOM, preserve ordered turns/roles, run PII scan, and archive via `/api/archive` with attribution metadata.
+- **PII flow (extension)**:
+
+```
+User clicks "Archive to Mnemolog"
+         ↓
+PIIDetector.scanConversation(messages)
+         ↓
+    ┌────┴────┐
+    │         │
+No PII     PII Found
+    │         │
+    ↓         ↓
+Archive    Show Review Screen
+directly   ├─ Critical: …
+           ├─ High: …
+           ├─ Medium: …
+           │
+           ├─ [Redact & Archive] → auto-redacts, then archives
+           ├─ [Archive Without Changes] → user accepts risk
+           └─ [Edit on Mnemolog →] → opens site for manual review
+```
 
 ## Project Structure
 
