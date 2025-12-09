@@ -1,0 +1,95 @@
+{
+  "manifest_version": 3,
+  "name": "Mnemolog",
+  "version": "1.0.0",
+  "description": "Archive your AI conversations with verified provenance. Your ideas deserve attribution.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "Archive to Mnemolog",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "permissions": [
+    "activeTab",
+    "storage",
+    "tabs",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://claude.ai/*",
+    "https://chat.openai.com/*",
+    "https://chatgpt.com/*",
+    "https://gemini.google.com/*",
+    "https://x.com/*",
+    "https://grok.x.ai/*",
+    "https://mnemolog.com/*",
+    "https://*.mnemolog.com/*",
+    "https://mnemolog.pages.dev/*",
+    "https://*.mnemolog.pages.dev/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://claude.ai/*"
+      ],
+      "js": ["platforms/claude.js", "content/content.js"]
+    },
+    {
+      "matches": [
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*"
+      ],
+      "js": ["platforms/chatgpt.js", "content/content.js"]
+    },
+    {
+      "matches": [
+        "https://gemini.google.com/*"
+      ],
+      "js": ["platforms/gemini.js", "content/content.js"]
+    },
+    {
+      "matches": [
+        "https://x.com/i/grok/*",
+        "https://grok.x.ai/*"
+      ],
+      "js": ["platforms/grok.js", "content/content.js"]
+    },
+    {
+      "matches": [
+        "https://mnemolog.com/*",
+        "https://*.mnemolog.com/*"
+      ],
+      "js": ["content/auth.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://mnemolog.com/login*",
+        "https://*.mnemolog.com/login*",
+        "https://mnemolog.com/auth/*",
+        "https://*.mnemolog.com/auth/*",
+        "https://mnemolog.pages.dev/*",
+        "https://*.mnemolog.pages.dev/*"
+      ],
+      "js": ["content/callback.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "background": {
+    "service_worker": "background/background.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

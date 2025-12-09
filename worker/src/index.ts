@@ -23,6 +23,25 @@ interface CreateConversationBody {
   tags?: string[];
   is_public?: boolean;
   show_author?: boolean;
+  model_id?: string | null;
+  model_display_name?: string | null;
+  platform_conversation_id?: string | null;
+  attribution_confidence?: 'verified' | 'inferred' | 'claimed' | null;
+  attribution_source?: 'network_intercept' | 'page_state' | 'dom_scrape' | 'user_reported' | null;
+  pii_scanned?: boolean;
+  pii_redacted?: boolean;
+  source?: string | null;
+}
+
+interface ArchivePayload {
+  conversation?: Partial<CreateConversationBody> & {
+    model?: string;
+    timestamp?: string;
+    conversationId?: string;
+    attribution?: any;
+  };
+  source?: string;
+  version?: string;
 }
 
 // CORS headers
@@ -58,6 +77,11 @@ async function getUser(request: IRequest, supabase: SupabaseClient) {
   }
   
   return user;
+}
+
+function buildConversationUrl(id: string) {
+  // Primary domain for shared conversations
+  return `https://mnemolog.com/c/${id}`;
 }
 
 // Create router
@@ -236,6 +260,14 @@ router.post('/api/conversations', async (request: IRequest, env: Env) => {
       tags: body.tags || [],
       is_public: body.is_public ?? true,
       show_author: body.show_author ?? true,
+      model_id: body.model_id || null,
+      model_display_name: body.model_display_name || null,
+      platform_conversation_id: body.platform_conversation_id || null,
+      attribution_confidence: body.attribution_confidence || null,
+      attribution_source: body.attribution_source || null,
+      pii_scanned: body.pii_scanned ?? false,
+      pii_redacted: body.pii_redacted ?? false,
+      source: body.source || 'web',
     })
     .select()
     .single();
@@ -246,6 +278,74 @@ router.post('/api/conversations', async (request: IRequest, env: Env) => {
   }
 
   return json({ conversation: data }, 201);
+});
+
+// Archive conversation (extension-friendly)
+router.post('/api/archive', async (request: IRequest, env: Env) => {
+  const authHeader = request.headers.get('Authorization') || undefined;
+  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+    global: {
+      headers: authHeader ? { Authorization: authHeader } : {},
+    },
+  });
+  const user = await getUser(request, supabase);
+  if (!user) {
+    return json({ error: 'Unauthorized' }, 401);
+  }
+
+  let payload: ArchivePayload;
+  try {
+    payload = await request.json();
+  } catch {
+    return json({ error: 'Invalid JSON' }, 400);
+  }
+
+  const conv = payload.conversation || {};
+  const platform = (conv.platform as CreateConversationBody['platform']) || 'other';
+  const title = conv.title?.trim() || 'Untitled conversation';
+  const messages = conv.messages || [];
+  if (!messages.length) {
+    return json({ error: 'Missing messages' }, 400);
+  }
+
+  const validPlatforms = ['claude', 'chatgpt', 'gemini', 'grok', 'other'];
+  if (!validPlatforms.includes(platform)) {
+    return json({ error: 'Invalid platform' }, 400);
+  }
+
+  const { data, error } = await supabase
+    .from('conversations')
+    .insert({
+      user_id: user.id,
+      title,
+      description: conv.description || null,
+      platform,
+      messages,
+      tags: conv.tags || [],
+      is_public: conv.is_public ?? true,
+      show_author: conv.show_author ?? true,
+      model_id: conv.model_id || null,
+      model_display_name: conv.model_display_name || null,
+      platform_conversation_id: conv.platform_conversation_id || null,
+      attribution_confidence: conv.attribution_confidence || null,
+      attribution_source: conv.attribution_source || null,
+      pii_scanned: conv.pii_scanned ?? true,
+      pii_redacted: conv.pii_redacted ?? false,
+      source: payload.source || 'extension',
+    })
+    .select('id')
+    .single();
+
+  if (error || !data) {
+    console.error('Archive insert error:', error);
+    return json({ error: 'Failed to archive conversation' }, 500);
+  }
+
+  return json({
+    success: true,
+    id: data.id,
+    url: buildConversationUrl(data.id),
+  }, 201);
 });
 
 // Update conversation (owner only)
@@ -284,6 +384,14 @@ router.put('/api/conversations/:id', async (request: IRequest, env: Env) => {
   if (body.show_author !== undefined) updates.show_author = body.show_author;
   if (body.is_public !== undefined) updates.is_public = body.is_public;
   if (body.messages !== undefined) updates.messages = body.messages;
+   updates.model_id = body.model_id ?? updates.model_id;
+   updates.model_display_name = body.model_display_name ?? updates.model_display_name;
+   updates.platform_conversation_id = body.platform_conversation_id ?? updates.platform_conversation_id;
+   updates.attribution_confidence = body.attribution_confidence ?? updates.attribution_confidence;
+   updates.attribution_source = body.attribution_source ?? updates.attribution_source;
+   if (body.pii_scanned !== undefined) updates.pii_scanned = body.pii_scanned;
+   if (body.pii_redacted !== undefined) updates.pii_redacted = body.pii_redacted;
+   if (body.source !== undefined) updates.source = body.source;
 
   const { data, error } = await supabase
     .from('conversations')
@@ -356,6 +464,14 @@ router.get('/api/conversations', async (request: IRequest, env: Env) => {
       created_at,
       view_count,
       show_author,
+      model_id,
+      model_display_name,
+      platform_conversation_id,
+      attribution_confidence,
+      attribution_source,
+      pii_scanned,
+      pii_redacted,
+      source,
       profiles!inner (
         id,
         display_name,

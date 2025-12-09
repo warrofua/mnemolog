@@ -95,6 +95,8 @@ nav {
   color: var(--text-secondary);
 }
 
+.theme-toggle.mobile-only { display: none; }
+
 .theme-toggle input {
   width: 36px;
   height: 20px;
@@ -105,6 +107,7 @@ nav {
   outline: none;
   cursor: pointer;
   transition: background 0.2s;
+  transform: translateY(0.2rem);
 }
 
 .theme-toggle input::before {
@@ -351,6 +354,8 @@ nav {
   nav { position: relative; }
   .desktop-only { display: none; }
   .mobile-only { display: inline-flex; }
+  .theme-toggle.desktop-only { display: none; }
+  .theme-toggle.mobile-only { display: inline-flex; }
 
   .mobile-menu-button {
     display: inline-flex;

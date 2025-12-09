@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mnemolog</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo">
+        <svg class="logo-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M12 6v12M8 9l4-3 4 3M8 15l4 3 4-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="logo-text">mnemo<span>log</span></span>
+      </div>
+      <div class="status-indicator" id="statusIndicator">
+        <span class="status-dot"></span>
+        <span class="status-text">Detecting...</span>
+      </div>
+      <button class="btn-tertiary" id="signInBtn">Sign in</button>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+      <!-- No Conversation State -->
+      <div class="state state-empty" id="stateEmpty">
+        <div class="state-icon">
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+            <circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 4"/>
+            <path d="M24 16v16M16 24h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h2>No conversation detected</h2>
+        <p>Navigate to a conversation on Claude, ChatGPT, Gemini, or Grok to archive it.</p>
+        <div class="supported-platforms">
+          <span class="platform-badge">Claude</span>
+          <span class="platform-badge">ChatGPT</span>
+          <span class="platform-badge">Gemini</span>
+          <span class="platform-badge">Grok</span>
+        </div>
+      </div>
+
+      <!-- Conversation Detected State -->
+      <div class="state state-detected hidden" id="stateDetected">
+        <div class="detection-card">
+          <div class="detection-header">
+            <div class="platform-info">
+              <span class="platform-icon" id="platformIcon">●</span>
+              <span class="platform-name" id="platformName">Claude</span>
+            </div>
+            <div class="model-badge" id="modelBadge">
+              <span class="model-name" id="modelName">Opus 4.5</span>
+              <span class="verification-icon" title="Verified from page data">✓</span>
+            </div>
+          </div>
+          
+          <div class="conversation-preview">
+            <h3 class="conversation-title" id="conversationTitle">Untitled Conversation</h3>
+            <div class="conversation-meta">
+              <span id="messageCount">0 messages</span>
+              <span class="meta-separator">·</span>
+              <span id="conversationDate">Today</span>
+            </div>
+          </div>
+
+          <div class="provenance-info">
+            <div class="provenance-row">
+              <span class="provenance-label">Attribution</span>
+              <span class="provenance-value" id="attributionSource">
+                <span class="confidence-high">Verified</span>
+              </span>
+            </div>
+            <div class="provenance-row">
+              <span class="provenance-label">Model ID</span>
+              <span class="provenance-value monospace" id="modelId">claude-opus-4-5-20251101</span>
+            </div>
+            <div class="provenance-row">
+              <span class="provenance-label">Timestamp</span>
+              <span class="provenance-value" id="timestamp">2025-12-08T14:32:00Z</span>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn-primary" id="archiveBtn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 5v14M5 12l7 7 7-7"/>
+          </svg>
+          Archive to Mnemolog
+        </button>
+
+        <button class="btn-secondary" id="previewBtn">
+          Preview & Edit
+        </button>
+      </div>
+
+      <!-- PII Review State -->
+      <div class="state state-pii-review hidden" id="statePiiReview">
+        <div class="pii-header">
+          <div class="pii-icon warning">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 9v4M12 17h.01"/>
+              <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+            </svg>
+          </div>
+          <div class="pii-title">
+            <h2>Sensitive info detected</h2>
+            <p>Review before archiving</p>
+          </div>
+        </div>
+
+        <div class="pii-summary" id="piiSummary">
+          <div class="pii-stat critical" id="piiCritical">
+            <span class="stat-count">0</span>
+            <span class="stat-label">Critical</span>
+          </div>
+          <div class="pii-stat high" id="piiHigh">
+            <span class="stat-count">0</span>
+            <span class="stat-label">High</span>
+          </div>
+          <div class="pii-stat medium" id="piiMedium">
+            <span class="stat-count">0</span>
+            <span class="stat-label">Medium</span>
+          </div>
+        </div>
+
+        <div class="pii-findings-list" id="piiFindings">
+          <!-- Populated dynamically -->
+        </div>
+
+        <div class="pii-actions">
+          <button class="btn-primary" id="redactAndArchiveBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+            Redact & Archive
+          </button>
+          <button class="btn-secondary" id="archiveAnywayBtn">
+            Archive Without Changes
+          </button>
+          <button class="btn-tertiary" id="editOnSiteBtn">
+            Edit on Mnemolog →
+          </button>
+        </div>
+      </div>
+
+      <!-- Archiving State -->
+      <div class="state state-archiving hidden" id="stateArchiving">
+        <div class="archiving-animation">
+          <div class="thread-line"></div>
+          <div class="pulse-ring"></div>
+        </div>
+        <h2>Archiving...</h2>
+        <p>Creating permanent record with verified provenance</p>
+      </div>
+
+      <!-- Success State -->
+      <div class="state state-success hidden" id="stateSuccess">
+        <div class="success-icon">
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+            <circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M16 24l6 6 12-12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h2>Archived</h2>
+        <p>Your conversation is now part of the permanent record.</p>
+        <a href="#" class="view-link" id="viewLink" target="_blank">
+          View on Mnemolog →
+        </a>
+      </div>
+
+      <!-- Error State -->
+      <div class="state state-error hidden" id="stateError">
+        <div class="error-icon">
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+            <circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M24 16v10M24 30v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h2>Something went wrong</h2>
+        <p class="error-message" id="errorMessage">Could not archive conversation.</p>
+        <button class="btn-secondary" id="retryBtn">Try Again</button>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <a href="https://mnemolog.com" target="_blank">mnemolog.com</a>
+      <span class="footer-separator">·</span>
+      <a href="#" id="settingsLink">Settings</a>
+    </footer>
+  </div>
+
+  <script src="../utils/pii-detector.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

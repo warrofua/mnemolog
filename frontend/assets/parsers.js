@@ -202,6 +202,7 @@
 
     let currentRole = firstSpeaker;
     const messages = [];
+    const sentenceEndBoundary = /[.?!]\s+[A-Z]/;
 
     segments.forEach((seg, idx) => {
       const content = (seg.content || '').trim();
@@ -221,7 +222,11 @@
         if (/^[-*•]/.test(t)) return true;
         if (/^\d+\.\s/.test(t)) return true; // numbered list
         if (/^[a-z]/.test(t)) return true;
-        if (/^(and|but|also|however|so|yes|no|additionally|moreover|furthermore|that said)/i.test(t)) return true;
+        if (/^(and|but|or|however|so|yes|no|additionally|moreover|furthermore|that said)/i.test(t)) return true;
+        if (/^(takes a breath|exhales|sitting with|let me think|thinking)/i.test(t)) return true;
+        if (/^(option\s+\d+\.?|[IVXLCDM]+\.?)/i.test(t) && last && last.role === 'assistant') return true;
+        // Avoid splitting mid-sentence: if prior content ends with sentence end and this starts with capital, treat as new turn
+        if (last && sentenceEndBoundary.test(last.content.slice(-120) + ' ' + t.slice(0, 2))) return false;
         return false;
       })();
 

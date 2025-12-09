@@ -413,7 +413,7 @@ function buildHeaderHTML() {
       </div>
       <div class="nav-center">
         ${shareCta}
-        <label class="theme-toggle" style="margin-left:0;">
+        <label class="theme-toggle desktop-only" style="margin-left:0;">
           <input type="checkbox" id="global-theme-toggle" ${currentTheme === 'dark' ? 'checked' : ''}>
           <span style="font-size:0.85rem;color:var(--text-secondary);">Dark mode</span>
         </label>
@@ -421,10 +421,14 @@ function buildHeaderHTML() {
       <div class="nav-right">
         <div class="nav-dropdown">
           <div class="nav-links">
+            <a href="/profile">Your Archive</a>
             <a href="/explore">Explore</a>
             <a href="/#about">About</a>
             <a href="/faq">FAQ</a>
-            <a href="/profile">Your Archive</a>
+            <label class="theme-toggle mobile-only" style="margin-top:0.5rem;">
+              <input type="checkbox" id="global-theme-toggle-mobile" ${currentTheme === 'dark' ? 'checked' : ''}>
+              <span style="font-size:0.9rem;color:var(--text-secondary);">Dark mode</span>
+            </label>
           </div>
           <div class="nav-actions">
             <button class="auth-toggle" data-auth-toggle type="button">Sign in</button>
@@ -487,6 +491,21 @@ function setupThemeToggle() {
       applyTheme(mode, true);
     }
   };
+  const mobileToggle = document.getElementById('global-theme-toggle-mobile');
+  if (mobileToggle) {
+    mobileToggle.onchange = (e) => {
+      const mode = e.target.checked ? 'dark' : 'light';
+      if (window.mnemolog?.setTheme) {
+        window.mnemolog.setTheme(mode);
+      } else {
+        applyTheme(mode, true);
+      }
+      // keep both toggles in sync
+      if (toggle && toggle.checked !== mobileToggle.checked) {
+        toggle.checked = mobileToggle.checked;
+      }
+    };
+  }
 }
 
 // Initialize header + auth when DOM ready

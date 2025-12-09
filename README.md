@@ -18,6 +18,8 @@ Key flows:
 - **Auth**: Supabase Auth (Google, GitHub)
 - **Link previews**: Pages `_worker.js` injects dynamic OpenGraph tags for `/c/<uuid>` by fetching metadata from the API worker.
 - **Theme**: User-selectable light/dark mode (persists via local storage) exposed in the site header.
+- **Extension archive API**: `/api/archive` accepts structured JSON from the browser extension (includes attribution, model IDs, and PII flags).
+- **Attribution fields**: Conversations store `model_id`, `model_display_name`, `platform_conversation_id`, `attribution_confidence` (verified/inferred/claimed), `attribution_source` (network_intercept/page_state/dom_scrape/user_reported), PII flags, and `source` (extension/web/api) to display provenance badges.
 
 ## Project Structure
 
@@ -93,6 +95,7 @@ SUPABASE_SERVICE_KEY=eyJ...  # For server-side operations
 ```
 GET     /api/auth/user                # Get current user
 POST    /api/conversations            # Create conversation (auth required)
+POST    /api/archive                  # Archive from extension (auth required; structured payload)
 GET     /api/conversations            # List public conversations (filters: limit, offset, platform, tag, q, sort=newest|oldest|views)
 GET     /api/conversations/:id        # Get single conversation (public or owner)
 PUT     /api/conversations/:id        # Update (owner)
@@ -123,3 +126,10 @@ Share flow:
 - Icons: favicons/logos live in `frontend/assets/mnemolog-fav-icon.svg`, `mnemolog-logo-light.svg`, `mnemolog-logo-dark.svg`; OG previews use the dark logo.
 - Profiles: users can set an avatar image URL on `profile.html`; any publicly hosted image URL works (e.g., an image you host under `/assets/`).
 - Theme: users can toggle light/dark in the header; preference is stored in `localStorage` and applied across pages.
+- Attribution/PII fields: conversations store model_id, model_display_name, platform_conversation_id, attribution_confidence/source, pii_scanned, pii_redacted, and source for provenance tracking (extension/web/api).
+- Browse UI: Explore/profile/conversation pages now display model and attribution badges pulled from the database, and cards respect dark mode.
+- Browser extension: parsers upgraded for Claude, Gemini, Grok, and ChatGPT DOM structures to capture ordered turns with correct roles; archive calls post to `/api/archive` with attribution metadata.
+
+## License
+
+MIT License — see `LICENSE`

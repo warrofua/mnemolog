@@ -208,6 +208,7 @@
             outline: none;
             cursor: pointer;
             transition: background 0.2s;
+            transform: translateY(0.1rem);
         }
 
         .theme-toggle input::before {
@@ -361,6 +362,15 @@
             font-weight: 500;
         }
 
+        .conversation-model, .conversation-attrib {
+            background: rgba(184, 134, 11, 0.12);
+            color: var(--accent);
+            padding: 0.2rem 0.45rem;
+            border-radius: 4px;
+            font-weight: 500;
+            font-size: 0.75rem;
+        }
+
         .conversation-tags {
             display: flex;
             gap: 0.4rem;
@@ -497,7 +507,7 @@
         }
 
         .modal {
-            background: white;
+            background: var(--bg);
             border-radius: 12px;
             padding: 2rem;
             max-width: 420px;
@@ -947,6 +957,8 @@
                         ${conv.excerpt ? `<p class="conversation-excerpt">${escapeHtml(conv.excerpt)}</p>` : ''}
                         <div class="conversation-meta">
                             <span class="conversation-platform">${mnemolog.platformNames[conv.platform] || conv.platform}</span>
+                            ${conv.model_display_name || conv.model_id ? `<span class="conversation-model">${escapeHtml(conv.model_display_name || conv.model_id)}</span>` : ''}
+                            ${conv.attribution_confidence ? `<span class="conversation-attrib">${escapeHtml(conv.attribution_confidence === 'verified' ? 'Verified' : conv.attribution_confidence === 'inferred' ? 'Inferred' : 'Claimed')}</span>` : ''}
                             <span>${mnemolog.formatDate(conv.created_at)}</span>
                             ${conv.tags?.length ? `
                                 <div class="conversation-tags">

@@ -261,6 +261,15 @@
             font-size: 0.75rem;
         }
 
+        .model-badge, .attrib-badge {
+            background: rgba(184, 134, 11, 0.12);
+            color: var(--accent);
+            padding: 0.15rem 0.5rem;
+            border-radius: 3px;
+            font-weight: 500;
+            font-size: 0.75rem;
+        }
+
         /* Explore section */
         .explore-section {
             display: flex;
@@ -1159,12 +1168,17 @@
             const created = conv.created_at ? mnemolog.formatDate(conv.created_at) : '';
             const tags = Array.isArray(conv.tags) ? conv.tags : [];
             const excerpt = conv.description || conv.content || conv.excerpt || '';
+            const modelLabel = conv.model_display_name || conv.model_id || '';
+            const attrib = conv.attribution_confidence;
+            const attribText = attrib === 'verified' ? 'Verified' : attrib === 'inferred' ? 'Inferred' : attrib === 'claimed' ? 'Claimed' : '';
 
             card.innerHTML = `
                 <div class="card-content">
                     <div class="card-meta">
                         <span class="platform-badge">${escapeHtml(platformLabel)}</span>
                         <span>${escapeHtml(created)}</span>
+                        ${modelLabel ? `<span class="model-badge">${escapeHtml(modelLabel)}</span>` : ''}
+                        ${attribText ? `<span class="attrib-badge">${escapeHtml(attribText)}</span>` : ''}
                     </div>
                     <h3>${escapeHtml(conv.title || 'Untitled conversation')}</h3>
                     <p class="card-excerpt">${escapeHtml(excerpt)}</p>
@@ -1187,6 +1201,9 @@
                 const platformLabel = (mnemolog.platformNames && mnemolog.platformNames[conv.platform]) || conv.platform || 'Conversation';
                 const created = conv.created_at ? mnemolog.formatDate(conv.created_at) : '';
                 const excerpt = conv.description || conv.content || conv.excerpt || '';
+                const modelLabel = conv.model_display_name || conv.model_id || '';
+                const attrib = conv.attribution_confidence;
+                const attribText = attrib === 'verified' ? 'Verified' : attrib === 'inferred' ? 'Inferred' : attrib === 'claimed' ? 'Claimed' : '';
                 return `
                     <a href="/c/${conv.id}" class="featured-card">
                         <h3>${escapeHtml(conv.title || 'Untitled conversation')}</h3>
@@ -1194,6 +1211,8 @@
                         <div class="meta">
                             <span class="platform-badge">${escapeHtml(platformLabel)}</span>
                             <span>${escapeHtml(created)}</span>
+                            ${modelLabel ? `<span class="model-badge">${escapeHtml(modelLabel)}</span>` : ''}
+                            ${attribText ? `<span class="attrib-badge">${escapeHtml(attribText)}</span>` : ''}
                         </div>
                     </a>
                 `;

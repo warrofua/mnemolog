@@ -22,6 +22,12 @@
             --assistant-bg: #FFFFFF;
         }
 
+        :root[data-theme="dark"],
+        body.dark-mode {
+            --human-bg: #312b24;
+            --assistant-bg: #2a251f;
+        }
+
         nav {
             background: var(--bg);
             position: sticky;
@@ -89,6 +95,15 @@
             font-size: 0.8rem;
             font-weight: 500;
             color: var(--text-secondary);
+        }
+
+        .model-badge, .attrib-badge {
+            background: rgba(184, 134, 11, 0.12);
+            color: var(--accent);
+            padding: 0.25rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 500;
         }
 
         .date, .view-count {
@@ -200,8 +215,8 @@
         }
 
         .message-content pre {
-            background: var(--text);
-            color: var(--bg);
+            background: var(--bg-warm);
+            color: var(--text);
             padding: 1rem;
             border-radius: 6px;
             overflow-x: auto;
@@ -292,6 +307,8 @@
             <header class="conversation-header">
                 <div class="conversation-meta">
                     <span class="platform-badge" id="platform"></span>
+                    <span class="model-badge" id="model"></span>
+                    <span class="attrib-badge" id="attrib"></span>
                     <span class="date" id="date"></span>
                     <span class="view-count">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -413,6 +430,28 @@
             document.title = `${data.title} — Mnemolog`;
             const platformLookup = (window.mnemolog && window.mnemolog.platformNames) || {};
             document.getElementById('platform').textContent = platformLookup[data.platform] || data.platform;
+            const modelEl = document.getElementById('model');
+            const attribEl = document.getElementById('attrib');
+            const modelText = data.model_display_name || data.model_id || '';
+            const attribText = data.attribution_confidence === 'verified'
+                ? 'Verified'
+                : data.attribution_confidence === 'inferred'
+                    ? 'Inferred'
+                    : data.attribution_confidence === 'claimed'
+                        ? 'Claimed'
+                        : '';
+            if (modelText) {
+                modelEl.textContent = modelText;
+                modelEl.style.display = 'inline-block';
+            } else {
+                modelEl.style.display = 'none';
+            }
+            if (attribText) {
+                attribEl.textContent = attribText;
+                attribEl.style.display = 'inline-block';
+            } else {
+                attribEl.style.display = 'none';
+            }
             document.getElementById('date').textContent = formatDate(data.created_at);
             document.getElementById('views').textContent = data.view_count || 0;
             document.getElementById('title').textContent = data.title;
