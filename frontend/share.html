@@ -895,9 +895,6 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
             <div class="conversation-preview" id="conversation-preview">
                 <!-- Populated by JS -->
             </div>
-            <div class="preview-actions">
-                <button class="btn btn-secondary" type="button" id="undo-merge-btn" disabled>Undo last merge</button>
-            </div>
         </div>
 
             <div class="button-row">
@@ -1253,7 +1250,6 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
             const messageCountWarning = document.getElementById('message-count-warning');
             const continueBtn = document.getElementById('step1-next');
             const redactAllBtn = document.getElementById('redact-all-btn');
-            const undoMergeBtn = document.getElementById('undo-merge-btn');
 
             container.innerHTML = '';
             let totalFlags = 0;
@@ -1322,6 +1318,13 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
                     mergeNext.onclick = () => mergeWithNext(idx);
                     actionsEl.appendChild(mergeNext);
                 }
+                const undoBtn = document.createElement('button');
+                undoBtn.type = 'button';
+                undoBtn.textContent = 'Undo last merge';
+                undoBtn.className = 'merge-btn';
+                undoBtn.disabled = mergeHistory.length === 0;
+                undoBtn.onclick = () => undoLastMerge();
+                actionsEl.appendChild(undoBtn);
 
                 messageEl.appendChild(roleEl);
                 messageEl.appendChild(contentEl);
@@ -1351,7 +1354,6 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
             // Enable continue only when parsed and >=2 messages
             const canContinue = parsedMessages.length >= 2;
             if (continueBtn) continueBtn.disabled = !canContinue;
-            if (undoMergeBtn) undoMergeBtn.disabled = mergeHistory.length === 0;
         }
 
         // Heading detection for title-case / list-like lines

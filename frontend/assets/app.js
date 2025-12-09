@@ -1,5 +1,34 @@
 // Mnemolog Frontend JS
 
+// Theme handling (apply stored preference early)
+const THEME_KEY = 'mnemolog-theme';
+
+function applyTheme(mode, persist = false) {
+  const root = document.documentElement;
+  const enableDark = mode === 'dark';
+  if (enableDark) {
+    root.setAttribute('data-theme', 'dark');
+    document.body?.classList.add('dark-mode');
+  } else {
+    root.removeAttribute('data-theme');
+    document.body?.classList.remove('dark-mode');
+  }
+  if (persist) {
+    localStorage.setItem(THEME_KEY, enableDark ? 'dark' : 'light');
+  }
+}
+
+(function initStoredTheme() {
+  try {
+    const saved = localStorage.getItem(THEME_KEY);
+    if (saved === 'dark') {
+      applyTheme('dark', false);
+    }
+  } catch (e) {
+    console.warn('Theme init failed', e);
+  }
+})();
+
 // Initialize Supabase client
 let supabase;
 
@@ -360,6 +389,8 @@ window.mnemolog = {
   detectSensitiveInfo,
   formatDate,
   platformNames,
+  setTheme: (mode) => applyTheme(mode, true),
+  getTheme: () => (localStorage.getItem(THEME_KEY) === 'dark' ? 'dark' : 'light'),
   updateProfile,
   get currentUser() { return currentUser; },
   get isLoggedIn() { return !!currentUser; },
@@ -371,13 +402,21 @@ function buildHeaderHTML() {
   const shareCta = isSharePage ? '' : `
     <a href="/share" class="btn btn-primary share-cta">Share <span class="desktop-only">a Conversation</span><span class="mobile-only"> Now</span></a>
   `;
+  const currentTheme = (localStorage.getItem('mnemolog-theme') === 'dark') ? 'dark' : 'light';
   return `
     <nav>
       <div class="nav-left">
-        <a href="/" class="logo">mnemo<span>log</span></a>
+        <a href="/" class="logo">
+          <img src="/assets/mnemolog-fav-icon.svg" alt="" class="brand-mark">
+          mnemo<span>log</span>
+        </a>
       </div>
       <div class="nav-center">
         ${shareCta}
+        <label class="theme-toggle" style="margin-left:0;">
+          <input type="checkbox" id="global-theme-toggle" ${currentTheme === 'dark' ? 'checked' : ''}>
+          <span style="font-size:0.85rem;color:var(--text-secondary);">Dark mode</span>
+        </label>
       </div>
       <div class="nav-right">
         <div class="nav-dropdown">
@@ -436,9 +475,24 @@ function setupMobileMenus() {
   });
 }
 
+// Wire up global theme toggle in header if present
+function setupThemeToggle() {
+  const toggle = document.getElementById('global-theme-toggle');
+  if (!toggle) return;
+  toggle.onchange = (e) => {
+    const mode = e.target.checked ? 'dark' : 'light';
+    if (window.mnemolog?.setTheme) {
+      window.mnemolog.setTheme(mode);
+    } else {
+      applyTheme(mode, true);
+    }
+  };
+}
+
 // Initialize header + auth when DOM ready
 document.addEventListener('DOMContentLoaded', async () => {
   injectHeader();
   setupMobileMenus();
+  setupThemeToggle();
   await checkAuth();
 });

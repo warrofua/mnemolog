@@ -13,6 +13,22 @@
   --success-bg: #E8F5EC;
 }
 
+:root[data-theme="dark"],
+body.dark-mode {
+  --bg: #2C2A26;
+  --bg-warm: #3A3733;
+  --text: #FAF8F5;
+  --text-secondary: #B8B3AD;
+  --accent: #D4A84B;
+  --accent-muted: #B8860B;
+  --thread: #96744A;
+  --border: #4A4540;
+  --warning: #D4A84B;
+  --warning-bg: #3A3733;
+  --success: #74C28A;
+  --success-bg: #1f2a22;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -50,10 +66,18 @@ nav {
   gap: 1rem;
 }
 
+.brand-mark {
+  width: 21px;
+  height: 21px;
+  display: inline-block;
+  vertical-align: middle;
+  border-radius: 50%;
+}
+
 .nav-center {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
 }
 
 .nav-right {
@@ -63,10 +87,53 @@ nav {
   margin-left: auto;
 }
 
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.theme-toggle input {
+  width: 36px;
+  height: 20px;
+  appearance: none;
+  background: var(--border);
+  border-radius: 999px;
+  position: relative;
+  outline: none;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.theme-toggle input::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+
+.theme-toggle input:checked {
+  background: var(--accent);
+}
+
+.theme-toggle input:checked::before {
+  transform: translateX(16px);
+}
+
 .logo {
   font-family: 'Cormorant Garamond', serif;
   font-size: 1.5rem;
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .logo span {
@@ -135,7 +202,7 @@ nav {
   display: none;
   padding: 0.45rem 0.9rem;
   border: 1px solid var(--border);
-  background: white;
+  background: var(--bg);
   color: var(--text);
   border-radius: 4px;
   font-size: 0.85rem;
@@ -151,7 +218,7 @@ nav {
 .auth-button {
   padding: 0.45rem 0.9rem;
   border: 1px solid var(--border);
-  background: white;
+  background: var(--bg);
   color: var(--text);
   border-radius: 4px;
   font-size: 0.85rem;
@@ -202,7 +269,7 @@ nav {
   right: 0;
   top: 100%;
   margin-top: 0.5rem;
-  background: white;
+  background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 0.5rem;
@@ -263,7 +330,7 @@ nav {
 }
 
 .btn-secondary {
-  background: white;
+  background: var(--bg);
   color: var(--text);
 }
 
@@ -315,7 +382,7 @@ nav {
     flex-direction: column;
     align-items: stretch;
     gap: 0.75rem;
-    background: white;
+    background: var(--bg);
     padding: 1rem;
     border: 1px solid var(--border);
     border-radius: 6px;

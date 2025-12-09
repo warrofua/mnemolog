@@ -9,7 +9,7 @@
   </defs>
   
   <!-- Background -->
-  <rect width="64" height="64" fill="#FAF8F5"/>
+  <rect width="64" height="64" fill="#2C2A26"/>
   
   <!-- Logo Mark: M flowing into spiral -->
   <g transform="translate(32, 34)">
@@ -32,6 +32,6 @@
       stroke-linejoin="round"
     />
     <!-- Terminal node -->
-    <circle cx="12" cy="11" r="3" fill="#B8860B"/>
+    <circle cx="12" cy="11" r="3" fill="#D4A84B"/>
   </g>
 </svg>

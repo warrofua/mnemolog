@@ -16,6 +16,23 @@
             --danger-bg: #FEF2F2;
         }
 
+        /* Dark Mode Palette */
+        :root[data-theme="dark"],
+        body.dark-mode {
+            --bg: #2C2A26;
+            --bg-warm: #3A3733;
+            --text: #FAF8F5;
+            --text-secondary: #B8B3AD;
+            --accent: #D4A84B;
+            --accent-muted: #B8860B;
+            --thread: #96744A;
+            --border: #4A4540;
+            --warning: #D4A84B;
+            --warning-bg: #3A3733;
+            --success: #74C28A;
+            --success-bg: #1f2a22;
+        }
+
         html {
             scroll-behavior: smooth;
         }
@@ -62,7 +79,7 @@
             left: 0;
             right: 0;
             padding: 1.5rem 4rem;
-            background: rgba(250, 248, 245, 0.9);
+            background: color-mix(in srgb, var(--bg) 92%, transparent);
             backdrop-filter: blur(10px);
             z-index: 100;
             border-bottom: 1px solid var(--border);
@@ -172,10 +189,51 @@
             padding: 0;
         }
 
+        .theme-toggle {
+            margin-left: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .theme-toggle input {
+            width: 36px;
+            height: 20px;
+            appearance: none;
+            background: var(--border);
+            border-radius: 999px;
+            position: relative;
+            outline: none;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .theme-toggle input::before {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 16px;
+            height: 16px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.2s;
+        }
+
+        .theme-toggle input:checked {
+            background: var(--accent);
+        }
+
+        .theme-toggle input:checked::before {
+            transform: translateX(16px);
+        }
+
         .profile-edit-form {
             display: none;
             margin-top: 1rem;
-            background: white;
+            background: var(--bg);
             border: 1px solid var(--border);
             border-radius: 6px;
             padding: 1rem;
@@ -240,7 +298,7 @@
         }
 
         .conversation-item {
-            background: white;
+            background: var(--bg-warm);
             border: 1px solid var(--border);
             border-radius: 8px;
             padding: 1.25rem 1.5rem;
@@ -614,23 +672,31 @@
             <header class="profile-header">
                 <img id="profile-avatar" class="profile-avatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='22' r='14' fill='%23E5DFD5'/%3E%3Ccircle cx='32' cy='48' r='20' fill='%23E5DFD5'/%3E%3C/svg%3E" alt="Your avatar">
                 <div class="profile-info">
-                    <h1 id="profile-name">Your Archive</h1>
-                    <div class="profile-meta">
-                        <span id="profile-joined">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                                <line x1="16" y1="2" x2="16" y2="6"/>
-                                <line x1="8" y1="2" x2="8" y2="6"/>
-                                <line x1="3" y1="10" x2="21" y2="10"/>
-                            </svg>
-                            Member since —
-                        </span>
-                        <span id="profile-count">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                            </svg>
-                            — conversations shared
-                        </span>
+                    <div style="display:flex; align-items:flex-start; gap:1rem;">
+                        <div>
+                            <h1 id="profile-name">Your Archive</h1>
+                            <div class="profile-meta">
+                                <span id="profile-joined">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                                        <line x1="16" y1="2" x2="16" y2="6"/>
+                                        <line x1="8" y1="2" x2="8" y2="6"/>
+                                        <line x1="3" y1="10" x2="21" y2="10"/>
+                                    </svg>
+                                    Member since —
+                                </span>
+                                <span id="profile-count">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                    </svg>
+                                    — conversations shared
+                                </span>
+                            </div>
+                        </div>
+                        <label class="theme-toggle" id="theme-toggle" style="display:none;">
+                            <input type="checkbox" id="theme-toggle-input">
+                            <span>Dark mode</span>
+                        </label>
                     </div>
                     <div class="profile-bio" id="profile-bio" style="display: none;"></div>
                     <div class="profile-website" id="profile-website" style="display: none;"></div>
@@ -770,6 +836,8 @@
             const bioEl = document.getElementById('profile-bio');
             const websiteEl = document.getElementById('profile-website');
             const statusEl = document.getElementById('profile-save-status');
+            const themeToggle = document.getElementById('theme-toggle');
+            const themeInput = document.getElementById('theme-toggle-input');
 
             if (user.profile?.avatar_url) {
                 avatar.src = user.profile.avatar_url;
@@ -805,6 +873,29 @@
             }
 
             statusEl.style.display = 'none';
+
+            // Show dark mode toggle for owner
+            if (themeToggle && themeInput) {
+                themeToggle.style.display = 'inline-flex';
+                const saved = (window.mnemolog?.getTheme && window.mnemolog.getTheme()) || (localStorage.getItem('mnemolog-theme') === 'dark' ? 'dark' : 'light');
+                const isDark = saved === 'dark';
+                if (isDark) {
+                    window.mnemolog?.setTheme?.('dark');
+                }
+                themeInput.checked = isDark;
+                themeInput.onchange = (e) => {
+                    const enabled = e.target.checked;
+                    const mode = enabled ? 'dark' : 'light';
+                    if (window.mnemolog?.setTheme) {
+                        window.mnemolog.setTheme(mode);
+                    } else {
+                        const root = document.documentElement;
+                        document.body.classList.toggle('dark-mode', enabled);
+                        if (enabled) root.setAttribute('data-theme', 'dark'); else root.removeAttribute('data-theme');
+                        localStorage.setItem('mnemolog-theme', mode);
+                    }
+                };
+            }
         }
 
         async function loadConversations() {

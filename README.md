@@ -17,6 +17,7 @@ Key flows:
 - **Database**: Supabase (PostgreSQL)
 - **Auth**: Supabase Auth (Google, GitHub)
 - **Link previews**: Pages `_worker.js` injects dynamic OpenGraph tags for `/c/<uuid>` by fetching metadata from the API worker.
+- **Theme**: User-selectable light/dark mode (persists via local storage) exposed in the site header.
 
 ## Project Structure
 
@@ -121,3 +122,4 @@ Share flow:
 - Link previews: `_worker.js` injects OG/Twitter tags on `/c/<id>` by fetching conversation metadata from the API worker.
 - Icons: favicons/logos live in `frontend/assets/mnemolog-fav-icon.svg`, `mnemolog-logo-light.svg`, `mnemolog-logo-dark.svg`; OG previews use the dark logo.
 - Profiles: users can set an avatar image URL on `profile.html`; any publicly hosted image URL works (e.g., an image you host under `/assets/`).
+- Theme: users can toggle light/dark in the header; preference is stored in `localStorage` and applied across pages.
