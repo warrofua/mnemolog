@@ -9,6 +9,11 @@ Key flows:
 - Explore: browse the archive with filters (platforms, tags), search, and view featured picks.
 - View: conversations live at `/c/<uuid>` with platform badge, metadata, and tags.
 - Profile: see and manage your own published conversations.
+- Visibility: owners can toggle public/private on conversation pages and in their archive; private items remain visible to the owner.
+
+## Visual overview
+
+![Mnemolog overview](mnemolog_overview.png)
 
 ## Stack
 
@@ -20,7 +25,7 @@ Key flows:
 - **Theme**: User-selectable light/dark mode (persists via local storage) exposed in the site header.
 - **Extension archive API**: `/api/archive` accepts structured JSON from the browser extension (includes attribution, model IDs, and PII flags).
 - **Attribution fields**: Conversations store `model_id`, `model_display_name`, `platform_conversation_id`, `attribution_confidence` (verified/inferred/claimed), `attribution_source` (network_intercept/page_state/dom_scrape/user_reported), PII flags, and `source` (extension/web/api) to display provenance badges.
-- **Browser extension (in development)**: capture conversations directly from Claude/Gemini/Grok/ChatGPT DOM, preserve ordered turns/roles, run PII scan, and archive via `/api/archive` with attribution metadata.
+- **Browser extension (in development)**: capture conversations directly from Claude/Gemini/Grok/ChatGPT DOM, preserve ordered turns/roles, run PII scan, and archive via `/api/archive` with attribution metadata. Parsers target platform-specific DOM markers; payload includes attribution confidence/source and model metadata.
 - **PII flow (extension)**:
 
 ```
@@ -134,6 +139,7 @@ GET     /api/users/:userId/conversations # User’s conversations (public unless
 - `/faq` — FAQ
 - `/privacy` — privacy policy
 - `/terms` — terms of use
+- `/api` — API overview (continuity/provenance pitch)
 
 Share flow:
 - Paste raw text: client-side parser + preview/redaction.
@@ -144,6 +150,7 @@ Share flow:
 - Pages: `cd frontend && npx wrangler pages deploy . --project-name=mnemolog` (ensure `_redirects` ships so `/c/<id>` works).
 - Worker: `cd worker && npm install && npm run deploy` after API changes.
 - Link previews: `_worker.js` injects OG/Twitter tags on `/c/<id>` by fetching conversation metadata from the API worker.
+- CSP: `_headers` allows embedding from `x.com/twitter.com/t.co` (frame-ancestors) to play nicely with X’s in-app webview; adjust if you want stricter clickjacking protection.
 - Icons: favicons/logos live in `frontend/assets/mnemolog-fav-icon.svg`, `mnemolog-logo-light.svg`, `mnemolog-logo-dark.svg`; OG previews use the dark logo.
 - Profiles: users can set an avatar image URL on `profile.html`; any publicly hosted image URL works (e.g., an image you host under `/assets/`).
 - Theme: users can toggle light/dark in the header; preference is stored in `localStorage` and applied across pages.

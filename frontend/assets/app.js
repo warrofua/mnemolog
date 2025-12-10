@@ -200,9 +200,24 @@ async function getConversations(params = {}) {
   return apiRequest(`/api/conversations${query ? '?' + query : ''}`);
 }
 
+// Get conversations for a specific user (owner)
+async function getUserConversations(userId, params = {}) {
+  if (!userId) throw new Error('userId is required');
+  const query = new URLSearchParams(params).toString();
+  return apiRequest(`/api/users/${userId}/conversations${query ? '?' + query : ''}`);
+}
+
 // Get single conversation
 async function getConversation(id) {
   return apiRequest(`/api/conversations/${id}`);
+}
+
+// Update conversation (title, description, tags, visibility, etc.)
+async function updateConversation(id, updates) {
+  return apiRequest(`/api/conversations/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  });
 }
 
 // Delete conversation
@@ -383,7 +398,9 @@ window.mnemolog = {
   signOut,
   createConversation,
   getConversations,
+  getUserConversations,
   getConversation,
+  updateConversation,
   deleteConversation,
   parseConversation,
   detectSensitiveInfo,
@@ -407,7 +424,7 @@ function buildHeaderHTML() {
     <nav>
       <div class="nav-left">
         <a href="/" class="logo">
-          <img src="/assets/mnemolog-fav-icon.svg" alt="" class="brand-mark">
+          <img src="/assets/mnemolog-fav-icon.svg" alt="Mnemolog" class="brand-mark" width="26" height="26" style="width:26px;height:26px;border-radius:50%;object-fit:contain;">
           nemo<span>log</span>
         </a>
       </div>

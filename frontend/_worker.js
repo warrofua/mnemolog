@@ -59,11 +59,11 @@ export default {
         );
         html = html.replace(
           /<meta property="og:image"[^>]*>/,
-          `<meta property="og:image" content="https://mnemolog.com/assets/mnemolog-logo-dark.svg">`
+          `<meta property="og:image" content="https://mnemolog.com/assets/mnemolog_circle_image.png">`
         );
         html = html.replace(
           /<meta property="twitter:image"[^>]*>/,
-          `<meta property="twitter:image" content="https://mnemolog.com/assets/mnemolog-logo-dark.svg">`
+          `<meta property="twitter:image" content="https://mnemolog.com/assets/mnemolog_circle_image.png">`
         );
 
         const headers = new Headers(baseResp.headers);

@@ -6,6 +6,13 @@ class MnemologPopup {
     this.piiResults = null;
     this.currentState = 'empty';
     this.auth = null;
+    this.settings = {
+      runPiiScan: true,
+      alwaysRedact: false,
+      defaultVisibility: 'public',
+      defaultShowAuthor: true,
+      analyticsEnabled: false
+    };
     
     this.elements = {
       // States
@@ -50,7 +57,20 @@ class MnemologPopup {
       
       // Links
       viewLink: document.getElementById('viewLink'),
-      errorMessage: document.getElementById('errorMessage')
+      errorMessage: document.getElementById('errorMessage'),
+
+      // Settings
+      settingsLink: document.getElementById('settingsLink'),
+      settingsPanel: document.getElementById('settingsPanel'),
+      closeSettingsBtn: document.getElementById('closeSettingsBtn'),
+      saveSettingsBtn: document.getElementById('saveSettingsBtn'),
+      settingsSignInBtn: document.getElementById('settingsSignInBtn'),
+      accountStatus: document.getElementById('accountStatus'),
+      settingRunPii: document.getElementById('settingRunPii'),
+      settingAlwaysRedact: document.getElementById('settingAlwaysRedact'),
+      settingVisibility: document.getElementById('settingVisibility'),
+      settingShowAuthor: document.getElementById('settingShowAuthor'),
+      settingAnalytics: document.getElementById('settingAnalytics')
     };
     
     this.init();
@@ -63,8 +83,10 @@ class MnemologPopup {
         // New session from site: store and refresh UI
         this.auth = request.session;
         this.elements.signInBtn?.classList.add('hidden');
+        this.updateAccountStatus();
       }
     });
+    await this.loadSettings();
     await this.loadAuth();
     await this.detectConversation();
   }
@@ -77,6 +99,10 @@ class MnemologPopup {
     this.elements.archiveAnywayBtn?.addEventListener('click', () => this.archiveConversation(false));
     this.elements.editOnSiteBtn?.addEventListener('click', () => this.openPreview());
     this.elements.signInBtn?.addEventListener('click', () => this.openLogin());
+    this.elements.settingsLink?.addEventListener('click', (e) => { e.preventDefault(); this.showSettings(); });
+    this.elements.closeSettingsBtn?.addEventListener('click', () => this.hideSettings());
+    this.elements.saveSettingsBtn?.addEventListener('click', () => this.saveSettings());
+    this.elements.settingsSignInBtn?.addEventListener('click', () => this.openLogin());
   }
 
   async loadAuth() {
@@ -85,6 +111,7 @@ class MnemologPopup {
       if (stored?.token) {
         this.auth = stored;
         this.elements.signInBtn?.classList.add('hidden');
+        this.updateAccountStatus();
         return;
       }
       // Try to refresh from an open mnemolog.com tab
@@ -92,12 +119,77 @@ class MnemologPopup {
       if (refreshed?.session?.token) {
         this.auth = refreshed.session;
         this.elements.signInBtn?.classList.add('hidden');
+        this.updateAccountStatus();
       } else {
         this.elements.signInBtn?.classList.remove('hidden');
+        this.updateAccountStatus();
       }
     } catch (e) {
       console.warn('Auth load failed', e);
       this.elements.signInBtn?.classList.remove('hidden');
+      this.updateAccountStatus();
+    }
+  }
+
+  async loadSettings() {
+    const defaults = {
+      runPiiScan: true,
+      alwaysRedact: false,
+      defaultVisibility: 'public',
+      defaultShowAuthor: true,
+      analyticsEnabled: false
+    };
+    await new Promise((resolve) => {
+      chrome.storage.sync.get(['mnemologSettings'], (result) => {
+        this.settings = { ...defaults, ...(result.mnemologSettings || {}) };
+        this.applySettingsToUI();
+        resolve();
+      });
+    });
+  }
+
+  applySettingsToUI() {
+    if (this.elements.settingRunPii) this.elements.settingRunPii.checked = !!this.settings.runPiiScan;
+    if (this.elements.settingAlwaysRedact) this.elements.settingAlwaysRedact.checked = !!this.settings.alwaysRedact;
+    if (this.elements.settingVisibility) this.elements.settingVisibility.value = this.settings.defaultVisibility || 'public';
+    if (this.elements.settingShowAuthor) this.elements.settingShowAuthor.checked = !!this.settings.defaultShowAuthor;
+    if (this.elements.settingAnalytics) this.elements.settingAnalytics.checked = !!this.settings.analyticsEnabled;
+    this.updateAccountStatus();
+  }
+
+  saveSettings() {
+    this.settings.runPiiScan = !!this.elements.settingRunPii?.checked;
+    this.settings.alwaysRedact = !!this.elements.settingAlwaysRedact?.checked;
+    this.settings.defaultVisibility = this.elements.settingVisibility?.value || 'public';
+    this.settings.defaultShowAuthor = !!this.elements.settingShowAuthor?.checked;
+    this.settings.analyticsEnabled = !!this.elements.settingAnalytics?.checked;
+
+    chrome.storage.sync.set({ mnemologSettings: this.settings }, () => {
+      this.hideSettings();
+    });
+  }
+
+  showSettings() {
+    this.applySettingsToUI();
+    this.elements.settingsPanel?.classList.remove('hidden');
+    document.querySelector('.main')?.classList.add('hidden');
+    document.querySelector('.footer')?.classList.add('hidden');
+  }
+
+  hideSettings() {
+    this.elements.settingsPanel?.classList.add('hidden');
+    document.querySelector('.main')?.classList.remove('hidden');
+    document.querySelector('.footer')?.classList.remove('hidden');
+  }
+
+  updateAccountStatus() {
+    if (!this.elements.accountStatus) return;
+    if (this.auth?.token) {
+      this.elements.accountStatus.textContent = 'Signed in';
+      this.elements.settingsSignInBtn?.classList.add('hidden');
+    } else {
+      this.elements.accountStatus.textContent = 'Not signed in';
+      this.elements.settingsSignInBtn?.classList.remove('hidden');
     }
   }
 
@@ -320,19 +412,23 @@ class MnemologPopup {
   
   handleArchiveClick() {
     if (!this.conversationData) return;
-    
-    // Run PII detection (fails open if detector unavailable)
-    if (window.PIIDetector) {
+    const runPii = this.settings?.runPiiScan !== false;
+
+    if (runPii && window.PIIDetector) {
       this.piiResults = PIIDetector.scanConversation(this.conversationData.messages);
     } else {
       this.piiResults = { totalFindings: 0, byMessage: [] };
     }
     
     if (this.piiResults.totalFindings > 0) {
+      if (this.settings?.alwaysRedact) {
+        this.redactAndArchive();
+        return;
+      }
       this.displayPiiWarnings();
       this.setState('pii-review');
     } else {
-      // No PII found, proceed directly
+      // No PII found or scan disabled, proceed directly
       this.archiveConversation(false);
     }
   }
@@ -407,9 +503,14 @@ class MnemologPopup {
       const attribConf = this.conversationData.attribution?.confidence || this.conversationData.attribution_confidence;
       const attribSource = this.conversationData.attribution?.source || this.conversationData.attribution_source;
 
+      const isPublic = this.settings?.defaultVisibility !== 'private';
+      const showAuthor = this.settings?.defaultShowAuthor !== false;
+
       const payload = {
         conversation: {
           ...this.conversationData,
+          is_public: this.conversationData.is_public ?? isPublic,
+          show_author: this.conversationData.show_author ?? showAuthor,
           model_id: modelId || null,
           model_display_name: modelDisplay || null,
           platform_conversation_id: platformConversationId || null,

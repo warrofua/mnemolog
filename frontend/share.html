@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Share a Conversation — Mnemolog</title>
     <link rel="icon" href="/assets/mnemolog-fav-icon.svg" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="/assets/mnemolog-logo-light.svg">
+    <link rel="icon" href="/assets/mnemolog_circle_image.png" type="image/png" sizes="32x32">
+    <link rel="apple-touch-icon" href="/assets/mnemolog_circle_image.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
@@ -368,7 +369,7 @@
         .preview-card {
             border: 1px solid var(--border);
             border-radius: 10px;
-            background: white;
+            background: var(--bg-warm);
             padding: 1.5rem;
             box-shadow: 0 8px 20px rgba(0,0,0,0.03);
         }
@@ -566,6 +567,8 @@
             font-family: 'DM Sans', sans-serif;
             font-size: 0.95rem;
             transition: border-color 0.2s;
+            background: var(--bg);
+            color: var(--text);
         }
 
         .form-group input:focus,
@@ -747,6 +750,10 @@
         .success-message p {
             color: var(--text-secondary);
             margin-bottom: 2rem;
+        }
+
+        .success-message .share-link-box input {
+            color: var(--text);
         }
 
         .share-link-box {
@@ -1014,7 +1021,7 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
                 </div>
 
                 <div style="display: flex; gap: 1rem; justify-content: center;">
-                    <a href="/share" class="btn btn-secondary">Share Another</a>
+                    <a href="/share" class="btn btn-primary">Share Another</a>
                     <a href="/explore" class="btn btn-primary">Explore Archive</a>
                 </div>
             </div>

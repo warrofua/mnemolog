@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API — Mnemolog</title>
+    <link rel="icon" href="/assets/mnemolog-fav-icon.svg" type="image/svg+xml">
+    <link rel="icon" href="/assets/mnemolog_circle_image.png" type="image/png" sizes="32x32">
+    <link rel="apple-touch-icon" href="/assets/mnemolog_circle_image.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/styles.css">
+    <style>
+        body { background: var(--bg); color: var(--text); }
+        .container { max-width: 960px; margin: 0 auto; padding: 3rem 1.5rem 4rem; }
+        .page-header { margin: 2rem 0 2.5rem; }
+        .page-header h1 { font-family: 'Cormorant Garamond', serif; font-size: clamp(2.4rem, 4vw, 3.2rem); margin-bottom: 0.5rem; }
+        .page-header p { color: var(--text-secondary); max-width: 760px; }
+        .grid { display: grid; gap: 1.25rem; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin: 2rem 0; }
+        .card { border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; background: var(--bg-warm); }
+        .card h3 { margin-bottom: 0.5rem; }
+        .card p { color: var(--text-secondary); line-height: 1.6; }
+        .endpoint { border: 1px solid var(--border); border-radius: 8px; padding: 1rem; background: var(--bg-warm); margin-top: 1rem; }
+        .endpoint code { background: var(--bg); padding: 0.15rem 0.35rem; border-radius: 4px; }
+        .pill { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.25rem 0.55rem; border-radius: 999px; background: rgba(184,134,11,0.12); color: var(--accent); font-weight: 600; font-size: 0.85rem; }
+        .cta { margin-top: 2rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+        footer { padding: 2.5rem 4rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; color: var(--text-secondary); font-size: 0.95rem; }
+        .footer-links { display: flex; gap: 1.5rem; }
+        .footer-links a { color: var(--text-secondary); text-decoration: none; transition: color 0.2s ease; }
+        .footer-links a:hover { color: var(--text); }
+        .footer-note { font-size: 0.85rem; }
+        @media (max-width: 700px) {
+            footer { flex-direction: column; gap: 0.75rem; padding: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+    <div id="site-header"></div>
+    <main class="container">
+        <header class="page-header">
+            <h1>The Mnemolog Continuity API</h1>
+            <p>Access a high-quality, human-curated dataset of opt-in conversations with attribution and provenance. Designed for AI developers who care about continuity and credit.</p>
+        </header>
+
+        <div class="grid">
+            <div class="card">
+                <h3>Consented & Attributed</h3>
+                <p>Every conversation is explicitly shared by a human. Attribution metadata travels with the text so models can cite and credit sources.</p>
+                <span class="pill">include_attribution=true</span>
+            </div>
+            <div class="card">
+                <h3>Continuity, not scraping</h3>
+                <p>Use public cognitive history (with user permission) to avoid cold starts across models. Fetch context instead of starting from zero.</p>
+                <span class="pill">/users/{id}/context_window</span>
+            </div>
+            <div class="card">
+                <h3>Provenance-first</h3>
+                <p>Data is opt-in, licensed, and auditable. No “mystery crawl” risk—good for safety, governance, and training with citations.</p>
+                <span class="pill">Attribution Covenant</span>
+            </div>
+        </div>
+
+        <section class="endpoint">
+            <h3>Examples</h3>
+            <p><code>GET /api/conversations?include_attribution=true&limit=20</code></p>
+            <p><code>GET /api/users/{user_id}/context_window</code></p>
+            <p><code>GET /api/conversations/{id}</code></p>
+        </section>
+
+        <div class="cta">
+            <a href="/share" class="btn btn-primary">Share a Conversation</a>
+            <a href="mailto:info@joshuafarrow.com?subject=Mnemolog%20API%20Access" class="btn btn-secondary">Request Access</a>
+        </div>
+    </main>
+
+    <footer>
+        <div class="footer-links">
+            <a href="/privacy">Privacy</a>
+            <a href="/terms">Terms</a>
+            <a href="/api">API</a>
+            <a href="https://github.com/warrofua/mnemolog" target="_blank">GitHub</a>
+        </div>
+        <span class="footer-note">Building continuity, together.</span>
+    </footer>
+
+    <script src="/assets/config.js"></script>
+    <script src="/assets/app.js"></script>
+</body>
+</html>

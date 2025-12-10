@@ -155,7 +155,11 @@ async function getSettings() {
       resolve(result.mnemologSettings || {
         analyticsEnabled: false,
         autoDetect: true,
-        showFloatingButton: true
+        showFloatingButton: true,
+        runPiiScan: true,
+        alwaysRedact: false,
+        defaultVisibility: 'public',
+        defaultShowAuthor: true
       });
     });
   });
@@ -174,7 +178,11 @@ chrome.runtime.onInstalled.addListener((details) => {
       mnemologSettings: {
         analyticsEnabled: false,
         autoDetect: true,
-        showFloatingButton: true
+        showFloatingButton: true,
+        runPiiScan: true,
+        alwaysRedact: false,
+        defaultVisibility: 'public',
+        defaultShowAuthor: true
       }
     });
   }

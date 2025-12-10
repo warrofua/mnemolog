@@ -444,6 +444,10 @@ router.get('/api/conversations', async (request: IRequest, env: Env) => {
   const platformParam = url.searchParams.get('platform');
   const tagParam = url.searchParams.get('tag');
   const search = url.searchParams.get('q');
+  const userParam = url.searchParams.get('user');
+
+  const user = await getUser(request, supabase);
+  const isOwnerView = user && (userParam === 'me' || userParam === user.id);
 
   const platforms = platformParam
     ? platformParam.split(',').map(p => p.trim()).filter(Boolean)
@@ -480,7 +484,20 @@ router.get('/api/conversations', async (request: IRequest, env: Env) => {
     `,
       { count: 'exact' }
     )
-    .eq('is_public', true);
+    .neq('id', null); // placeholder base filter
+
+  // User scoping
+  if (userParam) {
+    const targetUserId = userParam === 'me' ? (user?.id || '') : userParam;
+    if (isOwnerView) {
+      query = query.eq('user_id', user!.id);
+      // no is_public filter so owner can see private
+    } else {
+      query = query.eq('user_id', targetUserId).eq('is_public', true);
+    }
+  } else {
+    query = query.eq('is_public', true);
+  }
 
   if (sort === 'oldest') {
     query = query.order('created_at', { ascending: true });

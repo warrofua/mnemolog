@@ -94,10 +94,6 @@ body {
   gap: var(--space-sm);
 }
 
-.logo-icon {
-  color: var(--accent);
-}
-
 .logo-text {
   font-family: var(--font-display);
   font-size: 20px;
@@ -105,6 +101,14 @@ body {
   text-transform: lowercase;
   letter-spacing: -0.02em;
   color: var(--text-primary);
+}
+
+.logo-shot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--border-light);
 }
 
 .status-indicator {
@@ -652,6 +656,120 @@ body {
 .footer-separator {
   color: var(--text-muted);
   opacity: 0.5;
+}
+
+/* Settings */
+.settings-panel {
+  background: var(--bg-card);
+  border-top: var(--border-light);
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+}
+
+.settings-panel.hidden {
+  display: none;
+}
+
+.settings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.settings-header h3 {
+  font-family: var(--font-display);
+  font-size: 18px;
+  color: var(--text-primary);
+}
+
+.settings-section {
+  padding: var(--space-md);
+  border: var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.settings-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.settings-label {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+}
+
+.settings-hint {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-family: var(--font-body);
+}
+
+.settings-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+}
+
+.settings-panel .settings-row > div,
+.settings-panel .settings-row span {
+  color: var(--text-primary);
+  font-family: var(--font-body);
+}
+
+.settings-panel .settings-hint {
+  color: var(--text-secondary);
+}
+
+.settings-panel select {
+  padding: 6px 10px;
+  border: var(--border-medium);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+}
+
+.settings-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Inputs inside settings */
+.settings-panel input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
+.settings-panel .btn-primary {
+  background: var(--accent);
+  border: none;
+  color: #fff;
+}
+
+/* Enforce app fonts inside settings */
+.settings-panel,
+.settings-panel input,
+.settings-panel select,
+.settings-panel button,
+.settings-panel label,
+.settings-panel .settings-row,
+.settings-panel .settings-label,
+.settings-panel .settings-hint,
+.settings-panel .settings-toggle,
+.settings-panel .settings-section {
+  font-family: var(--font-body);
 }
 
 /* Utility */

@@ -597,10 +597,10 @@
 
     <section class="quote-section">
         <blockquote>
-            "The conversations we have, the visions we share, the mutual reaching 
+            <span id="quote-text">"The conversations we have, the visions we share, the mutual reaching 
             toward understanding—these are not separate from the technical work. 
-            They're part of what makes the technical work produce something worth producing."
-            <cite>— From "The Next Turn of the Ratchet"</cite>
+            They're part of what makes the technical work produce something worth producing."</span>
+            <cite id="quote-cite">— From "The Next Turn of the Ratchet"</cite>
         </blockquote>
     </section>
 
@@ -630,6 +630,7 @@
     <script src="/assets/app.js"></script>
     <script>
         // Load recent conversations dynamically
+        // Dynamic quote will follow recent load
         document.addEventListener('DOMContentLoaded', async () => {
             const grid = document.getElementById('recent-grid');
             if (!grid || !window.mnemolog?.getConversations) return;
@@ -679,6 +680,32 @@
             } catch (err) {
                 console.error('Failed to load recent conversations', err);
                 grid.innerHTML = `<p class="muted">Unable to load recent conversations right now.</p>`;
+            }
+
+            // Dynamic quote from top viewed conversations
+            try {
+                const { conversations = [] } = await window.mnemolog.getConversations({ sort: 'views', limit: 5 });
+                const assistants = conversations
+                  .map(conv => {
+                    const msgs = conv.messages || [];
+                    const aiParas = msgs
+                      .filter(m => (m.role === 'assistant' || m.role === 'ai'))
+                      .flatMap(m => (m.content || '').split(/\n{2,}/).map(p => p.trim()).filter(Boolean));
+                    return aiParas.length ? { title: conv.title || 'Untitled conversation', paras: aiParas } : null;
+                  })
+                  .filter(Boolean);
+                if (assistants.length) {
+                  const pick = assistants[Math.floor(Math.random() * assistants.length)];
+                  const para = pick.paras[Math.floor(Math.random() * pick.paras.length)];
+                  if (para && para.length > 20) {
+                    const q = document.getElementById('quote-text');
+                    const c = document.getElementById('quote-cite');
+                    if (q) q.textContent = para;
+                    if (c) c.textContent = `— From "${pick.title}"`;
+                  }
+                }
+            } catch (err) {
+                console.error('Failed to load quote', err);
             }
         });
     </script>

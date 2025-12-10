@@ -6,7 +6,7 @@
   <title>Mnemolog</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
@@ -14,10 +14,7 @@
     <!-- Header -->
     <header class="header">
       <div class="logo">
-        <svg class="logo-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5"/>
-          <path d="M12 6v12M8 9l4-3 4 3M8 15l4 3 4-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+        <img class="logo-shot" src="https://mnemolog.com/assets/mnemolog_circle_image.png" alt="Mnemolog">
         <span class="logo-text">mnemo<span>log</span></span>
       </div>
       <div class="status-indicator" id="statusIndicator">
@@ -195,6 +192,74 @@
       <span class="footer-separator">·</span>
       <a href="#" id="settingsLink">Settings</a>
     </footer>
+
+    <!-- Settings Panel -->
+    <div class="settings-panel hidden" id="settingsPanel">
+      <div class="settings-header">
+        <h3>Settings</h3>
+        <button class="btn-tertiary close-settings" id="closeSettingsBtn">Close</button>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-row">
+          <div>
+            <div class="settings-label">Account</div>
+            <div class="settings-hint" id="accountStatus">Not signed in</div>
+          </div>
+          <button class="btn-secondary" id="settingsSignInBtn">Sign in</button>
+        </div>
+        <div class="settings-row">
+          <div>
+            <div class="settings-label">Destination</div>
+            <div class="settings-hint">https://mnemolog.com/api/archive</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-row">
+          <label for="settingVisibility" class="settings-label">Default visibility</label>
+          <select id="settingVisibility">
+            <option value="public">Public</option>
+            <option value="private">Private</option>
+          </select>
+        </div>
+        <div class="settings-row">
+          <label class="settings-toggle">
+            <input type="checkbox" id="settingShowAuthor" checked>
+            <span>Show my name by default</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-row">
+          <label class="settings-toggle">
+            <input type="checkbox" id="settingRunPii" checked>
+            <span>Run PII scan before upload</span>
+          </label>
+        </div>
+        <div class="settings-row">
+          <label class="settings-toggle">
+            <input type="checkbox" id="settingAlwaysRedact">
+            <span>Always redact flagged items</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-row">
+          <label class="settings-toggle">
+            <input type="checkbox" id="settingAnalytics">
+            <span>Allow anonymous analytics (off by default)</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-actions">
+        <button class="btn-primary" id="saveSettingsBtn">Save</button>
+      </div>
+    </div>
   </div>
 
   <script src="../utils/pii-detector.js"></script>
