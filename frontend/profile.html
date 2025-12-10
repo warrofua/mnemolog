@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Your Archive — Mnemolog</title>
     <link rel="icon" href="/assets/mnemolog-fav-icon.svg" type="image/svg+xml">
-    <link rel="icon" href="/assets/mnemolog_circle_image.png" type="image/png" sizes="32x32">
-    <link rel="apple-touch-icon" href="/assets/mnemolog_circle_image.png">
+    <link rel="icon" href="/assets/mnemolog_icon_header_screenshot.png" type="image/png" sizes="32x32">
+    <link rel="apple-touch-icon" href="/assets/mnemolog_icon_header_screenshot.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
@@ -340,12 +340,18 @@
             margin-bottom: 0.35rem;
         }
 
-        .conversation-content h3 a {
+        .conversation-link {
+            display: block;
             text-decoration: none;
+            color: inherit;
+            flex: 1;
+        }
+
+        .conversation-content h3 {
             transition: color 0.2s;
         }
 
-        .conversation-content h3 a:hover {
+        .conversation-link:hover h3 {
             color: var(--accent);
         }
 
@@ -507,7 +513,12 @@
 
         /* Loading skeleton */
         .skeleton {
-            background: linear-gradient(90deg, var(--bg-warm) 25%, var(--bg) 50%, var(--bg-warm) 75%);
+            background: linear-gradient(
+                90deg,
+                rgba(255, 255, 255, 0.06) 25%,
+                rgba(255, 255, 255, 0.12) 50%,
+                rgba(255, 255, 255, 0.06) 75%
+            );
             background-size: 200% 100%;
             animation: shimmer 1.5s infinite;
             border-radius: 4px;
@@ -519,7 +530,7 @@
         }
 
         .skeleton-item {
-            background: white;
+            background: var(--bg-warm);
             border: 1px solid var(--border);
             border-radius: 8px;
             padding: 1.25rem 1.5rem;
@@ -981,21 +992,23 @@
             
             list.innerHTML = conversations.map(conv => `
                 <article class="conversation-item" data-id="${conv.id}">
-                    <div class="conversation-content">
-                        <h3><a href="/c/${conv.id}">${escapeHtml(conv.title)}</a></h3>
-                        ${conv.excerpt ? `<p class="conversation-excerpt">${escapeHtml(conv.excerpt)}</p>` : ''}
-                        <div class="conversation-meta">
-                            <span class="conversation-platform">${mnemolog.platformNames[conv.platform] || conv.platform}</span>
-                            ${conv.model_display_name || conv.model_id ? `<span class="conversation-model">${escapeHtml(conv.model_display_name || conv.model_id)}</span>` : ''}
-                            ${conv.attribution_confidence ? `<span class="conversation-attrib">${escapeHtml(conv.attribution_confidence === 'verified' ? 'Verified' : conv.attribution_confidence === 'inferred' ? 'Inferred' : 'Claimed')}</span>` : ''}
-                            <span>${mnemolog.formatDate(conv.created_at)}</span>
-                            ${conv.tags?.length ? `
-                                <div class="conversation-tags">
-                                    ${conv.tags.slice(0, 3).map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}
-                                </div>
-                            ` : ''}
+                    <a class="conversation-link" href="/c/${conv.id}">
+                        <div class="conversation-content">
+                            <h3>${escapeHtml(conv.title)}</h3>
+                            ${conv.excerpt ? `<p class="conversation-excerpt">${escapeHtml(conv.excerpt)}</p>` : ''}
+                            <div class="conversation-meta">
+                                <span class="conversation-platform">${mnemolog.platformNames[conv.platform] || conv.platform}</span>
+                                ${conv.model_display_name || conv.model_id ? `<span class="conversation-model">${escapeHtml(conv.model_display_name || conv.model_id)}</span>` : ''}
+                                ${conv.attribution_confidence ? `<span class="conversation-attrib">${escapeHtml(conv.attribution_confidence === 'verified' ? 'Verified' : conv.attribution_confidence === 'inferred' ? 'Inferred' : 'Claimed')}</span>` : ''}
+                                <span>${mnemolog.formatDate(conv.created_at)}</span>
+                                ${conv.tags?.length ? `
+                                    <div class="conversation-tags">
+                                        ${conv.tags.slice(0, 3).map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}
+                                    </div>
+                                ` : ''}
+                            </div>
                         </div>
-                    </div>
+                    </a>
                     <div class="conversation-actions">
                         <label class="switch">
                             <input type="checkbox" ${conv.is_public ? 'checked' : ''} onchange="toggleVisibility('${conv.id}', this.checked)">

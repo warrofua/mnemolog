@@ -291,6 +291,63 @@ body {
   padding: var(--space-sm) var(--space-md);
 }
 
+/* Tag editor */
+.tag-editor {
+  margin: var(--space-md) 0;
+}
+
+.tag-label {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: var(--space-xs);
+  color: var(--text-primary);
+}
+
+.tag-input-row {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.tag-input-row input {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: var(--border-medium);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+}
+
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--bg-secondary);
+  border: var(--border-light);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.tag-chip button {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  font-size: 12px;
+}
+
 .provenance-row {
   display: flex;
   justify-content: space-between;

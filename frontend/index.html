@@ -671,12 +671,23 @@
             };
 
             try {
-                const { conversations = [] } = await window.mnemolog.getConversations({ limit: 4, sort: 'newest' });
+                const { conversations = [] } = await window.mnemolog.getConversations({ limit: 8, sort: 'newest' });
                 if (!conversations.length) {
                     grid.innerHTML = `<p class="muted">No conversations yet. Check back soon.</p>`;
                     return;
                 }
-                grid.innerHTML = conversations.map(renderCard).join('');
+                // dedupe by title and pick a random 4
+                const uniq = [];
+                const seen = new Set();
+                conversations.forEach(c => {
+                    const t = (c.title || '').trim().toLowerCase();
+                    if (!t || !seen.has(t)) {
+                        seen.add(t);
+                        uniq.push(c);
+                    }
+                });
+                const shuffled = uniq.sort(() => Math.random() - 0.5);
+                grid.innerHTML = shuffled.slice(0, 4).map(renderCard).join('');
             } catch (err) {
                 console.error('Failed to load recent conversations', err);
                 grid.innerHTML = `<p class="muted">Unable to load recent conversations right now.</p>`;

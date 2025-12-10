@@ -200,7 +200,7 @@ router.get('/api/auth/user', async (request: IRequest, env: Env) => {
       headers: authHeader ? { Authorization: authHeader } : {},
     },
   });
-  const user = await getUser(request, supabase);
+  const user = undefined; // not used for public list
   
   if (!user) {
     return json({ error: 'Unauthorized' }, 401);
@@ -429,12 +429,13 @@ router.put('/api/conversations/:id', async (request: IRequest, env: Env) => {
 
 // List public conversations
 router.get('/api/conversations', async (request: IRequest, env: Env) => {
-  const authHeader = request.headers.get('Authorization') || undefined;
-  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
-    global: {
-      headers: authHeader ? { Authorization: authHeader } : {},
-    },
-  });
+  // Use service key when available; fallback to anon key
+  const supabaseKey = env.SUPABASE_SERVICE_KEY || env.SUPABASE_ANON_KEY;
+  if (!env.SUPABASE_URL || !supabaseKey) {
+    console.error('Missing SUPABASE_URL or SUPABASE key');
+    return json({ error: 'Service misconfigured' }, 500);
+  }
+  const supabase = createClient(env.SUPABASE_URL, supabaseKey);
   const url = new URL(request.url);
   
   const limit = Math.min(parseInt(url.searchParams.get('limit') || '20', 10), 100);
@@ -444,10 +445,7 @@ router.get('/api/conversations', async (request: IRequest, env: Env) => {
   const platformParam = url.searchParams.get('platform');
   const tagParam = url.searchParams.get('tag');
   const search = url.searchParams.get('q');
-  const userParam = url.searchParams.get('user');
-
   const user = await getUser(request, supabase);
-  const isOwnerView = user && (userParam === 'me' || userParam === user.id);
 
   const platforms = platformParam
     ? platformParam.split(',').map(p => p.trim()).filter(Boolean)
@@ -475,29 +473,13 @@ router.get('/api/conversations', async (request: IRequest, env: Env) => {
       attribution_source,
       pii_scanned,
       pii_redacted,
-      source,
-      profiles!inner (
-        id,
-        display_name,
-        avatar_url
-      )
+      source
     `,
       { count: 'exact' }
-    )
-    .neq('id', null); // placeholder base filter
+    );
 
-  // User scoping
-  if (userParam) {
-    const targetUserId = userParam === 'me' ? (user?.id || '') : userParam;
-    if (isOwnerView) {
-      query = query.eq('user_id', user!.id);
-      // no is_public filter so owner can see private
-    } else {
-      query = query.eq('user_id', targetUserId).eq('is_public', true);
-    }
-  } else {
-    query = query.eq('is_public', true);
-  }
+  // Public list only for this endpoint
+  query = query.eq('is_public', true);
 
   if (sort === 'oldest') {
     query = query.order('created_at', { ascending: true });
@@ -537,12 +519,12 @@ router.get('/api/conversations', async (request: IRequest, env: Env) => {
 
   if (error) {
     console.error('Query error:', error);
-    return json({ error: 'Failed to fetch conversations' }, 500);
+    return json({ error: `Failed to fetch conversations: ${error.message || 'unknown error'}` }, 500);
   }
 
   const conversations = data?.map(c => ({
     ...c,
-    profiles: c.show_author ? c.profiles : null,
+    profiles: undefined, // profiles omitted in list view
   }));
 
   return json({ conversations, count });

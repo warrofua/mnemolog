@@ -1,2 +1,0 @@
-/*
-  Content-Security-Policy: default-src 'self'; img-src * data: blob:; style-src 'self' 'unsafe-inline' https:; script-src 'self' 'unsafe-inline' https:; connect-src 'self' https:; font-src 'self' https://fonts.gstatic.com data:; frame-ancestors 'self' https://x.com https://twitter.com https://t.co;

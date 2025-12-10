@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Explore the Archive — Mnemolog</title>
     <link rel="icon" href="/assets/mnemolog-fav-icon.svg" type="image/svg+xml">
-    <link rel="icon" href="/assets/mnemolog_circle_image.png" type="image/png" sizes="32x32">
-    <link rel="apple-touch-icon" href="/assets/mnemolog_circle_image.png">
+    <link rel="icon" href="/assets/mnemolog_icon_header_screenshot.png" type="image/png" sizes="32x32">
+    <link rel="apple-touch-icon" href="/assets/mnemolog_icon_header_screenshot.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
@@ -535,7 +535,12 @@
 
         /* Loading state */
         .skeleton {
-            background: linear-gradient(90deg, var(--bg-warm) 25%, var(--bg) 50%, var(--bg-warm) 75%);
+            background: linear-gradient(
+                90deg,
+                rgba(255, 255, 255, 0.06) 25%,
+                rgba(255, 255, 255, 0.12) 50%,
+                rgba(255, 255, 255, 0.06) 75%
+            );
             background-size: 200% 100%;
             animation: shimmer 1.5s infinite;
             border-radius: 4px;
@@ -547,7 +552,7 @@
         }
 
         .skeleton-card {
-            background: white;
+            background: var(--bg-warm);
             border: 1px solid var(--border);
             border-radius: 8px;
             padding: 1.25rem;
@@ -1087,11 +1092,29 @@
             loadResults(true);
         }
 
+        function pickUniqueFeatured(list, count = 3) {
+            if (!Array.isArray(list)) return [];
+            // shallow shuffle
+            const shuffled = [...list].sort(() => Math.random() - 0.5);
+            const seen = new Set();
+            const out = [];
+            for (const conv of shuffled) {
+                const title = (conv.title || '').trim().toLowerCase();
+                if (title && !seen.has(title)) {
+                    seen.add(title);
+                    out.push(conv);
+                }
+                if (out.length >= count) break;
+            }
+            return out;
+        }
+
         async function loadFeatured() {
-            // Use the same fetch but only take a few items for now
+            // Fetch a larger pool, then de-dupe titles and pick a random set
             try {
-                const { conversations } = await mnemolog.getConversations({ limit: 3, offset: 0 });
-                renderFeatured(conversations || []);
+                const { conversations } = await mnemolog.getConversations({ limit: 10, offset: 0, sort: 'views' });
+                const picks = pickUniqueFeatured(conversations || [], 3);
+                renderFeatured(picks);
             } catch (err) {
                 console.error('Featured load failed:', err);
             }

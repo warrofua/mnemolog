@@ -38,6 +38,9 @@ class MnemologPopup {
       attributionSource: document.getElementById('attributionSource'),
       modelId: document.getElementById('modelId'),
       timestamp: document.getElementById('timestamp'),
+      tagInput: document.getElementById('tagInput'),
+      addTagBtn: document.getElementById('addTagBtn'),
+      tagList: document.getElementById('tagList'),
       
       // Buttons
       archiveBtn: document.getElementById('archiveBtn'),
@@ -103,6 +106,29 @@ class MnemologPopup {
     this.elements.closeSettingsBtn?.addEventListener('click', () => this.hideSettings());
     this.elements.saveSettingsBtn?.addEventListener('click', () => this.saveSettings());
     this.elements.settingsSignInBtn?.addEventListener('click', () => this.openLogin());
+
+    // Tagging
+    if (this.elements.tagInput && this.elements.addTagBtn && this.elements.tagList) {
+      const addTag = () => {
+        const val = (this.elements.tagInput.value || '').trim();
+        if (!val) return;
+        if (!this.conversationData) this.conversationData = {};
+        if (!Array.isArray(this.conversationData.tags)) this.conversationData.tags = [];
+        if (!this.conversationData.tags.includes(val)) {
+          this.conversationData.tags.push(val);
+          this.renderTags();
+        }
+        this.elements.tagInput.value = '';
+        this.elements.tagInput.focus();
+      };
+      this.elements.addTagBtn.addEventListener('click', addTag);
+      this.elements.tagInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          addTag();
+        }
+      });
+    }
   }
 
   async loadAuth() {
@@ -154,6 +180,7 @@ class MnemologPopup {
     if (this.elements.settingVisibility) this.elements.settingVisibility.value = this.settings.defaultVisibility || 'public';
     if (this.elements.settingShowAuthor) this.elements.settingShowAuthor.checked = !!this.settings.defaultShowAuthor;
     if (this.elements.settingAnalytics) this.elements.settingAnalytics.checked = !!this.settings.analyticsEnabled;
+    this.renderTags();
     this.updateAccountStatus();
   }
 
@@ -254,7 +281,9 @@ class MnemologPopup {
       
       if (response?.success && response.data) {
         this.conversationData = response.data;
+        if (!Array.isArray(this.conversationData.tags)) this.conversationData.tags = [];
         this.displayConversation(response.data);
+        this.renderTags();
         this.setState('detected');
         this.updateStatus('active');
       } else {
@@ -338,6 +367,7 @@ class MnemologPopup {
     
     // Attribution
     this.elements.attributionSource.innerHTML = this.formatConfidence(attribution);
+    this.renderTags();
   }
   
   formatPlatformName(platform) {
@@ -408,6 +438,37 @@ class MnemologPopup {
     
     return `<span class="${classes[confidence]}">${labels[confidence]}</span>
             <span style="color: var(--text-muted); font-size: 11px;"> ${sources[source] || ''}</span>`;
+  }
+
+  renderTags() {
+    const list = this.elements.tagList;
+    if (!list) return;
+    const tags = (this.conversationData && Array.isArray(this.conversationData.tags)) ? this.conversationData.tags : [];
+    list.innerHTML = '';
+    if (!tags.length) {
+      const empty = document.createElement('span');
+      empty.className = 'tag-empty';
+      empty.textContent = 'No tags yet';
+      list.appendChild(empty);
+      return;
+    }
+    tags.forEach((tag) => {
+      const chip = document.createElement('span');
+      chip.className = 'tag-chip';
+      const label = document.createElement('span');
+      label.textContent = tag;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = '×';
+      btn.addEventListener('click', () => {
+        if (!this.conversationData?.tags) return;
+        this.conversationData.tags = this.conversationData.tags.filter(t => t !== tag);
+        this.renderTags();
+      });
+      chip.appendChild(label);
+      chip.appendChild(btn);
+      list.appendChild(chip);
+    });
   }
   
   handleArchiveClick() {

@@ -14,7 +14,7 @@
     <!-- Header -->
     <header class="header">
       <div class="logo">
-        <img class="logo-shot" src="https://mnemolog.com/assets/mnemolog_circle_image.png" alt="Mnemolog">
+        <img class="logo-shot" src="https://mnemolog.com/assets/mnemolog_icon_header_screenshot.png" alt="Mnemolog">
         <span class="logo-text">mnemo<span>log</span></span>
       </div>
       <div class="status-indicator" id="statusIndicator">
@@ -57,7 +57,7 @@
               <span class="verification-icon" title="Verified from page data">✓</span>
             </div>
           </div>
-          
+
           <div class="conversation-preview">
             <h3 class="conversation-title" id="conversationTitle">Untitled Conversation</h3>
             <div class="conversation-meta">
@@ -65,6 +65,15 @@
               <span class="meta-separator">·</span>
               <span id="conversationDate">Today</span>
             </div>
+          </div>
+
+          <div class="tag-editor">
+            <div class="tag-label">Tags</div>
+            <div class="tag-input-row">
+              <input type="text" id="tagInput" placeholder="Add a tag and press Enter" />
+              <button class="btn-tertiary" id="addTagBtn">Add</button>
+            </div>
+            <div class="tag-list" id="tagList"></div>
           </div>
 
           <div class="provenance-info">
