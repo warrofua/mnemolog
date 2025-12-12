@@ -196,7 +196,7 @@
 
         .featured-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
             gap: 1.25rem;
         }
 
@@ -207,24 +207,13 @@
             padding: 1.25rem;
             text-decoration: none;
             transition: all 0.2s;
-            position: relative;
-        }
-
-        .featured-card::before {
-            content: '';
-            position: absolute;
-            top: 0.75rem;
-            left: 0;
-            width: 3px;
-            height: 2rem;
-            background: var(--accent);
-            border-radius: 0 2px 2px 0;
+            display: flex;
+            flex-direction: column;
         }
 
         .featured-card:hover {
             border-color: var(--thread);
             box-shadow: 0 4px 12px rgba(0,0,0,0.04);
-            transform: translateY(-2px);
         }
 
         .featured-card h3 {
@@ -232,7 +221,7 @@
             font-size: 1.15rem;
             font-weight: 600;
             margin-bottom: 0.4rem;
-            padding-right: 1rem;
+            line-height: 1.3;
         }
 
         .featured-card .excerpt {
@@ -252,6 +241,7 @@
             display: flex;
             align-items: center;
             gap: 0.75rem;
+            flex-wrap: wrap;
         }
 
         .platform-badge {
@@ -365,11 +355,17 @@
             background: var(--bg);
             color: var(--text);
             cursor: pointer;
+            appearance: none;
+            background-image: linear-gradient(45deg, transparent 50%, var(--text-secondary) 50%), linear-gradient(135deg, var(--text-secondary) 50%, transparent 50%);
+            background-position: calc(100% - 15px) calc(50% + 2px), calc(100% - 10px) calc(50% + 2px);
+            background-size: 6px 6px, 6px 6px;
+            background-repeat: no-repeat;
         }
 
         .sort-select:focus {
             outline: none;
             border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(184, 134, 11, 0.12);
         }
 
         /* Clear filters */
@@ -437,9 +433,9 @@
         }
 
         .view-toggle button.active {
-            background: white;
-            color: var(--text);
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            background: var(--accent);
+            color: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
         }
 
         .view-toggle button svg {
@@ -493,6 +489,14 @@
             font-size: 0.8rem;
             color: var(--text-secondary);
             margin-bottom: 0.5rem;
+        }
+        .view-meta {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            margin-left: auto;
         }
 
         .conversation-card h3 {
@@ -617,7 +621,7 @@
         }
 
         .load-more {
-            background: white;
+            background: var(--bg);
             border: 1px solid var(--border);
             padding: 0.75rem 2rem;
             font-size: 0.9rem;
@@ -647,7 +651,7 @@
             display: none;
             width: 100%;
             padding: 0.75rem 1rem;
-            background: white;
+            background: var(--bg);
             border: 1px solid var(--border);
             border-radius: 6px;
             font-size: 0.9rem;
@@ -878,18 +882,9 @@
                 </div>
 
                 <div class="filter-group">
-                    <div class="filter-label">Topics</div>
+                    <div class="filter-label">Trending topics (24h)</div>
                     <div class="tag-filters" id="tag-filters">
-                        <button class="tag-pill" data-tag="consciousness">consciousness</button>
-                        <button class="tag-pill" data-tag="physics">physics</button>
-                        <button class="tag-pill" data-tag="philosophy">philosophy</button>
-                        <button class="tag-pill" data-tag="creative">creative</button>
-                        <button class="tag-pill" data-tag="technical">technical</button>
-                        <button class="tag-pill" data-tag="personal">personal</button>
-                        <button class="tag-pill" data-tag="ai-futures">AI futures</button>
-                        <button class="tag-pill" data-tag="mathematics">mathematics</button>
-                        <button class="tag-pill" data-tag="language">language</button>
-                        <button class="tag-pill" data-tag="emergence">emergence</button>
+                        <!-- populated dynamically -->
                     </div>
                 </div>
 
@@ -1023,19 +1018,7 @@
                 });
             });
 
-            document.querySelectorAll('.tag-pill').forEach(pill => {
-                pill.addEventListener('click', () => {
-                    const tag = pill.dataset.tag;
-                    pill.classList.toggle('active');
-                    if (state.tags.includes(tag)) {
-                        state.tags = state.tags.filter(t => t !== tag);
-                    } else {
-                        state.tags.push(tag);
-                    }
-                    state.page = 0;
-                    loadResults(true);
-                });
-            });
+            loadTrendingTags();
 
             document.getElementById('sort-select').addEventListener('change', (e) => {
                 state.sort = e.target.value;
@@ -1092,6 +1075,38 @@
             loadResults(true);
         }
 
+        async function loadTrendingTags() {
+            const container = document.getElementById('tag-filters');
+            if (!container) return;
+            container.innerHTML = '<div class="skeleton skeleton-text" style="width:120px;height:16px;"></div>';
+            try {
+                const res = await fetch('/api/tags/trending');
+                const data = await res.json();
+                if (!res.ok || !data?.tags) throw new Error('Failed');
+                const tags = data.tags.slice(0, 12);
+                if (!tags.length) {
+                    container.innerHTML = '<div class="small-text" style="color: var(--text-secondary);">No trending topics yet.</div>';
+                    return;
+                }
+                container.innerHTML = tags.map(t => `<button class="tag-pill" data-tag="${escapeHtml(t.tag)}">${escapeHtml(t.tag)}</button>`).join('');
+                container.querySelectorAll('.tag-pill').forEach(pill => {
+                    pill.addEventListener('click', () => {
+                        const tag = pill.dataset.tag;
+                        pill.classList.toggle('active');
+                        if (state.tags.includes(tag)) {
+                            state.tags = state.tags.filter(t => t !== tag);
+                        } else {
+                            state.tags.push(tag);
+                        }
+                        state.page = 0;
+                        loadResults(true);
+                    });
+                });
+            } catch (e) {
+                container.innerHTML = '<div class="small-text" style="color: var(--warning);">Failed to load trending topics.</div>';
+            }
+        }
+
         function pickUniqueFeatured(list, count = 3) {
             if (!Array.isArray(list)) return [];
             // shallow shuffle
@@ -1110,9 +1125,9 @@
         }
 
         async function loadFeatured() {
-            // Fetch a larger pool, then de-dupe titles and pick a random set
+            // Fetch a larger pool of most-viewed, then de-dupe titles and pick a random set
             try {
-                const { conversations } = await mnemolog.getConversations({ limit: 10, offset: 0, sort: 'views' });
+                const { conversations } = await mnemolog.getConversations({ limit: 20, offset: 0, sort: 'views' });
                 const picks = pickUniqueFeatured(conversations || [], 3);
                 renderFeatured(picks);
             } catch (err) {
@@ -1194,18 +1209,30 @@
             const platformLabel = (mnemolog.platformNames && mnemolog.platformNames[conv.platform]) || conv.platform || 'Conversation';
             const created = conv.created_at ? mnemolog.formatDate(conv.created_at) : '';
             const tags = Array.isArray(conv.tags) ? conv.tags : [];
-            const excerpt = conv.description || conv.content || conv.excerpt || '';
+            const isContinuation = mnemolog.isContinuation ? mnemolog.isContinuation(conv) : false;
+            const excerpt = isContinuation
+                ? (conv.user_goal || conv.description || conv.content || conv.excerpt || '')
+                : (conv.description || conv.content || conv.excerpt || '');
             const modelLabel = conv.model_display_name || conv.model_id || '';
             const attrib = conv.attribution_confidence;
             const attribText = attrib === 'verified' ? 'Verified' : attrib === 'inferred' ? 'Inferred' : attrib === 'claimed' ? 'Claimed' : '';
+            const views = typeof conv.view_count === 'number' ? conv.view_count : 0;
 
             card.innerHTML = `
                 <div class="card-content">
                     <div class="card-meta">
                         <span class="platform-badge">${escapeHtml(platformLabel)}</span>
                         <span>${escapeHtml(created)}</span>
+                        ${isContinuation ? `<span class="model-badge">Continuation</span>` : ''}
                         ${modelLabel ? `<span class="model-badge">${escapeHtml(modelLabel)}</span>` : ''}
                         ${attribText ? `<span class="attrib-badge">${escapeHtml(attribText)}</span>` : ''}
+                        <span class="view-meta">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                            ${views}
+                        </span>
                     </div>
                     <h3>${escapeHtml(conv.title || 'Untitled conversation')}</h3>
                     <p class="card-excerpt">${escapeHtml(excerpt)}</p>
@@ -1227,8 +1254,12 @@
             grid.innerHTML = list.map(conv => {
                 const platformLabel = (mnemolog.platformNames && mnemolog.platformNames[conv.platform]) || conv.platform || 'Conversation';
                 const created = conv.created_at ? mnemolog.formatDate(conv.created_at) : '';
-                const excerpt = conv.description || conv.content || conv.excerpt || '';
+                const isContinuation = mnemolog.isContinuation ? mnemolog.isContinuation(conv) : false;
+                const excerpt = isContinuation
+                    ? (conv.user_goal || conv.description || conv.content || conv.excerpt || '')
+                    : (conv.description || conv.content || conv.excerpt || '');
                 const modelLabel = conv.model_display_name || conv.model_id || '';
+                const views = typeof conv.view_count === 'number' ? conv.view_count : 0;
                 const attrib = conv.attribution_confidence;
                 const attribText = attrib === 'verified' ? 'Verified' : attrib === 'inferred' ? 'Inferred' : attrib === 'claimed' ? 'Claimed' : '';
                 return `
@@ -1238,6 +1269,14 @@
                         <div class="meta">
                             <span class="platform-badge">${escapeHtml(platformLabel)}</span>
                             <span>${escapeHtml(created)}</span>
+                            <span class="view-meta">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                                ${views}
+                            </span>
+                            ${isContinuation ? `<span class="model-badge">Continuation</span>` : ''}
                             ${modelLabel ? `<span class="model-badge">${escapeHtml(modelLabel)}</span>` : ''}
                             ${attribText ? `<span class="attrib-badge">${escapeHtml(attribText)}</span>` : ''}
                         </div>

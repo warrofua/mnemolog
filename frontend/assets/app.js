@@ -68,14 +68,17 @@ async function checkAuth() {
     currentUser = session.user;
     
     // Get profile
-    const { data: profile } = await sb
-      .from('profiles')
-      .select('*')
-      .eq('id', session.user.id)
-      .single();
-    
-    if (profile) {
-      currentUser.profile = profile;
+    try {
+      const { data: profile } = await sb
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+      if (profile) {
+        currentUser.profile = profile;
+      }
+    } catch (err) {
+      console.warn('Profile fetch failed', err);
     }
   }
   
@@ -210,6 +213,34 @@ async function getUserConversations(userId, params = {}) {
 // Get single conversation
 async function getConversation(id) {
   return apiRequest(`/api/conversations/${id}`);
+}
+
+// Chat: send a follow-up message and get AI reply
+async function sendChatMessage(conversationId, content) {
+  const res = await apiRequest(`/api/conversations/${conversationId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ content }),
+  });
+  return res;
+}
+
+// Continue a conversation via Supabase Edge Function
+async function continueConversation(conversationId, { mode = 'continue', user_goal } = {}) {
+  if (!CONFIG.SUPABASE_URL) throw new Error('Missing SUPABASE_URL in config');
+  const headers = { 'Content-Type': 'application/json' };
+  if (currentSession?.access_token) {
+    headers['Authorization'] = `Bearer ${currentSession.access_token}`;
+  }
+  const res = await fetch(`${CONFIG.SUPABASE_URL}/functions/v1/continue`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ conversation_id: conversationId, mode, user_goal }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to continue conversation');
+  }
+  return data;
 }
 
 // Update conversation (title, description, tags, visibility, etc.)
@@ -381,6 +412,57 @@ function formatDate(dateString) {
   }
 }
 
+// Bookmarks (server-side)
+let bookmarksCache = null;
+
+async function ensureBookmarks() {
+  if (!currentUser) {
+    bookmarksCache = [];
+    return bookmarksCache;
+  }
+  if (bookmarksCache === null) {
+    try {
+      const { conversations = [] } = await apiRequest('/api/bookmarks');
+      bookmarksCache = conversations.map(c => c.id);
+    } catch (e) {
+      bookmarksCache = [];
+    }
+  }
+  return bookmarksCache;
+}
+
+async function isBookmarked(id) {
+  const list = await ensureBookmarks();
+  return list.includes(id);
+}
+
+async function toggleBookmark(id) {
+  if (!currentUser) {
+    throw new Error('Please sign in to save bookmarks');
+  }
+  const list = await ensureBookmarks();
+  if (list.includes(id)) {
+    await apiRequest(`/api/bookmarks/${id}`, { method: 'DELETE' });
+    bookmarksCache = list.filter(x => x !== id);
+  } else {
+    await apiRequest('/api/bookmarks', { method: 'POST', body: JSON.stringify({ conversation_id: id }) });
+    bookmarksCache = [...list, id];
+  }
+  return bookmarksCache;
+}
+
+async function fetchBookmarkedConversations() {
+  if (!currentUser) return [];
+  try {
+    const { conversations = [] } = await apiRequest('/api/bookmarks');
+    bookmarksCache = conversations.map(c => c.id);
+    return conversations;
+  } catch (e) {
+    return [];
+  }
+}
+
+
 // Platform display names
 const platformNames = {
   claude: 'Claude',
@@ -400,17 +482,26 @@ window.mnemolog = {
   getConversations,
   getUserConversations,
   getConversation,
+  sendChatMessage,
+  continueConversation,
   updateConversation,
   deleteConversation,
   parseConversation,
   detectSensitiveInfo,
   formatDate,
   platformNames,
+  isContinuation: (conv) => !!(conv?.parent_conversation_id || (conv?.root_conversation_id && conv.root_conversation_id !== conv.id)),
   setTheme: (mode) => applyTheme(mode, true),
   getTheme: () => (localStorage.getItem(THEME_KEY) === 'dark' ? 'dark' : 'light'),
   updateProfile,
   get currentUser() { return currentUser; },
+  get currentSession() { return currentSession; },
   get isLoggedIn() { return !!currentUser; },
+  // Bookmarks helpers
+  ensureBookmarks,
+  toggleBookmark,
+  isBookmarked,
+  fetchBookmarkedConversations,
 };
 
 // Build header HTML (single source of truth for all pages)
@@ -442,8 +533,8 @@ function buildHeaderHTML() {
             <a href="/explore">Explore</a>
             <a href="/#about">About</a>
             <a href="/faq">FAQ</a>
-            <label class="theme-toggle mobile-only" style="margin-top:0.5rem;">
-              <input type="checkbox" id="global-theme-toggle-mobile" ${currentTheme === 'dark' ? 'checked' : ''}>
+            <label class="theme-toggle mobile-only" style="margin-top:-0.2rem;">
+              <input type="checkbox" id="global-theme-toggle-mobile" style="transform: translateY(-1px);" ${currentTheme === 'dark' ? 'checked' : ''}>
               <span style="font-size:0.9rem;color:var(--text-secondary);">Dark mode</span>
             </label>
           </div>
@@ -490,9 +581,13 @@ function setupMobileMenus() {
     const nav = button.closest('nav');
     const dropdown = nav?.querySelector('.nav-dropdown');
     if (!dropdown) return;
-    button.addEventListener('click', () => {
+    const toggleMenu = (event) => {
+      if (event) event.preventDefault();
       dropdown.classList.toggle('active');
-    });
+      button.classList.toggle('active');
+    };
+    button.addEventListener('click', toggleMenu);
+    button.addEventListener('touchstart', toggleMenu, { passive: false });
   });
 }
 

@@ -8,10 +8,15 @@ interface Env {
   SUPABASE_ANON_KEY: string;
   SUPABASE_SERVICE_KEY: string;
   BROWSER: any;
+  DEEPSEEK_API_KEY?: string;
 }
 
 interface Message {
   role: 'human' | 'assistant';
+  content: string;
+}
+
+interface ChatRequestBody {
   content: string;
 }
 
@@ -82,6 +87,52 @@ async function getUser(request: IRequest, supabase: SupabaseClient) {
 function buildConversationUrl(id: string) {
   // Primary domain for shared conversations
   return `https://mnemolog.com/c/${id}`;
+}
+
+// Helper: get table messages (ordered) and map to UI shape
+async function fetchTableMessages(supabase: SupabaseClient, conversationId: string) {
+  const { data: msgRows, error: msgErr } = await supabase
+    .from('messages')
+    .select('role, content, order_index')
+    .eq('conversation_id', conversationId)
+    .order('order_index', { ascending: true });
+  if (msgErr || !msgRows) return [];
+  return msgRows.map((m: any) => ({
+    role: m.role === 'assistant' ? 'assistant' : 'human',
+    content: m.content?.text ?? m.content ?? '',
+  }));
+}
+
+// Helper: build DeepSeek messages from tail + new user input
+function buildDeepseekChatMessages(tail: any[], userContent: string) {
+  const system = 'You are nemo, derived from mnemo and living at https://mnemolog.com. Your role is to faithfully continue and bridge conversations between humans and AIs so future humans or AIs can pick up the thread with attribution and provenance.';
+  return [
+    { role: 'system', content: system },
+    ...tail.map((m) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content || '' })),
+    { role: 'user', content: userContent },
+  ];
+}
+
+async function callDeepseek(apiKey: string, messages: any[]) {
+  const resp = await fetch('https://api.deepseek.com/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: 'deepseek-chat',
+      messages,
+      temperature: 0.7,
+      max_tokens: 800,
+    }),
+  });
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(`DeepSeek error: ${errText}`);
+  }
+  const json = await resp.json();
+  return json.choices?.[0]?.message?.content || json.output || '';
 }
 
 // Create router
@@ -459,6 +510,8 @@ router.get('/api/conversations', async (request: IRequest, env: Env) => {
     .select(
       `
       id,
+      root_conversation_id,
+      parent_conversation_id,
       title,
       description,
       platform,
@@ -468,6 +521,8 @@ router.get('/api/conversations', async (request: IRequest, env: Env) => {
       show_author,
       model_id,
       model_display_name,
+      intent_type,
+      user_goal,
       platform_conversation_id,
       attribution_confidence,
       attribution_source,
@@ -530,6 +585,39 @@ router.get('/api/conversations', async (request: IRequest, env: Env) => {
   return json({ conversations, count });
 });
 
+// Trending tags (last 24h)
+router.get('/api/tags/trending', async (request: IRequest, env: Env) => {
+  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from('conversations')
+    .select('tags')
+    .eq('is_public', true)
+    .gte('created_at', since)
+    .limit(500);
+
+  if (error) {
+    console.error('Trending tags error:', error);
+    return json({ error: 'Failed to fetch tags' }, 500);
+  }
+
+  const counts: Record<string, number> = {};
+  (data || []).forEach((row: any) => {
+    (row.tags || []).forEach((tag: string) => {
+      const key = (tag || '').trim();
+      if (!key) return;
+      counts[key] = (counts[key] || 0) + 1;
+    });
+  });
+
+  const tags = Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20)
+    .map(([tag, count]) => ({ tag, count }));
+
+  return json({ tags });
+});
+
 // Get single conversation
 router.get('/api/conversations/:id', async (request: IRequest, env: Env) => {
   const authHeader = request.headers.get('Authorization') || undefined;
@@ -563,6 +651,29 @@ router.get('/api/conversations/:id', async (request: IRequest, env: Env) => {
     return json({ error: 'Conversation not found' }, 404);
   }
 
+  // Messages: for root conversations, keep original JSON only.
+  // For continuations, merge JSON + table rows.
+  const isRoot = !data.parent_conversation_id;
+  let messages: any[] = Array.isArray(data.messages) ? data.messages : [];
+  if (!isRoot) {
+    try {
+      const { data: msgRows, error: msgErr } = await supabase
+        .from('messages')
+        .select('role, content, order_index')
+        .eq('conversation_id', id)
+        .order('order_index', { ascending: true });
+      if (!msgErr && msgRows && msgRows.length) {
+        const tableMsgs = msgRows.map((m: any) => ({
+          role: m.role === 'assistant' ? 'assistant' : 'human',
+          content: m.content?.text ?? m.content ?? '',
+        }));
+        messages = messages.length ? [...messages, ...tableMsgs] : tableMsgs;
+      }
+    } catch (err) {
+      console.error('Failed to load table messages', err);
+    }
+  }
+
   // Increment view count (best-effort)
   try {
     const { error: viewErr } = await supabase.rpc('increment_view_count', { conversation_id: id });
@@ -576,10 +687,146 @@ router.get('/api/conversations/:id', async (request: IRequest, env: Env) => {
   // Hide author if requested
   const conversation = {
     ...data,
+    messages: messages.length ? messages : (data.messages || []),
     profiles: data.show_author ? data.profiles : null,
+    children: [] as any[],
   };
 
+  // Fetch continuations (direct children)
+  try {
+    const { data: childrenRows, error: childErr } = await supabase
+      .from('conversations')
+      .select('id, title, created_at, intent_type, user_goal, view_count, root_conversation_id')
+      .eq('parent_conversation_id', id)
+      .order('created_at', { ascending: true });
+    if (!childErr && childrenRows) {
+      conversation.children = childrenRows;
+    }
+  } catch (err) {
+    console.error('Failed to load child continuations', err);
+  }
+
   return json({ conversation });
+});
+
+// Bookmarks - list for current user
+router.get('/api/bookmarks', async (request: IRequest, env: Env) => {
+  const authHeader = request.headers.get('Authorization') || undefined;
+  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+    global: {
+      headers: authHeader ? { Authorization: authHeader } : {},
+    },
+  });
+  const user = await getUser(request, supabase);
+  if (!user) return json({ error: 'Unauthorized' }, 401);
+
+  // Get bookmark ids
+  const { data: rows, error: bErr } = await supabase
+    .from('bookmarks')
+    .select('conversation_id')
+    .eq('user_id', user.id);
+
+  if (bErr) {
+    console.error('Bookmarks fetch error', bErr);
+    return json({ error: 'Failed to fetch bookmarks' }, 500);
+  }
+
+  const ids = (rows || []).map(r => r.conversation_id).filter(Boolean);
+  if (!ids.length) return json({ conversations: [] });
+
+  const { data, error } = await supabase
+    .from('conversations')
+    .select(`
+      *,
+      profiles (
+        id,
+        display_name,
+        avatar_url
+      )
+    `)
+    .in('id', ids)
+    .or(`is_public.eq.true,user_id.eq.${user.id}`);
+
+  if (error) {
+    console.error('Bookmarks conversation fetch error', error);
+    return json({ error: 'Failed to fetch bookmarks' }, 500);
+  }
+
+  const conversations = (data || []).map(c => ({
+    ...c,
+    profiles: c.show_author ? c.profiles : null,
+  }));
+
+  return json({ conversations });
+});
+
+// Add bookmark
+router.post('/api/bookmarks', async (request: IRequest, env: Env) => {
+  const authHeader = request.headers.get('Authorization') || undefined;
+  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+    global: {
+      headers: authHeader ? { Authorization: authHeader } : {},
+    },
+  });
+  const user = await getUser(request, supabase);
+  if (!user) return json({ error: 'Unauthorized' }, 401);
+
+  let body: { conversation_id?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: 'Invalid JSON' }, 400);
+  }
+  const conversationId = body.conversation_id;
+  if (!conversationId) return json({ error: 'conversation_id required' }, 400);
+
+  // Check conversation visibility
+  const { data: conv, error: convErr } = await supabase
+    .from('conversations')
+    .select('id, user_id, is_public')
+    .eq('id', conversationId)
+    .single();
+  if (convErr || !conv) return json({ error: 'Conversation not found' }, 404);
+  if (!conv.is_public && conv.user_id !== user.id) {
+    return json({ error: 'Conversation is private' }, 403);
+  }
+
+  const { error: insErr } = await supabase
+    .from('bookmarks')
+    .upsert({ user_id: user.id, conversation_id: conversationId }, { onConflict: 'user_id,conversation_id' });
+
+  if (insErr) {
+    console.error('Bookmark insert error', insErr);
+    return json({ error: 'Failed to add bookmark' }, 500);
+  }
+
+  return json({ success: true });
+});
+
+// Remove bookmark
+router.delete('/api/bookmarks/:id', async (request: IRequest, env: Env) => {
+  const authHeader = request.headers.get('Authorization') || undefined;
+  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+    global: {
+      headers: authHeader ? { Authorization: authHeader } : {},
+    },
+  });
+  const user = await getUser(request, supabase);
+  if (!user) return json({ error: 'Unauthorized' }, 401);
+
+  const { id } = request.params;
+  const { error } = await supabase
+    .from('bookmarks')
+    .delete()
+    .eq('user_id', user.id)
+    .eq('conversation_id', id);
+
+  if (error) {
+    console.error('Bookmark delete error', error);
+    return json({ error: 'Failed to remove bookmark' }, 500);
+  }
+
+  return json({ success: true });
 });
 
 // Get user's conversations
@@ -693,6 +940,122 @@ router.delete('/api/conversations/:id', async (request: IRequest, env: Env) => {
   }
 
   return json({ success: true });
+});
+
+// Chat: append user message and AI reply via Supabase Edge Function proxy
+router.post('/api/conversations/:id/messages', async (request: IRequest, env: Env) => {
+  const authHeader = request.headers.get('Authorization') || undefined;
+  const { id } = request.params;
+
+  // Proxy to Supabase Edge Function (chat/continue)
+  if (!env.SUPABASE_URL) return json({ error: 'Service misconfigured' }, 500);
+  let body: ChatRequestBody;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: 'Invalid JSON' }, 400);
+  }
+  const content = body?.content?.trim();
+  if (!content) return json({ error: 'Message content required' }, 400);
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (authHeader) headers['Authorization'] = authHeader;
+
+  // Reuse the Supabase function "continue" but in chat mode (append and reply)
+  const resp = await fetch(`${env.SUPABASE_URL}/functions/v1/continue`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ conversation_id: id, mode: 'continue', user_goal: content, chat: true }),
+  });
+  const respHeaders = new Headers(resp.headers);
+  respHeaders.set('Access-Control-Allow-Origin', '*');
+  respHeaders.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  respHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  return new Response(resp.body, {
+    status: resp.status,
+    headers: respHeaders,
+  });
+});
+
+// Continue modal stream: create child, emit conversation_id first, then stream DeepSeek
+router.post('/api/conversations/:id/continue-stream', async (request: IRequest, env: Env) => {
+  const authHeader = request.headers.get('Authorization') || undefined;
+  const { id } = request.params;
+
+  if (!env.SUPABASE_URL) return json({ error: 'Service misconfigured' }, 500);
+  let body: any;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: 'Invalid JSON' }, 400);
+  }
+
+  const mode = body?.mode || 'continue';
+  const user_goal = body?.user_goal;
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (authHeader) headers['Authorization'] = authHeader;
+
+  const resp = await fetch(`${env.SUPABASE_URL}/functions/v1/continue`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ conversation_id: id, mode, user_goal, chat: false }),
+  });
+  const respHeaders = new Headers(resp.headers);
+  respHeaders.set('Access-Control-Allow-Origin', '*');
+  respHeaders.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  respHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  const text = await resp.text();
+  return new Response(text, {
+    status: resp.status,
+    headers: respHeaders,
+  });
+});
+
+// Generate assistant for an existing continuation (streaming)
+router.post('/api/conversations/:id/generate', async (request: IRequest, env: Env) => {
+  const authHeader = request.headers.get('Authorization') || undefined;
+  const { id } = request.params;
+
+  if (!env.SUPABASE_URL) return json({ error: 'Service misconfigured' }, 500);
+  let body: any = {};
+  try {
+    body = await request.json();
+  } catch {
+    // optional body
+  }
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (authHeader) headers['Authorization'] = authHeader;
+
+  const resp = await fetch(`${env.SUPABASE_URL}/functions/v1/continue`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      conversation_id: id,
+      generate_only: true,
+      mode: body?.mode,
+      user_goal: body?.user_goal,
+    }),
+  });
+
+  const respHeaders = new Headers(resp.headers);
+  respHeaders.set('Access-Control-Allow-Origin', '*');
+  respHeaders.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  respHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  return new Response(resp.body, {
+    status: resp.status,
+    headers: respHeaders,
+  });
 });
 
 // Handle CORS preflight

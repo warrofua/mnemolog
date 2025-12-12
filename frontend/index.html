@@ -132,7 +132,7 @@
             background: var(--accent);
             color: white;
             padding: 1rem 2rem;
-            border-radius: 4px;
+            border-radius: 12px;
             text-decoration: none;
             font-weight: 500;
             transition: all 0.2s;
@@ -153,7 +153,7 @@
             color: var(--text);
             padding: 1rem 2rem;
             border: 1px solid var(--border);
-            border-radius: 4px;
+            border-radius: 12px;
             text-decoration: none;
             font-weight: 500;
             transition: all 0.2s;
@@ -475,6 +475,7 @@
         .footer-note {
             font-size: 0.85rem;
             color: var(--text-secondary);
+            text-align: center;
         }
 
         /* Responsive */
@@ -512,6 +513,26 @@
             }
 
         }
+
+        @media (max-width: 600px) {
+            footer {
+                flex-direction: column;
+                align-items: center;
+                gap: 0.5rem;
+                text-align: center;
+            }
+            .footer-links {
+                width: 100%;
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 0.5rem;
+                justify-items: center;
+            }
+            .footer-note {
+                text-align: center;
+                margin-top: 0.25rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -532,7 +553,7 @@
                     <path d="M5 12h14M12 5l7 7-7 7"/>
                 </svg>
             </a>
-            <a href="/explore" class="btn-secondary">Explore the Archive</a>
+            <a href="/explore" class="btn-secondary" id="hero-explore-cta">Explore the Archive</a>
         </div>
     </section>
 
@@ -628,6 +649,18 @@
     </footer>
     <script src="/assets/config.js"></script>
     <script src="/assets/app.js"></script>
+    <script>
+        // Adjust hero CTA text on mobile
+        (function() {
+            const cta = document.getElementById('hero-explore-cta');
+            const update = () => {
+                if (!cta) return;
+                cta.textContent = window.innerWidth <= 600 ? 'Explore Archive' : 'Explore the Archive';
+            };
+            window.addEventListener('resize', update, { passive: true });
+            update();
+        })();
+    </script>
     <script>
         // Load recent conversations dynamically
         // Dynamic quote will follow recent load

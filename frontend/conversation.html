@@ -40,6 +40,7 @@
             max-width: 800px;
             margin: 0 auto;
             padding: 2rem;
+            position: relative;
         }
 
         .loading {
@@ -113,7 +114,7 @@
         }
 
         .view-count {
-            display: flex;
+            display: inline-flex;
             align-items: center;
             gap: 0.3rem;
         }
@@ -155,6 +156,16 @@
             border-top: 1px solid var(--border);
         }
 
+        .continue-actions {
+            margin-top: 1.25rem;
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: flex-start;
+            position: relative;
+        }
+
         .author-avatar {
             width: 36px;
             height: 36px;
@@ -166,6 +177,143 @@
         .author-name { font-weight: 500; }
         .author-label { font-size: 0.8rem; color: var(--text-secondary); }
 
+        .bookmark-btn {
+            margin-left: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.45rem 0.7rem;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .bookmark-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .bookmark-btn .icon {
+            width: 16px;
+            height: 16px;
+        }
+        .bookmark-btn.saved {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+        }
+        .bookmark-btn.saved:hover {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        /* Continue modal */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+        }
+        .modal-backdrop.show { display: flex; }
+        .modal {
+            background: var(--bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem;
+            width: min(420px, 92vw);
+            box-shadow: 0 14px 40px rgba(0,0,0,0.25);
+        }
+        .modal h3 {
+            margin: 0 0 0.5rem;
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.5rem;
+        }
+        .modal label {
+            display: block;
+            margin: 0.5rem 0 0.25rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+        .modal select,
+        .modal textarea {
+            width: 100%;
+            padding: 0.65rem 0.75rem;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+        }
+        .modal textarea { min-height: 90px; }
+        .modal-actions {
+            margin-top: 1rem;
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+        }
+        .modal .btn {
+            border-radius: 8px;
+        }
+        .small-text {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+        .nemo-mark {
+            font-family: 'Cormorant Garamond', serif;
+            font-weight: 700;
+            color: #2C2A26;
+            text-transform: lowercase;
+            font-size: 1.2em;
+        }
+
+        .title-font {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.25em;
+        }
+
+        .tooltip-icon {
+            position: relative;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .tooltip-icon svg { width: 14px; height: 14px; }
+        .tooltip-text {
+            position: absolute;
+            top: 115%;
+            right: 0;
+            background: var(--bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.6rem 0.75rem;
+            font-size: 0.9rem;
+            min-width: 220px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.15s ease;
+            z-index: 5;
+        }
+        .tooltip-icon:focus .tooltip-text,
+        .tooltip-icon:hover .tooltip-text,
+        .tooltip-icon.active .tooltip-text {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
         .messages {
             display: flex;
             flex-direction: column;
@@ -176,6 +324,42 @@
             padding: 1.5rem;
             border-radius: 8px;
             border: 1px solid var(--border);
+        }
+
+        .message.loading {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            background: var(--bg-warm);
+            border-style: dashed;
+        }
+
+        .spinner-inline {
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .message.meta {
+            background: var(--bg-warm);
+            border-style: dashed;
+            font-family: 'Cormorant Garamond', serif;
+            color: var(--text);
+        }
+
+        .message.meta .meta-title {
+            font-size: 1.05rem;
+            font-weight: 600;
+            margin-bottom: 0.35rem;
+        }
+
+        .message.meta .meta-prompt {
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.95rem;
+            color: var(--text-secondary);
         }
 
         .message.human {
@@ -230,6 +414,55 @@
             color: inherit;
         }
 
+        .continuations-panel {
+            margin-top: 2rem;
+            padding: 1rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg-warm);
+        }
+        .continuations-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+        .continuations-list {
+            margin-top: 0.75rem;
+            display: none;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .continuations-list.show { display: flex; }
+        .hidden-continuation { display: none; }
+        @media (min-width: 1200px) {
+            .continuations-panel.top-panel {
+                position: absolute;
+                top: 0;
+                width: 320px;
+                left: calc(100% + 24px);
+                margin-top: 0;
+            }
+        }
+        .continuation-item {
+            padding: 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--bg);
+        }
+        .continuation-item h4 {
+            margin: 0 0 0.25rem;
+            font-size: 1rem;
+        }
+        .continuation-meta {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+        .btn-compact {
+            padding: 0.35rem 0.6rem;
+            font-size: 0.85rem;
+        }
+
         .share-bar {
             margin-top: 3rem;
             padding: 1.5rem;
@@ -240,6 +473,66 @@
             align-items: center;
             flex-wrap: wrap;
             gap: 1rem;
+        }
+
+        .chat-composer {
+            margin-top: 2rem;
+            padding: 1.25rem;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: var(--bg-warm);
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        .chat-composer textarea {
+            width: 100%;
+            min-height: 90px;
+            padding: 0.75rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+        }
+        .chat-actions {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            justify-content: flex-end;
+        }
+        .chat-error {
+            font-size: 0.9rem;
+            color: var(--warning);
+            display: none;
+        }
+        .chat-loading {
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            display: none;
+        }
+        .chat-waiting {
+            display: none;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+        .chat-waiting .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--accent);
+            animation: pulse 1s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.2); opacity: 0.4; }
+            100% { transform: scale(1); opacity: 0.8; }
         }
 
         .share-bar p {
@@ -286,6 +579,13 @@
             .container { padding: 1.5rem; }
             .conversation-header h1 { font-size: 1.75rem; }
             .share-bar { flex-direction: column; text-align: center; }
+            #continue-btn { width: 80%; }
+            .hero-actions,
+            .hero-cta,
+            #continue-btn {
+                justify-content: center;
+                text-align: center;
+            }
         }
     </style>
 </head>
@@ -310,6 +610,7 @@
                     <span class="platform-badge" id="platform"></span>
                     <span class="model-badge" id="model"></span>
                     <span class="attrib-badge" id="attrib"></span>
+                    <span class="model-badge" id="lineage-badge" style="display:none;">Continuation</span>
                     <span class="date" id="date"></span>
                     <span class="view-count">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -318,6 +619,7 @@
                         </svg>
                         <span id="views">0</span>
                     </span>
+                    <a id="visit-original" class="btn btn-secondary btn-compact" style="display:none;">Visit original</a>
                 </div>
                 <h1 id="title"></h1>
                 <p class="conversation-description" id="description"></p>
@@ -328,13 +630,52 @@
                         <div class="author-name" id="author-name"></div>
                         <div class="author-label">Shared this conversation</div>
                     </div>
+                    <button class="bookmark-btn" id="bookmark-btn" title="Save bookmark">
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 4h12a2 2 0 0 1 2 2v15l-8-4-8 4V6a2 2 0 0 1 2-2z"/>
+                        </svg>
+                        <span id="bookmark-label">Save</span>
+                    </button>
                 </div>
                 <div style="margin-top: 1rem;">
                     <a id="edit-btn" href="#" class="btn btn-secondary" style="display:none;">Edit / Re-parse</a>
                 </div>
-            </header>
+            <div class="continue-actions">
+                <button class="btn btn-primary title-font" id="continue-btn"><em>Continue</em> <em>with</em> <span class="nemo-mark">Nemo</span></button>
+                <button class="tooltip-icon" id="continue-tooltip" aria-label="More info" type="button">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="8" x2="12" y2="8"/>
+                        <line x1="12" y1="10" x2="12" y2="16"/>
+                    </svg>
+                    <span class="tooltip-text">Click to continue a version of this AI chat with Nemo (DeepSeek v3.2).</span>
+                </button>
+            </div>
+        </header>
+
+        <div class="continuations-panel top-panel" id="continuations-panel-top" style="display:none;">
+            <div class="continuations-header" id="continuations-toggle-top">
+                <span style="font-weight:600;">Continuations</span>
+                <span id="continuations-count-top"></span>
+            </div>
+            <div class="continuations-list" id="continuations-list-top"></div>
+        </div>
 
             <div class="messages" id="messages"></div>
+
+            <div class="chat-composer" id="chat-box" style="display:none;">
+                <label for="chat-input" style="font-weight:600;">Send a follow-up</label>
+                <textarea id="chat-input" placeholder="Ask a follow-up or continue the thread..."></textarea>
+                <div class="chat-actions">
+                    <div class="chat-error" id="chat-error"></div>
+                    <div class="chat-loading" id="chat-loading"></div>
+                    <button class="btn btn-primary" id="chat-send" type="button">Send</button>
+                </div>
+                <div class="chat-waiting" id="chat-waiting">
+                    <span class="dot"></span>
+                    <span>Generating response…</span>
+                </div>
+            </div>
 
             <div class="share-bar">
                 <p>Found this valuable? Share it with others.</p>
@@ -346,11 +687,11 @@
                         </svg>
                         Copy link
                     </button>
-                    <a href="#" id="twitter-share" target="_blank" class="btn btn-secondary">
-                        Share on X
-                    </a>
-                </div>
-            </div>
+            <a href="#" id="twitter-share" target="_blank" class="btn btn-secondary">
+                Share on X
+            </a>
+        </div>
+    </div>
         </article>
     </div>
 
@@ -363,6 +704,28 @@
         </div>
         <span class="footer-note">Building continuity, together.</span>
     </footer>
+
+    <div class="modal-backdrop" id="continue-modal">
+        <div class="modal">
+            <h3 class="title-font">Continue with <span class="nemo-mark">Nemo</span></h3>
+            <p class="small-text">Pick a mode and optionally add a goal. We’ll create a continuation using Nemo.</p>
+            <label for="continue-mode">Mode</label>
+            <select id="continue-mode">
+                <option value="continue">Continue (default)</option>
+                <option value="outline">Outline it</option>
+                <option value="code">Turn into code</option>
+                <option value="critique">Critique it</option>
+                <option value="simplify">Explain simply</option>
+            </select>
+            <label for="continue-goal">Optional goal</label>
+            <textarea id="continue-goal" placeholder="What are you trying to do next?"></textarea>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="continue-cancel" type="button">Cancel</button>
+                <button class="btn btn-primary" id="continue-submit" type="button">Send</button>
+            </div>
+            <div class="small-text" id="continue-error" style="color: var(--warning); display:none;"></div>
+        </div>
+    </div>
 
     <script src="/assets/config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -408,23 +771,136 @@
             return html;
         }
 
+        let currentConversationId = null;
+        let currentMessages = [];
+        let isGenerating = false;
+        let chatBoxDisplay = '';
+        let waitingEl = null;
+        let loadingPlaceholder = null;
+
         async function loadConversation() {
             const id = getConversationId();
             if (!id) { showError(); return; }
 
             try {
+                // Ensure auth/session is loaded so private conversations owned by the user can be fetched
+                await mnemolog.checkAuth();
                 const { conversation } = await mnemolog.getConversation(id);
                 if (!conversation) { showError(); return; }
+                currentConversationId = conversation.id;
+                currentMessages = await loadLineageMessages(conversation);
                 renderConversation(conversation);
-            } catch (err) {
-                console.error('Failed to load conversation:', err);
-                showError();
+            renderContinuations(conversation.children || []);
+            // If we arrived from a continuation redirect, start streaming the assistant
+            if (window.location.hash === '#stream') {
+                scrollToBottom(true);
             }
+            if (window.location.hash === '#stream') {
+                await maybeStartGeneration(conversation);
+            }
+            setupTooltip();
+        } catch (err) {
+            console.error('Failed to load conversation:', err);
+            showError();
         }
+    }
 
         function showError() {
             document.getElementById('loading').style.display = 'none';
             document.getElementById('error').style.display = 'block';
+        }
+
+        // Fetch parent chain messages and merge with current
+        async function loadLineageMessages(conversation) {
+            const chain = [];
+            let cursor = conversation;
+            chain.unshift(cursor);
+            while (cursor.parent_conversation_id) {
+                try {
+                    const { conversation: parent } = await mnemolog.getConversation(cursor.parent_conversation_id);
+                    if (!parent) break;
+                    chain.unshift(parent);
+                    cursor = parent;
+                } catch (e) {
+                    break;
+                }
+            }
+            const merged = [];
+            chain.forEach((conv, idx) => {
+                const msgs = conv.messages || [];
+                msgs.forEach(m => merged.push(m));
+                if (idx < chain.length - 1) {
+                    const next = chain[idx + 1];
+                    merged.push({ role: 'meta', content: 'Continued below', prompt: next?.user_goal || '' });
+                }
+            });
+            return merged;
+        }
+
+        function renderContinuations(children) {
+            const panels = [
+                {
+                    panel: document.getElementById('continuations-panel-top'),
+                    toggle: document.getElementById('continuations-toggle-top'),
+                    countEl: document.getElementById('continuations-count-top'),
+                    listEl: document.getElementById('continuations-list-top'),
+                }
+            ];
+
+            panels.forEach(({ panel, toggle, countEl, listEl }) => {
+                if (!panel || !toggle || !countEl || !listEl) return;
+
+                if (!children || !children.length) {
+                    panel.style.display = 'none';
+                    return;
+                }
+
+                panel.style.display = 'block';
+                countEl.textContent = `${children.length} ${children.length === 1 ? 'continuation' : 'continuations'}`;
+
+                const previewCount = Math.min(3, children.length);
+                const preview = children.slice(0, previewCount);
+                const extra = children.slice(previewCount);
+
+                const renderItem = (child, hidden = false) => {
+                    const intent = child.intent_type ? `<span class="continuation-meta">${escapeHtml(child.intent_type)}</span>` : '';
+                    const goal = child.user_goal ? `<span class="continuation-meta">${escapeHtml(child.user_goal)}</span>` : '';
+                    const date = child.created_at ? formatDate(child.created_at) : '';
+                    const views = typeof child.view_count === 'number' ? `<span class="continuation-meta">${child.view_count} views</span>` : '';
+                    const hiddenClass = hidden ? ' hidden-continuation' : '';
+                    return `
+                        <a class="continuation-item${hiddenClass}" href="/c/${child.id}">
+                            <div>
+                                <h4>${escapeHtml(child.title || 'Continuation')}</h4>
+                                <div class="continuation-meta">${date}${intent ? ' · ' + intent : ''}${goal ? ' · ' + goal : ''}${views ? ' · ' + views : ''}</div>
+                            </div>
+                        </a>
+                    `;
+                };
+
+                listEl.innerHTML = [
+                    ...preview.map(c => renderItem(c, false)),
+                    ...extra.map(c => renderItem(c, true)),
+                ].join('');
+
+                let expanded = previewCount === children.length; // expand when only few
+                const applyState = () => {
+                    if (expanded) {
+                        listEl.classList.add('show');
+                        listEl.querySelectorAll('.hidden-continuation').forEach(el => el.style.display = 'block');
+                        toggle.setAttribute('aria-expanded', 'true');
+                    } else {
+                        listEl.classList.remove('show');
+                        listEl.querySelectorAll('.hidden-continuation').forEach(el => el.style.display = 'none');
+                        toggle.setAttribute('aria-expanded', 'false');
+                    }
+                };
+                applyState();
+                toggle.onclick = () => {
+                    expanded = !expanded;
+                    applyState();
+                };
+            });
         }
 
         function renderConversation(data) {
@@ -433,6 +909,8 @@
             document.getElementById('platform').textContent = platformLookup[data.platform] || data.platform;
             const modelEl = document.getElementById('model');
             const attribEl = document.getElementById('attrib');
+            const lineageEl = document.getElementById('lineage-badge');
+            const visitOriginalEl = document.getElementById('visit-original');
             const modelText = data.model_display_name || data.model_id || '';
             const attribText = data.attribution_confidence === 'verified'
                 ? 'Verified'
@@ -441,6 +919,7 @@
                     : data.attribution_confidence === 'claimed'
                         ? 'Claimed'
                         : '';
+            const isContinuation = !!(data.parent_conversation_id || (data.root_conversation_id && data.root_conversation_id !== data.id));
             if (modelText) {
                 modelEl.textContent = modelText;
                 modelEl.style.display = 'inline-block';
@@ -452,6 +931,17 @@
                 attribEl.style.display = 'inline-block';
             } else {
                 attribEl.style.display = 'none';
+            }
+            if (lineageEl) {
+                lineageEl.style.display = isContinuation ? 'inline-block' : 'none';
+            }
+            if (visitOriginalEl) {
+                if (data.root_conversation_id && data.root_conversation_id !== data.id) {
+                    visitOriginalEl.style.display = 'inline-flex';
+                    visitOriginalEl.href = `/c/${data.root_conversation_id}`;
+                } else {
+                    visitOriginalEl.style.display = 'none';
+                }
             }
             document.getElementById('date').textContent = formatDate(data.created_at);
             document.getElementById('views').textContent = data.view_count || 0;
@@ -489,12 +979,7 @@
                 editBtn.style.display = 'none';
             }
 
-            document.getElementById('messages').innerHTML = data.messages.map(msg => `
-                <div class="message ${msg.role}">
-                    <div class="message-role">${msg.role === 'human' ? 'Human' : 'AI'}</div>
-                    <div class="message-content">${formatContent(msg.content)}</div>
-                </div>
-            `).join('');
+            renderMessages();
 
             const url = window.location.href;
             document.getElementById('twitter-share').href = 
@@ -502,6 +987,80 @@
 
             document.getElementById('loading').style.display = 'none';
             document.getElementById('conversation').style.display = 'block';
+
+            initBookmark(data.id);
+            setupChat();
+        }
+
+        function renderMessages() {
+            const container = document.getElementById('messages');
+            container.innerHTML = (currentMessages || []).map(msg => {
+                if (msg.loading) {
+                    return `
+                        <div class="message loading">
+                            <div class="spinner-inline"></div>
+                            <div class="message-content">Generating response…</div>
+                        </div>
+                    `;
+                }
+                if (msg.role === 'meta') {
+                    return `
+                        <div class="message meta">
+                            <div class="meta-title">${escapeHtml(msg.content || 'Continued below')}</div>
+                            ${msg.prompt ? `<div class="meta-prompt">Human prompt: ${escapeHtml(msg.prompt)}</div>` : ''}
+                        </div>
+                    `;
+                }
+                return `
+                    <div class="message ${msg.role}">
+                        <div class="message-role">${msg.role === 'human' ? 'Human' : 'AI'}</div>
+                        <div class="message-content">${formatContent(msg.content)}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Continue modal handlers
+        function setupContinue() {
+            const btn = document.getElementById('continue-btn');
+            const modal = document.getElementById('continue-modal');
+            const cancel = document.getElementById('continue-cancel');
+            const submit = document.getElementById('continue-submit');
+            const mode = document.getElementById('continue-mode');
+            const goal = document.getElementById('continue-goal');
+            const errEl = document.getElementById('continue-error');
+            if (!btn || !modal || !cancel || !submit) return;
+
+            const close = () => {
+                modal.classList.remove('show');
+                errEl.style.display = 'none';
+                submit.disabled = false;
+                submit.textContent = 'Run';
+            };
+
+            btn.onclick = () => {
+                modal.classList.add('show');
+            };
+            cancel.onclick = close;
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) close();
+            });
+
+            submit.onclick = async () => {
+                if (!currentConversationId) return;
+                submit.disabled = true;
+                submit.textContent = 'Running...';
+                errEl.style.display = 'none';
+                try {
+                    await streamContinuation(currentConversationId, mode.value, goal.value.trim() || undefined);
+                    close();
+                } catch (err) {
+                    errEl.textContent = err?.message || 'Failed to continue';
+                    errEl.style.display = 'block';
+                    submit.disabled = false;
+                    submit.textContent = 'Run';
+                }
+            };
         }
 
         function copyLink() {
@@ -515,7 +1074,344 @@
             }, 2000);
         }
 
+        // Bookmark handling
+        async function initBookmark(conversationId) {
+            const btn = document.getElementById('bookmark-btn');
+            const label = document.getElementById('bookmark-label');
+            if (!btn || !window.mnemolog) return;
+
+            const setState = (saved) => {
+                btn.classList.toggle('saved', saved);
+                if (label) label.textContent = saved ? 'Saved' : 'Save';
+                btn.querySelector('svg')?.setAttribute('fill', saved ? 'currentColor' : 'none');
+            };
+
+            try {
+                const saved = await mnemolog.isBookmarked(conversationId);
+                setState(saved);
+            } catch (e) {
+                setState(false);
+            }
+
+            btn.onclick = async () => {
+                try {
+                    const saved = await mnemolog.toggleBookmark(conversationId);
+                    // toggleBookmark returns list; check membership
+                    const nowSaved = Array.isArray(saved) ? saved.includes(conversationId) : false;
+                    setState(nowSaved);
+                } catch (err) {
+                    alert('Please sign in to save bookmarks.');
+                }
+            };
+        }
+
+        function setupChat() {
+            const box = document.getElementById('chat-box');
+            const input = document.getElementById('chat-input');
+            const sendBtn = document.getElementById('chat-send');
+            const errEl = document.getElementById('chat-error');
+            const spinner = document.getElementById('chat-loading');
+            if (!box || !input || !sendBtn) return;
+
+            box.style.display = 'block';
+            waitingEl = document.getElementById('chat-waiting');
+
+            const send = async () => {
+                const content = input.value.trim();
+                if (!content || !currentConversationId) return;
+                sendBtn.disabled = true;
+                if (spinner) spinner.style.display = 'inline-block';
+                if (waitingEl) waitingEl.style.display = 'flex';
+                errEl.style.display = 'none';
+                try {
+                    await streamChatMessage(currentConversationId, content);
+                    input.value = '';
+                } catch (err) {
+                    errEl.textContent = err?.message || 'Failed to send';
+                    errEl.style.display = 'block';
+                } finally {
+                    sendBtn.disabled = false;
+                    if (spinner) spinner.style.display = 'none';
+                    if (waitingEl) waitingEl.style.display = 'none';
+                }
+            };
+
+            sendBtn.onclick = async () => {
+                await send();
+            };
+
+            input.addEventListener('keydown', async (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    await send();
+                }
+            });
+        }
+
+        // Streaming chat helper: consume SSE from worker -> Supabase function
+        async function streamChatMessage(conversationId, content) {
+            const headers = { 'Content-Type': 'application/json' };
+            if (window.mnemolog?.currentSession?.access_token) {
+                headers['Authorization'] = `Bearer ${window.mnemolog.currentSession.access_token}`;
+            }
+            toggleChatBox(false);
+            if (waitingEl) waitingEl.style.display = 'flex';
+            // Optimistically show the user message immediately
+            const userMsg = { role: 'human', content };
+            loadingPlaceholder = { role: 'assistant', loading: true };
+            currentMessages = [...currentMessages, userMsg, loadingPlaceholder];
+            renderMessages();
+            scrollToBottom();
+            const resp = await fetch(`/api/conversations/${conversationId}/messages`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ content }),
+            });
+            if (!resp.ok || !resp.body) {
+                const err = await safeJson(resp);
+                toggleChatBox(true);
+                if (waitingEl) waitingEl.style.display = 'none';
+                // rollback user message
+                currentMessages = currentMessages.filter(m => m !== userMsg && m !== loadingPlaceholder);
+                loadingPlaceholder = null;
+                renderMessages();
+                throw new Error(err?.error || 'AI reply failed');
+            }
+
+            let targetId = conversationId;
+            let assistantBuffer = '';
+            const reader = resp.body.getReader();
+            const decoder = new TextDecoder();
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n').map(l => l.trim()).filter(Boolean);
+                for (const line of lines) {
+                    if (!line.startsWith('data:')) continue;
+                    const dataStr = line.replace(/^data:\s*/, '');
+                    if (dataStr === '[DONE]') {
+                        if (assistantBuffer) {
+                            const base = currentMessages.filter(m => !m.loading);
+                            currentMessages = [...base, { role: 'assistant', content: assistantBuffer }];
+                            renderMessages();
+                        }
+                        if (targetId && targetId !== currentConversationId) {
+                            window.location.href = `/c/${targetId}`;
+                        }
+                        toggleChatBox(true);
+                        if (waitingEl) waitingEl.style.display = 'none';
+                        return;
+                    }
+                    try {
+                        const obj = JSON.parse(dataStr);
+                        if (obj.delta) {
+                            assistantBuffer += obj.delta;
+                            const base = (currentMessages || []).filter(m => !m.loading);
+                            const tempMessages = [...base, { role: 'assistant', content: assistantBuffer }];
+                            renderMessagesLive(tempMessages);
+                        }
+                        if (obj.conversation_id) {
+                            targetId = obj.conversation_id;
+                        }
+                    } catch (e) {
+                        // ignore parse errors
+                    }
+                }
+            }
+            toggleChatBox(true);
+            if (waitingEl) waitingEl.style.display = 'none';
+            loadingPlaceholder = null;
+        }
+
+        async function safeJson(resp) {
+            try {
+                return await resp.json();
+            } catch {
+                return null;
+            }
+        }
+
+        function renderMessagesLive(messagesList) {
+            const container = document.getElementById('messages');
+            container.innerHTML = (messagesList || []).map(msg => {
+                if (msg.loading) {
+                    return `
+                        <div class="message loading">
+                            <div class="spinner-inline"></div>
+                            <div class="message-content">Generating response…</div>
+                        </div>
+                    `;
+                }
+                if (msg.role === 'meta') {
+                    return `
+                        <div class="message meta">
+                            <div class="meta-title">${escapeHtml(msg.content || 'Continued below')}</div>
+                            ${msg.prompt ? `<div class="meta-prompt">Human prompt: ${escapeHtml(msg.prompt)}</div>` : ''}
+                        </div>
+                    `;
+                }
+                return `
+                    <div class="message ${msg.role === 'meta' ? '' : msg.role}">
+                        ${msg.role !== 'meta' ? `<div class="message-role">${msg.role === 'human' ? 'Human' : 'AI'}</div>` : ''}
+                        <div class="message-content">${formatContent(msg.content)}</div>
+                    </div>
+                `;
+            }).join('');
+            scrollToBottom();
+        }
+
+        // Continuation kick-off: create child and redirect immediately
+        async function streamContinuation(conversationId, mode, user_goal) {
+            const headers = { 'Content-Type': 'application/json' };
+            if (window.mnemolog?.currentSession?.access_token) {
+                headers['Authorization'] = `Bearer ${window.mnemolog.currentSession.access_token}`;
+            }
+            const resp = await fetch(`/api/conversations/${conversationId}/continue-stream`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ mode, user_goal }),
+            });
+            const data = await safeJson(resp);
+            if (!resp.ok || !data?.conversation_id) {
+                throw new Error(data?.error || 'Failed to start continuation');
+            }
+            window.location.href = `/c/${data.conversation_id}#stream`;
+        }
+
+        async function streamGeneration(conversationId, mode, user_goal) {
+            if (isGenerating) return;
+            isGenerating = true;
+            toggleChatBox(false);
+            if (waitingEl) waitingEl.style.display = 'flex';
+            // show placeholder spinner if no assistant yet
+            if (!loadingPlaceholder) {
+                loadingPlaceholder = { role: 'assistant', loading: true };
+                currentMessages = [...currentMessages, loadingPlaceholder];
+                renderMessages();
+                scrollToBottom();
+            }
+            const headers = { 'Content-Type': 'application/json' };
+            if (window.mnemolog?.currentSession?.access_token) {
+                headers['Authorization'] = `Bearer ${window.mnemolog.currentSession.access_token}`;
+            }
+            const resp = await fetch(`/api/conversations/${conversationId}/generate`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ mode, user_goal }),
+            });
+            if (!resp.ok || !resp.body) {
+                const err = await safeJson(resp);
+                isGenerating = false;
+                toggleChatBox(true);
+                if (waitingEl) waitingEl.style.display = 'none';
+                currentMessages = currentMessages.filter(m => m !== loadingPlaceholder);
+                loadingPlaceholder = null;
+                renderMessages();
+                throw new Error(err?.error || 'AI reply failed');
+            }
+            let assistantBuffer = '';
+            const reader = resp.body.getReader();
+            const decoder = new TextDecoder();
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n').map(l => l.trim()).filter(Boolean);
+                for (const line of lines) {
+                    if (!line.startsWith('data:')) continue;
+                    const dataStr = line.replace(/^data:\s*/, '');
+                    if (dataStr === '[DONE]') {
+                        if (assistantBuffer) {
+                            const base = currentMessages.filter(m => !m.loading);
+                            currentMessages = [...base, { role: 'assistant', content: assistantBuffer }];
+                            renderMessages();
+                            scrollToBottom();
+                        }
+                        isGenerating = false;
+                        toggleChatBox(true);
+                        if (waitingEl) waitingEl.style.display = 'none';
+                        return;
+                    }
+                    try {
+                        const obj = JSON.parse(dataStr);
+                        if (obj.delta) {
+                            assistantBuffer += obj.delta;
+                            const base = (currentMessages || []).filter(m => !m.loading);
+                            const tempMessages = [...base, { role: 'assistant', content: assistantBuffer }];
+                            renderMessagesLive(tempMessages);
+                        }
+                    } catch (e) {
+                        // ignore
+                    }
+                }
+            }
+            isGenerating = false;
+            toggleChatBox(true);
+            if (waitingEl) waitingEl.style.display = 'none';
+            loadingPlaceholder = null;
+        }
+
+        async function maybeStartGeneration(conversation) {
+            // Only trigger if this conversation is a continuation and has no AI reply yet
+            const hasAssistant = (conversation.messages || []).some(m => m.role === 'assistant');
+            if (hasAssistant) return;
+            try {
+                await streamGeneration(conversation.id, conversation.intent_type || 'continue', conversation.user_goal);
+                // remove hash to avoid duplicate retries
+                history.replaceState(null, '', window.location.pathname);
+            } catch (err) {
+                console.error('Generation stream failed', err);
+            }
+        }
+
+        function scrollToBottom(force = false) {
+            const container = document.getElementById('messages');
+            if (!container) return;
+            if (force) {
+                container.scrollTop = container.scrollHeight;
+            } else {
+                // smooth-ish only when already near bottom
+                const threshold = 150;
+                if (container.scrollHeight - container.scrollTop - container.clientHeight < threshold) {
+                    container.scrollTop = container.scrollHeight;
+                }
+            }
+        }
+
+        function setupTooltip() {
+            const icon = document.getElementById('continue-tooltip');
+            if (!icon) return;
+            const toggle = (e) => {
+                e.preventDefault();
+                icon.classList.toggle('active');
+            };
+            icon.addEventListener('click', toggle);
+            icon.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    toggle(e);
+                }
+            });
+            document.addEventListener('click', (e) => {
+                if (!icon.contains(e.target)) {
+                    icon.classList.remove('active');
+                }
+            });
+        }
+
+        function toggleChatBox(show) {
+            const box = document.getElementById('chat-box');
+            if (!box) return;
+            if (show) {
+                box.style.display = chatBoxDisplay || 'block';
+            } else {
+                if (!chatBoxDisplay) chatBoxDisplay = box.style.display || 'block';
+                box.style.display = 'none';
+            }
+        }
+
         loadConversation();
+        setupContinue();
     </script>
 </body>
 </html>

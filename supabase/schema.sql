@@ -1,7 +1,6 @@
 -- Mnemolog Database Schema
 -- Run this in Supabase SQL Editor
 
--- Enable UUID extension
 create extension if not exists "uuid-ossp";
 
 -- Users table (extends Supabase auth.users)
@@ -32,6 +31,22 @@ create table public.conversations (
     tags text[] default '{}',
     is_public boolean default true,
     show_author boolean default true,
+    model_id text,
+    model_display_name text,
+    platform_conversation_id text,
+    attribution_confidence text check (attribution_confidence in ('verified', 'inferred', 'claimed')),
+    attribution_source text check (attribution_source in ('network_intercept', 'page_state', 'dom_scrape', 'user_reported')),
+    pii_scanned boolean default false,
+    pii_redacted boolean default false,
+    source text check (source in ('extension', 'web', 'api')),
+    
+    -- Continuations / provider lineage
+    root_conversation_id uuid,
+    parent_conversation_id uuid,
+    provider text,
+    model text,
+    intent_type text,
+    user_goal text,
     
     -- Stats (denormalized for performance)
     view_count integer default 0,
@@ -47,19 +62,100 @@ create index conversations_created_at_idx on public.conversations(created_at des
 create index conversations_platform_idx on public.conversations(platform);
 create index conversations_tags_idx on public.conversations using gin(tags);
 create index conversations_is_public_idx on public.conversations(is_public) where is_public = true;
+create index if not exists conversations_root_idx on public.conversations(root_conversation_id);
+create index if not exists conversations_parent_idx on public.conversations(parent_conversation_id);
 
 -- Full-text search index
 alter table public.conversations add column fts tsvector 
     generated always as (
         setweight(to_tsvector('english', coalesce(title, '')), 'A') ||
-        setweight(to_tsvector('english', coalesce(description, '')), 'B')
+        setweight(to_tsvector('english', coalesce(description, '')), 'B') ||
+        to_tsvector('english', coalesce(messages::text, ''))
     ) stored;
 
 create index conversations_fts_idx on public.conversations using gin(fts);
 
+-- Messages table (normalized storage for convo turns)
+create table if not exists public.messages (
+    id uuid primary key default gen_random_uuid(),
+    conversation_id uuid not null references public.conversations(id) on delete cascade,
+    role text not null,            -- 'human' | 'assistant' | 'system' | 'meta'
+    content jsonb not null,        -- e.g., { "text": "..." }
+    order_index integer not null,
+    created_at timestamptz default now()
+);
+
+create index if not exists messages_conversation_order_idx
+    on public.messages (conversation_id, order_index);
+
+-- Row Level Security for messages
+alter table public.messages enable row level security;
+
+-- Allow select when conversation is public or owned by viewer
+create policy if not exists "Messages visible if convo public or owned"
+    on public.messages for select
+    using (
+        exists (
+            select 1 from public.conversations c
+            where c.id = conversation_id
+              and (c.is_public = true or c.user_id = auth.uid())
+        )
+    );
+
+-- Allow insert/update/delete only if viewer owns the conversation
+create policy if not exists "Insert messages for owned convo"
+    on public.messages for insert
+    with check (
+        exists (
+            select 1 from public.conversations c
+            where c.id = conversation_id
+              and c.user_id = auth.uid()
+        )
+    );
+
+create policy if not exists "Update messages for owned convo"
+    on public.messages for update
+    using (
+        exists (
+            select 1 from public.conversations c
+            where c.id = conversation_id
+              and c.user_id = auth.uid()
+        )
+    )
+    with check (
+        exists (
+            select 1 from public.conversations c
+            where c.id = conversation_id
+              and c.user_id = auth.uid()
+        )
+    );
+
+create policy if not exists "Delete messages for owned convo"
+    on public.messages for delete
+    using (
+        exists (
+            select 1 from public.conversations c
+            where c.id = conversation_id
+              and c.user_id = auth.uid()
+        )
+    );
+
+-- Bookmarks table
+create table public.bookmarks (
+    id uuid primary key default uuid_generate_v4(),
+    user_id uuid not null references public.profiles(id) on delete cascade,
+    conversation_id uuid not null references public.conversations(id) on delete cascade,
+    created_at timestamptz not null default now(),
+    unique (user_id, conversation_id)
+);
+
+create index idx_bookmarks_user_id on public.bookmarks(user_id);
+create index idx_bookmarks_conversation_id on public.bookmarks(conversation_id);
+
 -- Row Level Security
 alter table public.profiles enable row level security;
 alter table public.conversations enable row level security;
+alter table public.bookmarks enable row level security;
 
 -- Profiles policies
 create policy "Public profiles are viewable by everyone"
@@ -90,6 +186,38 @@ create policy "Users can update own conversations"
 create policy "Users can delete own conversations"
     on public.conversations for delete
     using (auth.uid() = user_id);
+
+-- Bookmarks policies (authenticated users only)
+create policy "Users can view own bookmarks"
+    on public.bookmarks for select
+    to authenticated
+    using (auth.uid() = user_id);
+
+create policy "Users can insert own bookmarks for public or owned conversations"
+    on public.bookmarks for insert
+    to authenticated
+    with check (
+        auth.uid() = user_id
+        and exists (
+            select 1 from public.conversations c
+            where c.id = conversation_id
+              and (c.is_public = true or c.user_id = auth.uid())
+        )
+    );
+
+create policy "Users can update own bookmarks"
+    on public.bookmarks for update
+    to authenticated
+    using (auth.uid() = user_id)
+    with check (auth.uid() = user_id);
+
+create policy "Users can delete own bookmarks"
+    on public.bookmarks for delete
+    to authenticated
+    using (auth.uid() = user_id);
+
+-- Allow policy subqueries to see conversations
+grant select on public.conversations to authenticated;
 
 -- Function to auto-create profile on signup
 create or replace function public.handle_new_user()

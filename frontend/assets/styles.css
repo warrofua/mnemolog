@@ -35,6 +35,12 @@ body.dark-mode {
   box-sizing: border-box;
 }
 
+html, body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 body {
   font-family: 'DM Sans', sans-serif;
   background: var(--bg);
@@ -172,25 +178,26 @@ nav {
 .heading-line {
   display: block;
   font-family: 'Cormorant Garamond', serif;
-  font-size: 1.15em;
-  margin: 0.25rem 0;
+  font-size: 1.25em;
+  margin: 0.2rem 0;
   font-weight: 600;
 }
 
 .heading-1 {
-  font-size: 1.55em;
+  font-size: 2.1em;
 }
 
 .heading-2 {
-  font-size: 1.35em;
+  font-size: 1.8em;
 }
 
 .heading-3 {
-  font-size: 1.2em;
+  font-size: 1.5em;
 }
 
 .heading-4 {
-  font-size: 1.1em;
+  font-size: 1.35em;
+  margin-bottom: 0.15rem;
 }
 
 .auth-buttons {
@@ -420,6 +427,12 @@ nav {
   .auth-buttons {
     flex-direction: column;
     width: 100%;
+  }
+
+  /* Nudge dark-mode toggle up slightly inside mobile dropdown */
+  .nav-dropdown .theme-toggle {
+    margin-top: -8px;
+    margin-bottom: -2px;
   }
   .auth-toggle {
     display: inline-flex;

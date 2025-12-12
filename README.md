@@ -6,9 +6,11 @@ What it is: a public archive where people can publish AI conversations that matt
 
 Key flows:
 - Share: paste raw text; we parse, flag sensitive info, and let you redact before publishing. Owners can later edit/re-parse.
-- Explore: browse the archive with filters (platforms, tags), search, and view featured picks.
-- View: conversations live at `/c/<uuid>` with platform badge, metadata, and tags.
-- Profile: see and manage your own published conversations.
+- Continue with Nemo (our DeepSeek-backed native model): from any conversation, launch a continuation or chat follow-up with streaming replies and lineage (root/parent).
+- Explore: browse the archive with filters (platforms), search, trending tags, and featured picks.
+- View: conversations live at `/c/<uuid>` with platform badge, attribution, tags, and continuation breadcrumbs.
+- Profile: Originals / Continuations / Bookmarked tabs; per-item visibility toggle; dark-mode toggle.
+- Bookmarks: save public conversations; see them in your archive.
 - Visibility: owners can toggle public/private on conversation pages and in their archive; private items remain visible to the owner.
 
 ## Visual overview
@@ -22,6 +24,7 @@ Key flows:
 - **Database**: Supabase (PostgreSQL)
 - **Auth**: Supabase Auth (Google, GitHub)
 - **Link previews**: Pages `_worker.js` injects dynamic OpenGraph tags for `/c/<uuid>` by fetching metadata from the API worker.
+- **AI continuations/chat**: Supabase Edge Function `continue` (DeepSeek) with streaming responses; worker proxies `/api/conversations/:id/messages` for chat and `/api/conversations/:id` for lineage-aware context.
 - **Theme**: User-selectable light/dark mode (persists via local storage) exposed in the site header.
 - **Extension archive API**: `/api/archive` accepts structured JSON from the browser extension (includes attribution, model IDs, and PII flags).
 - **Attribution fields**: Conversations store `model_id`, `model_display_name`, `platform_conversation_id`, `attribution_confidence` (verified/inferred/claimed), `attribution_source` (network_intercept/page_state/dom_scrape/user_reported), PII flags, and `source` (extension/web/api) to display provenance badges.
@@ -115,6 +118,9 @@ SUPABASE_ANON_KEY=eyJ...
 SUPABASE_URL=https://xxx.supabase.co
 SUPABASE_ANON_KEY=eyJ...
 SUPABASE_SERVICE_KEY=eyJ...  # For server-side operations
+
+# Supabase Edge Function (continue/chat)
+DEEPSEEK_API_KEY=sk-...
 ```
 
 ## API Endpoints
@@ -128,6 +134,12 @@ GET     /api/conversations/:id        # Get single conversation (public or owner
 PUT     /api/conversations/:id        # Update (owner)
 DELETE  /api/conversations/:id        # Delete (owner)
 GET     /api/users/:userId/conversations # User’s conversations (public unless owner)
+GET     /api/conversations/:id/messages  # (Proxy) Supabase streaming chat/continuation
+POST    /api/conversations/:id/messages # (Proxy) chat follow-up → DeepSeek streaming reply
+POST    /api/bookmarks                 # Save bookmark (auth)
+DELETE  /api/bookmarks/:id             # Remove bookmark (auth)
+GET     /api/bookmarks                 # List current user bookmarks
+GET     /api/tags/trending             # Trending tags (last 24h)
 ```
 
 ## Frontend Routes
@@ -136,10 +148,13 @@ GET     /api/users/:userId/conversations # User’s conversations (public unless
 - `/share` — submit/publish a conversation
 - `/c/<uuid>` → `/conversation/<uuid>` — public conversation view (rewritten by `_redirects`)
 - `/explore` — browse conversations (filters/search)
+- `/explore` shows trending tags (last 24h) and featured picks (most viewed)
 - `/faq` — FAQ
 - `/privacy` — privacy policy
 - `/terms` — terms of use
 - `/api` — API overview (continuity/provenance pitch)
+- `/profile` — Originals / Continuations / Bookmarked tabs; per-item visibility toggle; search within tab
+- `/conversation.html` supports “Continue with Nemo” and in-page follow-up chat with streaming
 
 Share flow:
 - Paste raw text: client-side parser + preview/redaction.
