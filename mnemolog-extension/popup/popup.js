@@ -281,6 +281,9 @@ class MnemologPopup {
       
       if (response?.success && response.data) {
         this.conversationData = response.data;
+        if (Array.isArray(this.conversationData.messages)) {
+          this.conversationData.messages = this.collapseSameRole(this.conversationData.messages);
+        }
         if (!Array.isArray(this.conversationData.tags)) this.conversationData.tags = [];
         this.displayConversation(response.data);
         this.renderTags();
@@ -294,6 +297,19 @@ class MnemologPopup {
       console.error('Detection error:', error);
       this.updateStatus('error');
     }
+  }
+
+  collapseSameRole(messages = []) {
+    const out = [];
+    for (const msg of messages) {
+      const last = out[out.length - 1];
+      if (last && last.role === msg.role) {
+        last.content = `${last.content}\n\n${msg.content || ''}`.trim();
+      } else {
+        out.push({ ...msg });
+      }
+    }
+    return out;
   }
 
   async injectPlatformScripts(tabId, platform) {
@@ -324,7 +340,8 @@ class MnemologPopup {
       'chatgpt.com': 'chatgpt',
       'gemini.google.com': 'gemini',
       'x.com/i/grok': 'grok',
-      'grok.x.ai': 'grok'
+      'grok.x.ai': 'grok',
+      'grok.com': 'grok'
     };
     
     for (const [domain, platform] of Object.entries(platforms)) {
@@ -588,23 +605,32 @@ class MnemologPopup {
       const response = await fetch('https://mnemolog.com/api/archive', {
         method: 'POST',
         headers: {
-        'Content-Type': 'application/json',
-        ...(this.auth?.token && { 'Authorization': `Bearer ${this.auth.token}` })
-      },
-      body: JSON.stringify(payload)
-    });
-      
-      if (!response.ok) {
-        throw new Error('Archive request failed');
+          'Content-Type': 'application/json',
+          ...(this.auth?.token && { 'Authorization': `Bearer ${this.auth.token}` })
+        },
+        body: JSON.stringify(payload)
+      });
+
+      let result = null;
+      try {
+        result = await response.json();
+      } catch {
+        // ignore JSON parse
       }
-      
-      const result = await response.json();
-      
-      if (result.success && result.url) {
+
+      if (!response.ok) {
+        const statusText = response.statusText || '';
+        const errMsg = result?.error || `Archive request failed (${response.status} ${statusText})`;
+        console.error('Archive error detail', { status: response.status, statusText, body: result });
+        throw new Error(errMsg);
+      }
+
+      if (result?.success && result?.url) {
         this.elements.viewLink.href = result.url;
         this.setState('success');
       } else {
-        throw new Error(result.error || 'Unknown error');
+        console.error('Archive unexpected response', result);
+        throw new Error(result?.error || 'Unknown error');
       }
       
     } catch (error) {
@@ -616,11 +642,12 @@ class MnemologPopup {
   
   openPreview() {
     if (!this.conversationData) return;
-    
-    // Store data and open preview page
-    chrome.storage.local.set({ previewData: this.conversationData }, () => {
-      chrome.tabs.create({ 
-        url: `https://mnemolog.com/share?source=extension&preview=true` 
+
+    const payload = JSON.stringify(this.conversationData);
+    // Persist payload so the share page content script can pick it up
+    chrome.storage?.local.set({ mnemolog_preview: payload }, () => {
+      chrome.tabs.create({
+        url: `https://mnemolog.com/share?source=extension&preview=true`
       });
     });
   }

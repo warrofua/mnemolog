@@ -30,6 +30,8 @@
     "https://gemini.google.com/*",
     "https://x.com/*",
     "https://grok.x.ai/*",
+    "https://grok.com/*",
+    "https://*.grok.com/*",
     "https://mnemolog.com/*",
     "https://*.mnemolog.com/*",
     "https://mnemolog.pages.dev/*",
@@ -58,7 +60,9 @@
     {
       "matches": [
         "https://x.com/i/grok/*",
-        "https://grok.x.ai/*"
+        "https://grok.x.ai/*",
+        "https://grok.com/*",
+        "https://*.grok.com/*"
       ],
       "js": ["platforms/grok.js", "content/content.js"]
     },
@@ -68,6 +72,16 @@
         "https://*.mnemolog.com/*"
       ],
       "js": ["content/auth.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://mnemolog.com/share*",
+        "https://*.mnemolog.com/share*",
+        "https://mnemolog.pages.dev/share*",
+        "https://*.mnemolog.pages.dev/share*"
+      ],
+      "js": ["content/preview.js"],
       "run_at": "document_idle"
     },
     {

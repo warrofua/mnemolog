@@ -1,6 +1,6 @@
 // Shared conversation parser for platform-specific exports.
 // Exposes window.mnemologParsers.parseConversation(rawText, platform, overrideFirstSpeaker?)
-// Designed to be loaded before assets/app.js and used by share.html and other pages.
+// Designed to be loaded before popup logic; copied from frontend/assets/parsers.js
 (function () {
   // Simplified math preservation: join likely math lines into single lines
   function preserveMathBlocks(text) {
@@ -198,53 +198,28 @@
 
     // Assign roles with simple alternation, honoring explicit labels
     const firstLabeled = segments.find(s => s.role)?.role || null;
-    let firstSpeaker = overrideFirstSpeaker || firstLabeled || detectFirstSpeaker(segments[0]?.content || '');
+    const detectedFirst = firstLabeled || detectFirstSpeaker(segments[0]?.content || '');
+    const firstSpeaker = overrideFirstSpeaker || detectedFirst;
 
-    let currentRole = firstSpeaker;
-    const messages = [];
-    const sentenceEndBoundary = /[.?!]\s+[A-Z]/;
-
-    segments.forEach((seg, idx) => {
-      const content = (seg.content || '').trim();
-      if (!content) return;
-
+    let lastRole = firstSpeaker;
+    const messages = segments.map((seg, idx) => {
       if (seg.role) {
-        currentRole = seg.role;
-      } else if (idx === 0) {
-        currentRole = firstSpeaker;
-      } else {
-        currentRole = currentRole === 'human' ? 'assistant' : 'human';
+        lastRole = seg.role;
+        return { role: seg.role, content: seg.content };
       }
-
-      const last = messages[messages.length - 1];
-      const isContinuation = (() => {
-        const t = content.trim();
-        if (/^[-*•]/.test(t)) return true;
-        if (/^\d+\.\s/.test(t)) return true; // numbered list
-        if (/^[a-z]/.test(t)) return true;
-        if (/^(and|but|or|however|so|yes|no|additionally|moreover|furthermore|that said)/i.test(t)) return true;
-        if (/^(takes a breath|exhales|sitting with|let me think|thinking)/i.test(t)) return true;
-        if (/^(option\s+\d+\.?|[IVXLCDM]+\.?)/i.test(t) && last && last.role === 'assistant') return true;
-        // Avoid splitting mid-sentence: if prior content ends with sentence end and this starts with capital, treat as new turn
-        if (last && sentenceEndBoundary.test(last.content.slice(-120) + ' ' + t.slice(0, 2))) return false;
-        return false;
-      })();
-
-      if (last && last.role === currentRole && isContinuation) {
-        last.content += '\n\n' + content;
-      } else {
-        messages.push({ role: currentRole, content });
-      }
+      const role = idx === 0 ? firstSpeaker : (lastRole === 'human' ? 'assistant' : 'human');
+      lastRole = role;
+      return { role, content: seg.content };
     });
 
     return {
       messages,
       metadata: {
-        detectedProvider: platformHint || 'generic',
-        detectedFirstSpeaker: firstSpeaker,
-        userOverrodeFirstSpeaker: !!overrideFirstSpeaker,
+        detectedProvider: platformHint || 'other',
+        detectedFirstSpeaker: detectedFirst,
+        userOverrodeFirstSpeaker: Boolean(overrideFirstSpeaker),
         hasLabels: sawLabel,
-        rawCharacterCount: text.length,
+        rawCharacterCount: rawText.length,
         messageCount: messages.length,
       }
     };
@@ -264,7 +239,7 @@
     // Gemini: strip common header if present
     if (selected === 'gemini') {
       const geminiResult = tryParseGemini(text);
-      if (geminiResult) return geminiResult;
+      if (geminiResult) return { ...geminiResult, messages: collapseSameRole(geminiResult.messages) };
     }
 
     const genericResult = parseGeneric(text, overrideFirstSpeaker, selected);

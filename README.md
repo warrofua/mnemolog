@@ -12,6 +12,7 @@ Key flows:
 - Profile: Originals / Continuations / Bookmarked tabs; per-item visibility toggle; dark-mode toggle.
 - Bookmarks: save public conversations; see them in your archive.
 - Visibility: owners can toggle public/private on conversation pages and in their archive; private items remain visible to the owner.
+- Chrome extension: capture conversations directly from Claude/ChatGPT/Gemini/Grok, run PII scan, and archive to Mnemolog (review/redact on site). [Chrome Web Store](https://chromewebstore.google.com/detail/mnemolog/gcdcfjbcehplbkaahapklgcglijalcjh).
 
 ## Visual overview
 

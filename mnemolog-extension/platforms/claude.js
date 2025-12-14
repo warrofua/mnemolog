@@ -115,34 +115,39 @@ window.MnemologPlatform = {
   },
   
   extractTitle() {
-    // Try various selectors for conversation title
+    // 1) Use <title>… - Claude</title>
+    const docTitle = document.title || '';
+    const match = docTitle.replace(/\s*-\s*Claude\s*$/i, '');
+    const cleaned = (typeof match === 'string' ? match : '').trim();
+    if (cleaned && cleaned.length < 200) return cleaned;
+
+    // 2) Look for a visible conversation title in DOM
     const titleSelectors = [
-      'h1',
       '[data-testid="conversation-title"]',
       '.conversation-title',
-      'title'
+      'h1'
     ];
-    
     for (const selector of titleSelectors) {
       const el = document.querySelector(selector);
       const text = el?.textContent?.trim();
-      if (text && text.length > 0 && text.length < 200 && !text.includes('Claude')) {
+      if (text && text.length > 0 && text.length < 200 && !/claude/i.test(text)) {
         return text;
       }
     }
-    
-    // Extract from first user message
-    const firstMessage = document.querySelector('[data-is-human="true"]');
+
+    // 3) Fallback: derive from first user message
+    const firstMessage = document.querySelector('[data-testid="user-message"], [data-is-human="true"]');
     if (firstMessage) {
       const text = firstMessage.textContent?.trim().slice(0, 100);
       if (text) return text + (text.length >= 100 ? '...' : '');
     }
-    
+
     return 'Untitled Conversation';
   },
   
   extractMessages() {
     const messages = [];
+    const normalizeContent = (txt = '') => (txt || '').replace(/\s+/g, ' ').trim();
 
     // Primary: walk ordered DOM blocks for user + assistant
     const blocks = document.querySelectorAll('[data-testid="user-message"], div.font-claude-response');
@@ -163,12 +168,23 @@ window.MnemologPlatform = {
       if (altMessages.length > 0) return altMessages;
     }
 
+    // Deduplicate identical role/content pairs (some DOM variants double-render)
+    const seen = new Set();
+    const deduped = [];
+    messages.forEach(m => {
+      const key = `${m.role}|${normalizeContent(m.content)}`;
+      if (!key.trim()) return;
+      if (seen.has(key)) return;
+      seen.add(key);
+      deduped.push(m);
+    });
+
     // If all roles defaulted to human because of missing markers, enforce alternation
-    if (messages.length > 1 && messages.every(m => m.role === 'human')) {
-      messages.forEach((m, i) => { if (i % 2 === 1) m.role = 'assistant'; });
+    if (deduped.length > 1 && deduped.every(m => m.role === 'human')) {
+      deduped.forEach((m, i) => { if (i % 2 === 1) m.role = 'assistant'; });
     }
 
-    return messages;
+    return deduped;
   },
   
   extractMessageContent(container) {

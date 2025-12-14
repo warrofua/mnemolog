@@ -531,6 +531,7 @@ function buildHeaderHTML() {
           <div class="nav-links">
             <a href="/profile">Your Archive</a>
             <a href="/explore">Explore</a>
+            <a href="/api">API</a>
             <a href="/#about">About</a>
             <a href="/faq">FAQ</a>
             <label class="theme-toggle mobile-only" style="margin-top:-0.2rem;">

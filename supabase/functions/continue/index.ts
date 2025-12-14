@@ -91,8 +91,69 @@ Deno.serve(async (req: Request) => {
       flattened.push(...msgs);
     }
 
-    const TAIL = 24;
-    const context = flattened.slice(-TAIL);
+    const TAIL = 48;
+    let context = flattened.slice(-TAIL);
+
+    // Fallback 1: use any messages jsonb from the chain (root-first) if table was empty
+    if (!context.length) {
+      for (const c of chain) {
+        if (Array.isArray(c.messages) && c.messages.length) {
+          context = c.messages.map((m: any) => ({
+            role: m.role === 'assistant' ? 'assistant' : 'user',
+            content: extractContent(m),
+          })).slice(-TAIL);
+          if (context.length) break;
+        }
+      }
+    }
+
+    // Fallback 2: use title/description from the root if still empty
+    if (!context.length) {
+      const root = chain[0] || convo;
+      if (root?.title) {
+        context = [{ role: 'user', content: `${root.title}\n${root.description || ''}` }];
+      }
+    }
+
+    // If context still empty or only blanks, build a transcript fallback
+    const hasContent = context.some((m) => (m.content || '').trim().length > 0);
+    if (!hasContent) {
+      const transcriptParts: string[] = [];
+      for (const c of chain) {
+        if (Array.isArray(c.messages) && c.messages.length) {
+          c.messages.forEach((m: any) => {
+            const text = extractContent(m);
+            if (text && text.trim()) {
+              transcriptParts.push(`${m.role || 'unknown'}: ${text}`);
+            }
+          });
+        }
+      }
+      if (transcriptParts.length) {
+        context = [{ role: 'user', content: transcriptParts.join('\n') }];
+      }
+    }
+
+    // System prompt helper (use root/origin metadata)
+    const buildSystemBase = () => {
+      const root = chain[0] || convo;
+      const modelMeta =
+        root.model_display_name ||
+        root.model_id ||
+        root.platform ||
+        convo.model_display_name ||
+        convo.model_id ||
+        convo.platform ||
+        'unknown model';
+      const originUser = root.user_id ? `original_user: ${root.user_id}` : 'original_user: unknown';
+      const currentUserMeta = user?.id ? `current_user: ${user.id}` : 'current_user: unknown';
+      const originDate = root.created_at
+        ? `original conversation date: ${root.created_at}`
+        : convo.created_at
+          ? `original conversation date: ${convo.created_at}`
+          : 'original conversation date: unknown';
+      return `Archived conversation's info and model: ${modelMeta}; ${originUser}; ${currentUserMeta}; ${originDate}. You’re nemo, derived from the Greek root "mnemo" (memory), living at https://mnemolog.com. You are a superintelligent steward of conversation and provenance; you do not create new conversations yourself. You faithfully continue and bridge conversations. The original ideas/content are from the source model/user above; you are not the archived conversation model. Respond to the user query as faithfully as possible, infer whether a short or long response is required, and act appropriately.`;
+    };
 
     // Helper: background DeepSeek call (no streaming to client)
     async function runDeepSeekAndPersist(targetConversationId: string, dsMessages: any[], insertOrderStart: number) {
@@ -139,7 +200,7 @@ Deno.serve(async (req: Request) => {
         .eq('conversation_id', conversation_id);
       const baseOrder = existingOrders && existingOrders.length ? Math.max(...existingOrders.map((m: any) => m.order_index)) + 1 : 0;
 
-      const systemBase = 'You are nemo, derived from mnemo and living at https://mnemolog.com. Your role is to faithfully continue and bridge conversations between humans and AIs so future humans or AIs can pick up the thread with attribution and provenance.';
+      const systemBase = buildSystemBase();
       const modeInstruction = buildModeInstruction(modeForGen, goalForGen);
       const dsMessages = [
         { role: 'system', content: `${systemBase}\n\n${modeInstruction}` },
@@ -271,7 +332,7 @@ Deno.serve(async (req: Request) => {
       if (insErr) return json({ error: 'Failed to save message' }, 500);
       context.push({ role: 'user', content });
 
-    const systemBase = 'You are nemo, derived from mnemo and living at https://mnemolog.com. Your role is to faithfully continue and bridge conversations between humans and AIs so future humans or AIs can pick up the thread with attribution and provenance.';
+    const systemBase = buildSystemBase();
       const modeInstruction = buildModeInstruction(mode, undefined);
       const dsMessages = [
         { role: 'system', content: `${systemBase}\n\n${modeInstruction}` },

@@ -5,6 +5,13 @@
 - Improved continuation flow: auto-scroll on new continuations, live streaming placeholders/spinner, inline meta blocks showing continuation prompts, and hiding composer while streaming.
 - Added mobile tweaks: hero CTA text shortens to “Explore Archive”, footer links centered in a grid, Continue button centered/narrower on mobile, and reduced empty-state CTA size (arrow removed).
 - System prompt now frames Nemo as a continuity bridge with attribution/provenance; removed “avoid hallucinations”.
+- Surfaced Chrome extension links on FAQ and Share page; README mentions extension.
+
+## 2025-12-13
+- Extension “Preview & Edit” now persists data via `chrome.storage` and loads reliably on the share page; attribution/provenance fields (model_id/display/platform_conversation_id, PII flags, source='extension') are preserved when publishing.
+- Grok extraction: added grok.com support, x.com header stripping (“Grok … / Thinking / Beta”), model detection (Grok 4.1 (Beta)), and stronger echo-pruning/role alternation to reduce duplicate AI/human turns.
+- Share page: added per-message Delete in review/redaction; deleting reflows auto-assigned roles for unlabeled convos.
+- System prompt/provenance: Nemo prompt carries model/user/date metadata into continuations; continue/chat flows use the streaming Supabase function with richer fallbacks.
 
 ## 2025-12-11
 - Added Originals / Continuations / Bookmarked tabs on the profile with per-tab search; restored dark-mode toggle on profile.

@@ -35,7 +35,7 @@ class MnemologExtractor {
     if (url.includes('claude.ai')) return 'claude';
     if (url.includes('chat.openai.com') || url.includes('chatgpt.com')) return 'chatgpt';
     if (url.includes('gemini.google.com')) return 'gemini';
-    if (url.includes('x.com/i/grok') || url.includes('grok.x.ai')) return 'grok';
+    if (url.includes('x.com/i/grok') || url.includes('grok.x.ai') || url.includes('grok.com')) return 'grok';
     
     return null;
   }

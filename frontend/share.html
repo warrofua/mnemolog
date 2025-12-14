@@ -332,6 +332,52 @@
             display: block;
         }
 
+        /* Similar section */
+        .similar-section {
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border);
+        }
+        .similar-section h3 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.4rem;
+            margin-bottom: 1rem;
+        }
+        .similar-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1rem;
+        }
+        .similar-card {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1rem;
+            background: var(--bg-warm);
+        }
+        .similar-card .meta {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.35rem;
+        }
+        .similar-card h4 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.2rem;
+            margin: 0 0 0.5rem 0;
+            color: var(--text);
+        }
+        .similar-card .tags {
+            display: flex;
+            gap: 0.35rem;
+            flex-wrap: wrap;
+        }
+        .similar-card .tag {
+            background: rgba(184, 134, 11, 0.12);
+            color: var(--accent);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+
         @media (max-width: 700px) {
             .review-header {
                 flex-direction: column;
@@ -811,6 +857,19 @@
                 <p>Paste your conversation, pick the AI, and review redactions before publishing.</p>
             </div>
 
+            <div class="alert alert-success" style="margin-bottom: 1.5rem;">
+                <div style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M12 8v4"/>
+                        <path d="M12 16h0.01"/>
+                    </svg>
+                    <div>
+                        Prefer one-click capture? Try the <a href="https://chromewebstore.google.com/detail/mnemolog/gcdcfjbcehplbkaahapklgcglijalcjh" target="_blank" rel="noopener">Mnemolog Chrome extension</a>.
+                    </div>
+                </div>
+            </div>
+
             <div class="text-input-group" id="text-input-group">
                 <div class="paste-area">
                     <textarea id="conversation-input" placeholder="Paste your conversation here...
@@ -1024,6 +1083,11 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
                     <a href="/share" class="btn btn-primary">Share Another</a>
                     <a href="/explore" class="btn btn-primary">Explore Archive</a>
                 </div>
+
+                <div id="similar-section" class="similar-section" style="display:none;">
+                    <h3>Similar conversations</h3>
+                    <div id="similar-grid" class="similar-grid"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -1045,6 +1109,7 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
         let parseTimer = null;
         let editConversationId = null;
         let lastMetadata = null;
+        let previewMeta = null;
     
         // Check edit mode
         function checkEditMode() {
@@ -1171,6 +1236,7 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
                 }, 200);
             }
         }
+
     
         // Step navigation
         async function goToStep(step) {
@@ -1341,6 +1407,12 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
                     mergeNext.onclick = () => mergeWithNext(idx);
                     actionsEl.appendChild(mergeNext);
                 }
+                const deleteBtn = document.createElement('button');
+                deleteBtn.type = 'button';
+                deleteBtn.textContent = 'Delete';
+                deleteBtn.className = 'merge-btn';
+                deleteBtn.onclick = () => deleteMessage(idx);
+                actionsEl.appendChild(deleteBtn);
                 const undoBtn = document.createElement('button');
                 undoBtn.type = 'button';
                 undoBtn.textContent = 'Undo last merge';
@@ -1494,6 +1566,23 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
             renderReviewPreview();
         }
 
+        function deleteMessage(idx) {
+            if (idx < 0 || idx >= parsedMessages.length) return;
+            mergeHistory.push(JSON.parse(JSON.stringify(parsedMessages)));
+            parsedMessages.splice(idx, 1);
+            // Re-apply alternation from this point downward if there were no labels
+            if (lastMetadata && lastMetadata.hasLabels === false && parsedMessages.length) {
+                // determine current start role from detectedFirstSpeaker
+                const start = detectedFirstSpeaker || 'human';
+                const swap = start === 'human' ? 'assistant' : 'human';
+                parsedMessages = parsedMessages.map((m, i) => ({
+                    role: i === 0 ? start : (i % 2 === 0 ? start : swap),
+                    content: m.content
+                }));
+            }
+            renderReviewPreview();
+        }
+
         // Utility: escape HTML
         function escapeHtml(text) {
             if (!text) return '';
@@ -1584,6 +1673,79 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
             tags = tags.filter(t => t !== text);
             if (el && el.parentElement) el.parentElement.remove();
         }
+
+        function renderTags() {
+            if (!tagContainer || !tagInput) return;
+            // Reset container and re-attach the input
+            tagContainer.innerHTML = '';
+            tagContainer.appendChild(tagInput);
+            tags.forEach(t => {
+                const tag = document.createElement('span');
+                tag.className = 'tag';
+                tag.innerHTML = `${t}<span class="tag-remove" onclick="removeTag(this, '${t}')">&times;</span>`;
+                tagContainer.insertBefore(tag, tagInput);
+            });
+        }
+
+        // Extension preview loader (called after tags are initialized)
+        function loadExtensionPreview() {
+            const params = new URLSearchParams(window.location.search);
+            if (!(params.get('source') === 'extension' && params.get('preview') === 'true')) return;
+            try {
+                const raw = localStorage.getItem('mnemolog_preview');
+                if (!raw) return;
+                const data = JSON.parse(raw);
+                if (!data || !Array.isArray(data.messages)) return;
+
+                // Capture provenance/meta so we can send to the backend
+                previewMeta = {
+                    model_id: data.model?.id || data.model_id || null,
+                    model_display_name: data.model?.displayName || data.model_display_name || null,
+                    platform_conversation_id: data.conversationId || data.platform_conversation_id || null,
+                    attribution_confidence: data.attribution?.confidence || data.attribution_confidence || null,
+                    attribution_source: data.attribution?.source || data.attribution_source || 'dom_scrape',
+                    pii_scanned: true,
+                    pii_redacted: data.pii_redacted || false,
+                    source: 'extension'
+                };
+
+                // Prefill platform
+                if (data.platform) {
+                    const radio = document.querySelector(`input[name="platform"][value="${data.platform}"]`);
+                    if (radio) {
+                        radio.checked = true;
+                        radio.closest('.platform-option')?.classList.add('selected');
+                    }
+                }
+
+                // Prefill title/description
+                if (data.title) document.getElementById('title').value = data.title;
+                if (data.description) document.getElementById('description').value = data.description;
+
+                // Prefill tags
+                if (Array.isArray(data.tags)) {
+                    tags = [...data.tags];
+                    renderTags();
+                }
+
+                // Build raw text from messages
+                const lines = data.messages.map(m => {
+                    const role = m.role === 'assistant' ? 'AI' : 'Human';
+                    return `${role}: ${m.content || ''}`;
+                });
+                const textarea = document.getElementById('conversation-input');
+                textarea.value = lines.join('\n\n');
+
+                // Trigger parse
+                parseAndReviewConversation();
+                checkStep1Valid();
+            } catch (e) {
+                console.warn('Failed to load extension preview', e);
+            }
+        }
+
+        // Now that tags/renderTags exist, load extension preview if present
+        loadExtensionPreview();
     
         // Copy link
         function copyLink() {
@@ -1672,6 +1834,8 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
     
             try {
                 let conversation;
+                const extra = previewMeta || {};
+
                 if (editConversationId) {
                     const res = await apiRequest(`/api/conversations/${editConversationId}`, {
                         method: 'PUT',
@@ -1683,6 +1847,14 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
                             tags,
                             is_public: true,
                             show_author: showAuthor,
+                            ...(extra.model_id && { model_id: extra.model_id }),
+                            ...(extra.model_display_name && { model_display_name: extra.model_display_name }),
+                            ...(extra.platform_conversation_id && { platform_conversation_id: extra.platform_conversation_id }),
+                            ...(extra.attribution_confidence && { attribution_confidence: extra.attribution_confidence }),
+                            ...(extra.attribution_source && { attribution_source: extra.attribution_source }),
+                            ...(extra.pii_scanned !== undefined && { pii_scanned: extra.pii_scanned }),
+                            ...(extra.pii_redacted !== undefined && { pii_redacted: extra.pii_redacted }),
+                            ...(extra.source && { source: extra.source })
                         }),
                     });
                     conversation = res.conversation;
@@ -1695,19 +1867,75 @@ Tip: Select the entire conversation (Ctrl/Cmd+A) while viewing it, then copy and
                         tags,
                         is_public: true,
                         show_author: showAuthor,
+                        ...(extra.model_id && { model_id: extra.model_id }),
+                        ...(extra.model_display_name && { model_display_name: extra.model_display_name }),
+                        ...(extra.platform_conversation_id && { platform_conversation_id: extra.platform_conversation_id }),
+                        ...(extra.attribution_confidence && { attribution_confidence: extra.attribution_confidence }),
+                        ...(extra.attribution_source && { attribution_source: extra.attribution_source }),
+                        ...(extra.pii_scanned !== undefined && { pii_scanned: extra.pii_scanned }),
+                        ...(extra.pii_redacted !== undefined && { pii_redacted: extra.pii_redacted }),
+                        ...(extra.source && { source: extra.source })
                     });
                     conversation = res.conversation;
                 }
-    
+
                 const shareUrl = `${window.location.origin}/c/${conversation.id}`;
                 document.getElementById('share-url').value = shareUrl;
                 goToStep(3);
+                loadSimilar(conversation);
             } catch (err) {
                 console.error('Publish error:', err);
                 alert(err?.message || 'Failed to publish conversation. Please try again.');
             } finally {
                 publishBtn.disabled = false;
                 publishBtn.innerHTML = originalPublishHtml;
+            }
+        }
+
+        // Similar conversations on success
+        function formatDateSimple(dateStr) {
+            if (!dateStr) return '';
+            return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+
+        function renderSimilarCard(c) {
+            const platform = (window.mnemolog?.platformNames && window.mnemolog.platformNames[c.platform]) || c.platform || '';
+            const date = formatDateSimple(c.created_at);
+            const tagsHtml = (c.tags || []).slice(0, 3).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('');
+            return `
+                <a class="similar-card" href="/c/${c.id}">
+                    <div class="meta">${escapeHtml(platform)} · ${escapeHtml(date)}</div>
+                    <h4>${escapeHtml(c.title || 'Conversation')}</h4>
+                    ${tagsHtml ? `<div class="tags">${tagsHtml}</div>` : ''}
+                </a>
+            `;
+        }
+
+        async function loadSimilar(conversation) {
+            const section = document.getElementById('similar-section');
+            const grid = document.getElementById('similar-grid');
+            if (!section || !grid) return;
+            section.style.display = 'none';
+            let query = '';
+            if (conversation.tags && conversation.tags.length) {
+                query = conversation.tags[0];
+            } else if (conversation.title) {
+                query = conversation.title.split(' ').slice(0, 4).join(' ');
+            }
+            try {
+                const params = { limit: 6, sort: 'newest' };
+                if (query) params.q = query;
+                const res = await mnemolog.getConversations(params);
+                const items = (res.conversations || []).filter(c =>
+                    c.id !== conversation.id &&
+                    c.is_public !== false &&
+                    (c.title || '').trim().toLowerCase() !== (conversation.title || '').trim().toLowerCase()
+                ).slice(0, 3);
+                if (!items.length) return;
+                grid.innerHTML = items.map(renderSimilarCard).join('');
+                section.style.display = 'block';
+            } catch (e) {
+                console.warn('Similar load failed', e);
             }
         }
     </script>

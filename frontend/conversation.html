@@ -269,6 +269,8 @@
             color: #2C2A26;
             text-transform: lowercase;
             font-size: 1.2em;
+            position: relative;
+            top: -1px;
         }
 
         .title-font {
@@ -777,6 +779,7 @@
         let chatBoxDisplay = '';
         let waitingEl = null;
         let loadingPlaceholder = null;
+        let userScrollInterrupt = false;
 
         async function loadConversation() {
             const id = getConversationId();
@@ -789,12 +792,9 @@
                 if (!conversation) { showError(); return; }
                 currentConversationId = conversation.id;
                 currentMessages = await loadLineageMessages(conversation);
-                renderConversation(conversation);
+            renderConversation(conversation);
             renderContinuations(conversation.children || []);
             // If we arrived from a continuation redirect, start streaming the assistant
-            if (window.location.hash === '#stream') {
-                scrollToBottom(true);
-            }
             if (window.location.hash === '#stream') {
                 await maybeStartGeneration(conversation);
             }
@@ -1048,8 +1048,13 @@
 
             submit.onclick = async () => {
                 if (!currentConversationId) return;
+                if (!window.mnemolog?.currentSession?.access_token) {
+                    errEl.textContent = 'Please sign in to continue with Nemo.';
+                    errEl.style.display = 'block';
+                    return;
+                }
                 submit.disabled = true;
-                submit.textContent = 'Running...';
+                submit.textContent = 'Sending...';
                 errEl.style.display = 'none';
                 try {
                     await streamContinuation(currentConversationId, mode.value, goal.value.trim() || undefined);
@@ -1058,7 +1063,7 @@
                     errEl.textContent = err?.message || 'Failed to continue';
                     errEl.style.display = 'block';
                     submit.disabled = false;
-                    submit.textContent = 'Run';
+                    submit.textContent = 'Send';
                 }
             };
         }
@@ -1180,6 +1185,7 @@
 
             let targetId = conversationId;
             let assistantBuffer = '';
+            let chunkCount = 0;
             const reader = resp.body.getReader();
             const decoder = new TextDecoder();
             while (true) {
@@ -1210,6 +1216,10 @@
                             const base = (currentMessages || []).filter(m => !m.loading);
                             const tempMessages = [...base, { role: 'assistant', content: assistantBuffer }];
                             renderMessagesLive(tempMessages);
+                            chunkCount++;
+                            if (chunkCount % 3 === 0) {
+                                scrollToBottom(true);
+                            }
                         }
                         if (obj.conversation_id) {
                             targetId = obj.conversation_id;
@@ -1279,7 +1289,7 @@
             window.location.href = `/c/${data.conversation_id}#stream`;
         }
 
-        async function streamGeneration(conversationId, mode, user_goal) {
+        async function streamGeneration(conversationId, mode, user_goal, autoScroll = false) {
             if (isGenerating) return;
             isGenerating = true;
             toggleChatBox(false);
@@ -1289,7 +1299,7 @@
                 loadingPlaceholder = { role: 'assistant', loading: true };
                 currentMessages = [...currentMessages, loadingPlaceholder];
                 renderMessages();
-                scrollToBottom();
+                scrollToBottom(autoScroll);
             }
             const headers = { 'Content-Type': 'application/json' };
             if (window.mnemolog?.currentSession?.access_token) {
@@ -1311,6 +1321,7 @@
                 throw new Error(err?.error || 'AI reply failed');
             }
             let assistantBuffer = '';
+            let chunkCount = 0;
             const reader = resp.body.getReader();
             const decoder = new TextDecoder();
             while (true) {
@@ -1326,7 +1337,7 @@
                             const base = currentMessages.filter(m => !m.loading);
                             currentMessages = [...base, { role: 'assistant', content: assistantBuffer }];
                             renderMessages();
-                            scrollToBottom();
+                            scrollToBottom(autoScroll);
                         }
                         isGenerating = false;
                         toggleChatBox(true);
@@ -1340,6 +1351,10 @@
                             const base = (currentMessages || []).filter(m => !m.loading);
                             const tempMessages = [...base, { role: 'assistant', content: assistantBuffer }];
                             renderMessagesLive(tempMessages);
+                            chunkCount++;
+                            if (autoScroll && chunkCount % 3 === 0) {
+                                scrollToBottom(true);
+                            }
                         }
                     } catch (e) {
                         // ignore
@@ -1356,8 +1371,9 @@
             // Only trigger if this conversation is a continuation and has no AI reply yet
             const hasAssistant = (conversation.messages || []).some(m => m.role === 'assistant');
             if (hasAssistant) return;
+            scrollToBottom(true);
             try {
-                await streamGeneration(conversation.id, conversation.intent_type || 'continue', conversation.user_goal);
+                await streamGeneration(conversation.id, conversation.intent_type || 'continue', conversation.user_goal, true);
                 // remove hash to avoid duplicate retries
                 history.replaceState(null, '', window.location.pathname);
             } catch (err) {
@@ -1366,18 +1382,25 @@
         }
 
         function scrollToBottom(force = false) {
+            if (userScrollInterrupt && !force) return;
             const container = document.getElementById('messages');
             if (!container) return;
-            if (force) {
-                container.scrollTop = container.scrollHeight;
-            } else {
-                // smooth-ish only when already near bottom
-                const threshold = 150;
-                if (container.scrollHeight - container.scrollTop - container.clientHeight < threshold) {
-                    container.scrollTop = container.scrollHeight;
-                }
-            }
+            const target = container.getBoundingClientRect().top + window.scrollY + container.scrollHeight;
+            const current = window.scrollY + window.innerHeight;
+            const distance = Math.abs(target - current);
+            const shouldScroll = force || distance < 600; // only smooth-scroll when near
+            window.scrollTo({ top: target, behavior: shouldScroll ? 'smooth' : 'auto' });
         }
+
+        // Track user scroll to disable auto-scroll until next force
+        (function bindScrollInterrupt() {
+            const onScroll = () => {
+                userScrollInterrupt = true;
+                clearTimeout(onScroll._t);
+                onScroll._t = setTimeout(() => { userScrollInterrupt = false; }, 800);
+            };
+            window.addEventListener('scroll', onScroll, { passive: true });
+        })();
 
         function setupTooltip() {
             const icon = document.getElementById('continue-tooltip');

@@ -199,7 +199,9 @@ chrome.action.onClicked.addListener((tab) => {
       tab.url.includes('chatgpt.com') || 
       tab.url.includes('chat.openai.com') ||
       tab.url.includes('gemini.google.com') ||
-      tab.url.includes('x.com/i/grok')) {
+      tab.url.includes('x.com/i/grok') ||
+      tab.url.includes('grok.x.ai') ||
+      tab.url.includes('grok.com')) {
     // Inject content script if not already present
     chrome.scripting.executeScript({
       target: { tabId: tab.id },
