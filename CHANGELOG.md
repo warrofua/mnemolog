@@ -42,3 +42,4 @@
 - Setup frontend structure and database (Supabase).
 - Added `.gitignore`, `robots.txt`, and `config.js`.
 - Implemented basic auth, FAQ, conversation views, explore, and profile pages to form the initial MVP skeleton.
+- Conceptualized, researched the non-existence of such a thing as Mnemolog, and decided to execute
