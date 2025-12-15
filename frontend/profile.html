@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Your Archive — Mnemolog</title>
     <link rel="icon" href="/assets/mnemolog-fav-icon.svg" type="image/svg+xml">
-    <link rel="icon" href="/assets/mnemolog_icon_header_screenshot.png" type="image/png" sizes="32x32">
-    <link rel="apple-touch-icon" href="/assets/mnemolog_icon_header_screenshot.png">
+    <link rel="icon" href="/assets/mnemolog_og.png" type="image/png" sizes="180x180">
+    <link rel="apple-touch-icon" href="/assets/mnemolog_og.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
@@ -1125,8 +1125,8 @@
             try {
                 const userId = mnemolog.currentUser?.id;
                 const response = userId
-                  ? await mnemolog.getUserConversations(userId)
-                  : await mnemolog.getConversations({ user: 'me' });
+                  ? await mnemolog.getUserConversations(userId, { limit: 500 })
+                  : await mnemolog.getConversations({ user: 'me', limit: 500 });
                 const conversations = response.conversations || [];
 
                 loadingState.style.display = 'none';
@@ -1319,11 +1319,42 @@
         }
 
 
+        function getExcerpt(conv, isContinuation) {
+            const toText = (val) => {
+                if (!val) return '';
+                if (typeof val === 'string') return val;
+                if (val.text) return val.text;
+                if (val.content) return val.content;
+                return '';
+            };
+
+            const firstMessage = () => {
+                if (Array.isArray(conv.messages) && conv.messages.length) {
+                    const first = conv.messages[0];
+                    return toText(first?.content || first);
+                }
+                return '';
+            };
+
+            if (isContinuation) {
+                if (Array.isArray(conv.messages)) {
+                    const human = [...conv.messages].reverse().find(m => (m.role === 'human' || m.role === 'user') && (m.content || m));
+                    const hText = human ? toText(human.content || human) : '';
+                    if (hText) return hText;
+                }
+                if (conv.user_goal) return conv.user_goal;
+                if (conv.description) return conv.description;
+                const first = firstMessage();
+                if (first) return first;
+                return '';
+            } else {
+                return conv.description || firstMessage() || '';
+            }
+        }
+
         function renderConversationCard(conv) {
             const isContinuation = conv.parent_conversation_id || (conv.root_conversation_id && conv.root_conversation_id !== conv.id);
-            const excerpt = isContinuation
-                ? (conv.user_goal || conv.description || '')
-                : (conv.description || '');
+            const excerpt = getExcerpt(conv, isContinuation);
             const views = typeof conv.view_count === 'number' ? conv.view_count : 0;
             return `
                 <article class="conversation-item" data-id="${conv.id}">

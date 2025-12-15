@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Explore the Archive — Mnemolog</title>
     <link rel="icon" href="/assets/mnemolog-fav-icon.svg" type="image/svg+xml">
-    <link rel="icon" href="/assets/mnemolog_icon_header_screenshot.png" type="image/png" sizes="32x32">
-    <link rel="apple-touch-icon" href="/assets/mnemolog_icon_header_screenshot.png">
+    <link rel="icon" href="/assets/mnemolog_og.png" type="image/png" sizes="180x180">
+    <link rel="apple-touch-icon" href="/assets/mnemolog_og.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
@@ -1201,6 +1201,58 @@
             }
         }
 
+        function getExcerpt(conv, isContinuation) {
+            const toText = (val) => {
+                if (!val) return '';
+                if (typeof val === 'string') return val;
+                if (val.text) return val.text;
+                if (val.content) return val.content;
+                return '';
+            };
+
+            const getMessages = () => {
+                let msgs = conv.messages;
+                if (typeof msgs === 'string') {
+                    try {
+                        msgs = JSON.parse(msgs);
+                    } catch {
+                        msgs = [];
+                    }
+                }
+                return Array.isArray(msgs) ? msgs : [];
+            };
+
+            const firstMessage = () => {
+                const msgs = getMessages();
+                if (msgs.length) {
+                    const first = msgs[0];
+                    return toText(first?.content || first);
+                }
+                return '';
+            };
+
+            if (isContinuation) {
+                const msgs = getMessages();
+                if (msgs.length) {
+                    const human = [...msgs].reverse().find(m => (m.role === 'human' || m.role === 'user') && (m.content || m));
+                    const hText = human ? toText(human.content || human) : '';
+                    if (hText) return hText;
+                }
+                if (conv.user_goal) return conv.user_goal;
+                if (conv.description) return conv.description;
+                if (conv.content) return conv.content;
+                if (conv.excerpt) return conv.excerpt;
+                const first = firstMessage();
+                if (first) return first;
+                return '';
+            } else {
+                // Originals: use description; if missing, show first user message;
+                // then fall back to content/excerpt
+                const first = firstMessage();
+                return conv.description || first || conv.content || conv.excerpt || '';
+            }
+        }
+
         function buildCard(conv) {
             const card = document.createElement('a');
             card.href = `/c/${conv.id}`;
@@ -1210,9 +1262,11 @@
             const created = conv.created_at ? mnemolog.formatDate(conv.created_at) : '';
             const tags = Array.isArray(conv.tags) ? conv.tags : [];
             const isContinuation = mnemolog.isContinuation ? mnemolog.isContinuation(conv) : false;
-            const excerpt = isContinuation
-                ? (conv.user_goal || conv.description || conv.content || conv.excerpt || '')
-                : (conv.description || conv.content || conv.excerpt || '');
+            const excerpt = getExcerpt(conv, isContinuation)
+                || conv.user_goal
+                || (Array.isArray(conv.messages) && conv.messages.length ? (conv.messages[0]?.content || '') : '')
+                || conv.description
+                || '';
             const modelLabel = conv.model_display_name || conv.model_id || '';
             const attrib = conv.attribution_confidence;
             const attribText = attrib === 'verified' ? 'Verified' : attrib === 'inferred' ? 'Inferred' : attrib === 'claimed' ? 'Claimed' : '';
@@ -1255,9 +1309,11 @@
                 const platformLabel = (mnemolog.platformNames && mnemolog.platformNames[conv.platform]) || conv.platform || 'Conversation';
                 const created = conv.created_at ? mnemolog.formatDate(conv.created_at) : '';
                 const isContinuation = mnemolog.isContinuation ? mnemolog.isContinuation(conv) : false;
-                const excerpt = isContinuation
-                    ? (conv.user_goal || conv.description || conv.content || conv.excerpt || '')
-                    : (conv.description || conv.content || conv.excerpt || '');
+                const excerpt = getExcerpt(conv, isContinuation)
+                    || conv.user_goal
+                    || (Array.isArray(conv.messages) && conv.messages.length ? (conv.messages[0]?.content || '') : '')
+                    || conv.description
+                    || '';
                 const modelLabel = conv.model_display_name || conv.model_id || '';
                 const views = typeof conv.view_count === 'number' ? conv.view_count : 0;
                 const attrib = conv.attribution_confidence;

@@ -31,7 +31,7 @@ Deno.serve(async (req: Request) => {
       return json({ error: 'Invalid JSON' }, 400);
     }
 
-    const { conversation_id, mode = 'continue', user_goal, chat } = body;
+    const { conversation_id, mode = 'continue', user_goal, chat, fork_message_index, messages_snapshot } = body;
     if (!conversation_id) return json({ error: 'conversation_id required' }, 400);
 
     const { data: userData, error: userErr } = await supabase.auth.getUser();
@@ -53,19 +53,21 @@ Deno.serve(async (req: Request) => {
       return '';
     };
 
-    // Build lineage chain (root -> current)
+    // Build lineage chain (root -> current); for forks, use only the forked convo slice
     const chain: any[] = [];
     let cursor: any = convo;
     chain.unshift(cursor);
-    while (cursor.parent_conversation_id) {
-      const { data: parent } = await supabase
-        .from('conversations')
-        .select('*')
-        .eq('id', cursor.parent_conversation_id)
-        .single();
-      if (!parent) break;
-      chain.unshift(parent);
-      cursor = parent;
+    if (convo.intent_type !== 'fork') {
+      while (cursor.parent_conversation_id) {
+        const { data: parent } = await supabase
+          .from('conversations')
+          .select('*')
+          .eq('id', cursor.parent_conversation_id)
+          .single();
+        if (!parent) break;
+        chain.unshift(parent);
+        cursor = parent;
+      }
     }
 
     // Flatten messages from chain (table first, fallback JSON)
@@ -417,6 +419,80 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    // Fork path: create a child convo and copy snapshot (or slice) of messages, no generation
+    const doFork = typeof fork_message_index === 'number' || (Array.isArray(messages_snapshot) && messages_snapshot.length);
+    if (doFork) {
+      const rootId = convo.root_conversation_id || convo.id;
+      const { data: newConvo, error: newConvoErr } = await supabase
+        .from('conversations')
+        .insert({
+          user_id: user.id,
+          title: convo.title || 'Continuation',
+          description: convo.description,
+          platform: convo.platform,
+          tags: convo.tags,
+          is_public: convo.is_public,
+          show_author: convo.show_author,
+          root_conversation_id: rootId,
+          parent_conversation_id: convo.id,
+          provider: 'mnemolog_native',
+          model: 'deepseek-v3.2',
+          intent_type: mode === 'fork' ? 'fork' : mode,
+          user_goal,
+          source: 'web',
+        })
+        .select()
+        .single();
+
+      if (newConvoErr || !newConvo) return json({ error: 'Create fork failed' }, 500);
+
+      let slice: any[] = [];
+      if (Array.isArray(messages_snapshot) && messages_snapshot.length) {
+        slice = messages_snapshot;
+      } else {
+        // fetch messages from table
+        const { data: msgRows } = await supabase
+          .from('messages')
+          .select('role, content, order_index')
+          .eq('conversation_id', conversation_id)
+          .order('order_index', { ascending: true });
+        if (msgRows && msgRows.length) {
+          const idx = Math.min(Math.max(0, fork_message_index as number), msgRows.length - 1);
+          slice = msgRows.slice(0, idx + 1).map(m => ({
+            role: m.role === 'assistant' ? 'assistant' : 'human',
+            content: m.content?.text ?? m.content ?? '',
+          }));
+        } else if (Array.isArray(convo.messages) && convo.messages.length) {
+          const idx = Math.min(Math.max(0, fork_message_index as number), convo.messages.length - 1);
+          slice = convo.messages.slice(0, idx + 1).map((m: any) => ({
+            role: m.role === 'assistant' ? 'assistant' : 'human',
+            content: extractContent(m),
+          }));
+        }
+      }
+
+      // Normalize slice to human/assistant only and drop any items beyond requested index
+      slice = slice
+        .filter((m) => m && (m.role === 'human' || m.role === 'assistant'))
+        .map((m) => ({ role: m.role, content: extractContent(m) }));
+
+      if (slice.length) {
+        const rows = slice.map((m, i) => ({
+          conversation_id: newConvo.id,
+          role: m.role === 'assistant' ? 'assistant' : 'human',
+          content: { text: extractContent(m) },
+          order_index: i,
+        }));
+        try {
+          await supabase.from('messages').insert(rows);
+        } catch (err) {
+          console.error('Fork insert messages failed', err);
+        }
+      }
+
+      return json({ conversation_id: newConvo.id });
+    }
+
     // Non-chat: create child, return conversation_id immediately, let client trigger generation
     const rootId = convo.root_conversation_id || convo.id;
     const { data: newConvo, error: newConvoErr } = await supabase
@@ -441,6 +517,23 @@ Deno.serve(async (req: Request) => {
       .single();
 
     if (newConvoErr || !newConvo) return json({ error: 'Create continuation failed' }, 500);
+
+    // Record the user's continuation choice as a human message so cards/previews have context
+    const continuationText = (typeof user_goal === 'string' && user_goal.trim().length)
+      ? user_goal.trim()
+      : `Continue conversation (mode: ${mode})`;
+
+    try {
+      await supabase.from('messages').insert({
+        conversation_id: newConvo.id,
+        role: 'human',
+        content: { text: continuationText },
+        order_index: 0,
+      });
+    } catch (err) {
+      console.error('Failed to record continuation selection', err);
+    }
+
     // Respond immediately so the client can redirect to /c/<id> and start streaming there
     return json({ conversation_id: newConvo.id });
   } catch (err: any) {

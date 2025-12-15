@@ -7,12 +7,12 @@
     <meta property="og:title" content="Conversation — Mnemolog">
     <meta property="og:description" content="A shared conversation on Mnemolog.">
     <meta property="og:type" content="article">
-    <meta property="og:image" content="https://mnemolog.com/assets/mnemolog_icon_header_screenshot.png">
+    <meta property="og:image" content="https://mnemolog.com/assets/mnemolog_og.png">
     <meta property="twitter:card" content="summary">
-    <meta property="twitter:image" content="https://mnemolog.com/assets/mnemolog_icon_header_screenshot.png">
+    <meta property="twitter:image" content="https://mnemolog.com/assets/mnemolog_og.png">
     <link rel="icon" href="/assets/mnemolog-fav-icon.svg" type="image/svg+xml">
-    <link rel="icon" href="/assets/mnemolog_icon_header_screenshot.png" type="image/png" sizes="32x32">
-    <link rel="apple-touch-icon" href="/assets/mnemolog_icon_header_screenshot.png">
+    <link rel="icon" href="/assets/mnemolog_og.png" type="image/png" sizes="180x180">
+    <link rel="apple-touch-icon" href="/assets/mnemolog_og.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
@@ -164,6 +164,37 @@
             flex-wrap: wrap;
             justify-content: flex-start;
             position: relative;
+        }
+
+        .fork-btn {
+            position: absolute;
+            top: 8px;
+            right: 10px;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 4px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .fork-btn svg {
+            width: 26px;
+            height: 26px;
+        }
+        .fork-btn:hover {
+            color: var(--accent);
+        }
+
+        .copy-md-btn {
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+        }
+        .copy-md-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
         }
 
         .author-avatar {
@@ -326,6 +357,7 @@
             padding: 1.5rem;
             border-radius: 8px;
             border: 1px solid var(--border);
+            position: relative;
         }
 
         .message.loading {
@@ -463,6 +495,73 @@
         .btn-compact {
             padding: 0.35rem 0.6rem;
             font-size: 0.85rem;
+        }
+
+        /* Lineage graph */
+        .lineage-container {
+            margin-top: 1.5rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg-warm);
+        }
+        .lineage-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 0.85rem 1rem;
+        }
+        .lineage-canvas {
+            width: 100%;
+            height: 360px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--bg);
+            position: relative;
+            overflow: hidden;
+            margin: 0 1rem 1rem;
+        }
+        .lineage-legend {
+            position: absolute;
+            right: 12px;
+            bottom: 12px;
+            background: rgba(0,0,0,0.6);
+            color: #fff;
+            padding: 0.4rem 0.6rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            display: flex;
+            gap: 0.6rem;
+            align-items: center;
+        }
+        .lineage-legend span {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .lineage-toolbar {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        .lineage-tooltip {
+            position: absolute;
+            pointer-events: none;
+            background: rgba(0,0,0,0.75);
+            color: #fff;
+            padding: 0.4rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            display: none;
+            z-index: 5;
+            max-width: 240px;
         }
 
         .share-bar {
@@ -652,6 +751,7 @@
                     </svg>
                     <span class="tooltip-text">Click to continue a version of this AI chat with Nemo (DeepSeek v3.2).</span>
                 </button>
+                <button class="btn copy-md-btn" id="copy-md-btn" type="button">Continue on another platform</button>
             </div>
         </header>
 
@@ -663,12 +763,31 @@
             <div class="continuations-list" id="continuations-list-top"></div>
         </div>
 
+        <div class="lineage-container">
+            <div class="lineage-header" id="lineage-toggle">
+                <h3 style="margin:0;">Lineage Graph</h3>
+                <div class="lineage-toolbar">
+                    <button class="btn btn-secondary btn-compact" id="lineage-refresh" type="button">Refresh</button>
+                    <button class="btn btn-secondary btn-compact" id="lineage-collapse" type="button">Collapse</button>
+                </div>
+            </div>
+            <div class="lineage-canvas" id="lineage-canvas">
+                <div class="lineage-tooltip" id="lineage-tooltip"></div>
+                <div class="lineage-legend">
+                    <span><span class="legend-dot" style="background:#b8860b;"></span>Root / Current</span>
+                    <span><span class="legend-dot" style="background:#2e7d4a;"></span>Continuation</span>
+                    <span><span class="legend-dot" style="background:#8a5adf;"></span>Fork</span>
+                </div>
+            </div>
+        </div>
+
             <div class="messages" id="messages"></div>
 
             <div class="chat-composer" id="chat-box" style="display:none;">
                 <label for="chat-input" style="font-weight:600;">Send a follow-up</label>
                 <textarea id="chat-input" placeholder="Ask a follow-up or continue the thread..."></textarea>
-                <div class="chat-actions">
+                <div class="chat-actions" style="align-items:center; gap:0.5rem;">
+                    <button class="btn copy-md-btn" id="copy-md-btn-bottom" type="button">Continue on another platform</button>
                     <div class="chat-error" id="chat-error"></div>
                     <div class="chat-loading" id="chat-loading"></div>
                     <button class="btn btn-primary" id="chat-send" type="button">Send</button>
@@ -775,11 +894,13 @@
 
         let currentConversationId = null;
         let currentMessages = [];
+        let loadedConversation = null;
         let isGenerating = false;
         let chatBoxDisplay = '';
         let waitingEl = null;
         let loadingPlaceholder = null;
         let userScrollInterrupt = false;
+        let lineageData = null;
 
         async function loadConversation() {
             const id = getConversationId();
@@ -790,13 +911,30 @@
                 await mnemolog.checkAuth();
                 const { conversation } = await mnemolog.getConversation(id);
                 if (!conversation) { showError(); return; }
+                loadedConversation = conversation;
                 currentConversationId = conversation.id;
                 currentMessages = await loadLineageMessages(conversation);
             renderConversation(conversation);
             renderContinuations(conversation.children || []);
+            await loadLineage(conversation.id);
             // If we arrived from a continuation redirect, start streaming the assistant
             if (window.location.hash === '#stream') {
                 await maybeStartGeneration(conversation);
+            }
+            const copyBtn = document.getElementById('copy-md-btn');
+            if (copyBtn) copyBtn.onclick = copyConversationMarkdown;
+            const copyBtnBottom = document.getElementById('copy-md-btn-bottom');
+            if (copyBtnBottom) copyBtnBottom.onclick = copyConversationMarkdown;
+            const collapseBtn = document.getElementById('lineage-collapse');
+            if (collapseBtn) {
+                collapseBtn.onclick = () => {
+                    const canvas = document.getElementById('lineage-canvas');
+                    const icon = collapseBtn;
+                    if (!canvas) return;
+                    const hidden = canvas.style.display === 'none';
+                    canvas.style.display = hidden ? 'block' : 'none';
+                    icon.textContent = hidden ? 'Collapse' : 'Expand';
+                };
             }
             setupTooltip();
         } catch (err) {
@@ -815,14 +953,16 @@
             const chain = [];
             let cursor = conversation;
             chain.unshift(cursor);
-            while (cursor.parent_conversation_id) {
-                try {
-                    const { conversation: parent } = await mnemolog.getConversation(cursor.parent_conversation_id);
-                    if (!parent) break;
-                    chain.unshift(parent);
-                    cursor = parent;
-                } catch (e) {
-                    break;
+            if (conversation.intent_type !== 'fork') {
+                while (cursor.parent_conversation_id) {
+                    try {
+                        const { conversation: parent } = await mnemolog.getConversation(cursor.parent_conversation_id);
+                        if (!parent) break;
+                        chain.unshift(parent);
+                        cursor = parent;
+                    } catch (e) {
+                        break;
+                    }
                 }
             }
             const merged = [];
@@ -836,6 +976,160 @@
             });
             return merged;
         }
+
+        async function loadLineage(convoId) {
+            const canvas = document.getElementById('lineage-canvas');
+            const tooltip = document.getElementById('lineage-tooltip');
+            if (!canvas) return;
+            try {
+                const resp = await fetch(`/api/conversations/${convoId}/lineage`);
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.error || 'Failed to load lineage');
+                lineageData = data;
+                renderLineage(data);
+                const refresh = document.getElementById('lineage-refresh');
+                if (refresh) refresh.onclick = () => loadLineage(convoId);
+            } catch (err) {
+                console.error('Lineage load error', err);
+                canvas.innerHTML = '<div style=\"padding:1rem;\">Lineage unavailable.</div>';
+            }
+        }
+
+        function renderLineage(data) {
+            const canvas = document.getElementById('lineage-canvas');
+            const tooltip = document.getElementById('lineage-tooltip');
+            if (!canvas || !data || !data.nodes) return;
+
+            const nodes = data.nodes;
+            const rootId = data.root_id;
+
+            // Build children map (order by created_at to keep stable)
+            const byId = new Map(nodes.map(n => [n.id, n]));
+            const children = {};
+            nodes.forEach(n => {
+                if (n.parent_conversation_id) {
+                    children[n.parent_conversation_id] = children[n.parent_conversation_id] || [];
+                    children[n.parent_conversation_id].push(n);
+                }
+            });
+            Object.values(children).forEach((arr) => {
+                arr.sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
+            });
+
+            // Simple tidy tree: assign x by in-order traversal of leaves; parent x = mean of children
+            let leafIndex = 0;
+            let maxDepth = 0;
+            const assignPos = (id, depth) => {
+                const node = byId.get(id);
+                if (!node) return;
+                maxDepth = Math.max(maxDepth, depth);
+                const kids = children[id] || [];
+                if (!kids.length) {
+                    node._layout = { depth, x: leafIndex++ };
+                } else {
+                    kids.forEach(k => assignPos(k.id, depth + 1));
+                    const xs = kids.map(k => (byId.get(k.id)?._layout?.x || 0));
+                    const avg = xs.reduce((a, b) => a + b, 0) / xs.length;
+                    node._layout = { depth, x: avg };
+                }
+            };
+
+            assignPos(rootId, 0);
+
+            const totalLeaves = Math.max(leafIndex, 1);
+            const widthPx = 900;
+            const heightPx = Math.max(360, (maxDepth + 1) * 140);
+            const padding = 40;
+            const scaleX = totalLeaves > 1 ? (widthPx - padding * 2) / (totalLeaves - 1) : (widthPx - padding * 2);
+            const scaleY = heightPx / Math.max(1, maxDepth + 1);
+
+            // Center nodes horizontally if there are gaps
+            const minX = Math.min(...nodes.map(n => n._layout?.x || 0));
+            nodes.forEach(n => {
+                if (n._layout) n._layout.x = n._layout.x - minX;
+            });
+
+            const svgParts = [];
+            svgParts.push(`<svg width=\"100%\" height=\"100%\" viewBox=\"0 0 ${widthPx} ${heightPx}\" preserveAspectRatio=\"xMidYMid meet\">`);
+
+            // Edges
+            nodes.forEach(n => {
+                const kids = children[n.id] || [];
+                kids.forEach(k => {
+                    const from = n._layout;
+                    const to = k._layout;
+                    if (!from || !to) return;
+                    const x1 = from.x * scaleX;
+                    const y1 = (from.depth + 1) * scaleY - (scaleY * 0.6);
+                    const x2 = to.x * scaleX;
+                    const y2 = (to.depth + 1) * scaleY - (scaleY * 0.6);
+                    const isFork = k.intent_type === 'fork';
+                    svgParts.push(`<line x1=\"${x1}\" y1=\"${y1}\" x2=\"${x2}\" y2=\"${y2}\" stroke=\"currentColor\" stroke-width=\"1.4\" ${isFork ? 'stroke-dasharray=\"4 3\"' : ''} />`);
+                });
+            });
+
+            // Nodes
+            nodes.forEach(n => {
+                const lay = n._layout;
+                if (!lay) return;
+                const x = lay.x * scaleX;
+                const y = (lay.depth + 1) * scaleY - (scaleY * 0.6);
+                const isRoot = n.id === rootId;
+                const isFork = n.intent_type === 'fork';
+                const color = isRoot ? '#b8860b' : isFork ? '#8a5adf' : '#2e7d4a';
+                const isCurrent = n.id === currentConversationId;
+                svgParts.push(`<g class=\"node\" data-id=\"${n.id}\" transform=\"translate(${x},${y})\" cursor=\"pointer\">`);
+                const radius = isCurrent ? 18 : 16;
+                const ring = isCurrent ? `<circle cx=\"0\" cy=\"0\" r=\"20\" fill=\"none\" stroke=\"#b8860b\" stroke-width=\"2.5\" />` : '';
+                svgParts.push(ring);
+                svgParts.push(`<circle cx=\"0\" cy=\"0\" r=\"${radius}\" fill=\"${color}\" opacity=\"0.15\" stroke=\"${color}\" stroke-width=\"1.5\" />`);
+                svgParts.push(`<text x=\"0\" y=\"5\" text-anchor=\"middle\" fill=\"${color}\" font-size=\"10\" font-weight=\"600\">${isRoot ? 'Root' : isFork ? 'Fork' : 'Cont'}</text>`);
+                svgParts.push(`</g>`);
+            });
+
+            svgParts.push(`</svg>`);
+            canvas.innerHTML = svgParts.join('');
+
+            // Re-attach tooltip/legend overlay
+            const legendHtml = `
+                <div class="lineage-legend">
+                    <span><span class="legend-dot" style="background:#b8860b;"></span>Root / Current</span>
+                    <span><span class="legend-dot" style="background:#2e7d4a;"></span>Continuation</span>
+                    <span><span class="legend-dot" style="background:#8a5adf;"></span>Fork</span>
+                </div>
+            `;
+            canvas.insertAdjacentHTML('beforeend', legendHtml);
+            canvas.appendChild(tooltip);
+
+            // Interactions
+            const svg = canvas.querySelector('svg');
+            if (!svg) return;
+            svg.querySelectorAll('.node').forEach((g) => {
+                const id = g.getAttribute('data-id');
+                const node = byId.get(id);
+                if (!node) return;
+                g.addEventListener('mouseenter', () => {
+                    if (!tooltip) return;
+                    const rect = canvas.getBoundingClientRect();
+                    const box = g.getBoundingClientRect();
+                    tooltip.style.display = 'block';
+                    tooltip.style.left = `${box.left - rect.left + 20}px`;
+                    tooltip.style.top = `${box.top - rect.top - 10}px`;
+                    const title = escapeHtml(node.title || 'Conversation');
+                    const date = node.created_at ? formatDate(node.created_at) : '';
+                    const views = node.view_count || 0;
+                    const goal = escapeHtml(node.user_goal || '');
+                    tooltip.innerHTML = `<div style=\"font-weight:600;\">${title}</div><div>${date} · ${views} views</div>${goal ? `<div>Goal: ${goal}</div>` : ''}`;
+                });
+                g.addEventListener('mouseleave', () => {
+                    if (tooltip) tooltip.style.display = 'none';
+                });
+                g.addEventListener('click', () => {
+                    window.location.href = `/c/${id}`;
+                });
+            });
+        }
+
 
         function renderContinuations(children) {
             const panels = [
@@ -994,7 +1288,7 @@
 
         function renderMessages() {
             const container = document.getElementById('messages');
-            container.innerHTML = (currentMessages || []).map(msg => {
+            container.innerHTML = (currentMessages || []).map((msg, idx) => {
                 if (msg.loading) {
                     return `
                         <div class="message loading">
@@ -1014,6 +1308,15 @@
                 return `
                     <div class="message ${msg.role}">
                         <div class="message-role">${msg.role === 'human' ? 'Human' : 'AI'}</div>
+                        <button class="fork-btn" data-idx="${idx}" type="button" title="Fork from here" onclick="forkFromMessage(${idx})">
+                            <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M8 6v10c0 4 3 7 7 7h6"/>
+                                <path d="M15 23v6"/>
+                                <path d="M13 16h12"/>
+                                <path d="M25 16l-3 3"/>
+                                <path d="M25 16l-3 -3"/>
+                            </svg>
+                        </button>
                         <div class="message-content">${formatContent(msg.content)}</div>
                     </div>
                 `;
@@ -1066,6 +1369,79 @@
                     submit.textContent = 'Send';
                 }
             };
+        }
+
+        function messageText(msg) {
+            if (!msg) return '';
+            if (typeof msg === 'string') return msg;
+            if (msg.content && typeof msg.content === 'string') return msg.content;
+            if (msg.content && msg.content.text) return msg.content.text;
+            if (msg.content && msg.content.content) return msg.content.content;
+            return '';
+        }
+
+        async function forkFromMessage(idx) {
+            if (!currentConversationId) return;
+            try {
+                // Build a clean snapshot up to and including idx, human/assistant only
+                const snapshot = (currentMessages || [])
+                    .slice(0, idx + 1)
+                    .filter(m => m.role === 'human' || m.role === 'assistant')
+                    .map(m => ({
+                        role: m.role,
+                        content: messageText(m),
+                    }));
+
+                const resp = await fetch(`/api/conversations/${currentConversationId}/fork`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(window.mnemolog?.currentSession?.access_token ? { 'Authorization': `Bearer ${window.mnemolog.currentSession.access_token}` } : {})
+                    },
+                    body: JSON.stringify({ fork_message_index: idx, messages_snapshot: snapshot, mode: 'fork' })
+                });
+                const data = await resp.json();
+                if (!resp.ok) {
+                    alert(data.error || 'Failed to fork conversation.');
+                    return;
+                }
+                if (data.conversation_id) {
+                    window.location.href = `/c/${data.conversation_id}#stream`;
+                }
+            } catch (err) {
+                console.error('Fork failed', err);
+                alert('Failed to fork conversation.');
+            }
+        }
+
+        async function copyConversationMarkdown() {
+            if (!loadedConversation || !currentMessages.length) {
+                alert('Conversation not loaded yet.');
+                return;
+            }
+            const lines = [];
+            lines.push(`# ${loadedConversation.title || 'Conversation'}`);
+            lines.push(`Source: https://mnemolog.com/c/${loadedConversation.id}`);
+            if (loadedConversation.platform) lines.push(`Platform: ${loadedConversation.platform}`);
+            lines.push('');
+            currentMessages.forEach(m => {
+                if (m.role === 'meta') return;
+                const role = m.role === 'assistant' ? 'AI' : 'Human';
+                const text = messageText(m);
+                if (text) {
+                    lines.push(`**${role}:**`);
+                    lines.push(text);
+                    lines.push('');
+                }
+            });
+            const md = lines.join('\n').trim();
+            try {
+                await navigator.clipboard.writeText(md);
+                alert('Conversation copied in Markdown. Paste into your preferred platform.');
+            } catch (err) {
+                console.error('Clipboard copy failed', err);
+                alert('Could not copy to clipboard.');
+            }
         }
 
         function copyLink() {

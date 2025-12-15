@@ -453,6 +453,7 @@ router.put('/api/conversations/:id', async (request: IRequest, env: Env) => {
       id,
       title,
       description,
+      messages,
       platform,
       tags,
       created_at,
@@ -514,6 +515,7 @@ router.get('/api/conversations', async (request: IRequest, env: Env) => {
       parent_conversation_id,
       title,
       description,
+      messages,
       platform,
       tags,
       created_at,
@@ -577,10 +579,40 @@ router.get('/api/conversations', async (request: IRequest, env: Env) => {
     return json({ error: `Failed to fetch conversations: ${error.message || 'unknown error'}` }, 500);
   }
 
-  const conversations = data?.map(c => ({
-    ...c,
-    profiles: undefined, // profiles omitted in list view
-  }));
+  // Attach first message from messages table (if exists) to help build excerpts in list views
+  let firstMessageMap: Record<string, { role: string; content: any }> = {};
+  try {
+    const ids = (data || []).map((c: any) => c.id).filter(Boolean);
+    if (ids.length) {
+      const { data: msgRows, error: msgErr } = await supabase
+        .from('messages')
+        .select('conversation_id, role, content, order_index')
+        .in('conversation_id', ids)
+        .order('order_index', { ascending: true });
+      if (!msgErr && msgRows) {
+        for (const row of msgRows) {
+          if (firstMessageMap[row.conversation_id]) continue; // keep earliest
+          firstMessageMap[row.conversation_id] = {
+            role: row.role === 'assistant' ? 'assistant' : 'human',
+            content: row.content?.text ?? row.content ?? '',
+          };
+        }
+      }
+    }
+  } catch (err) {
+    console.error('List messages fetch error:', err);
+  }
+
+  const conversations = data?.map(c => {
+    const mergedMessages = Array.isArray(c.messages) ? c.messages : (c.messages ? c.messages : []);
+    const firstTableMsg = firstMessageMap[c.id];
+    const messages = firstTableMsg ? [firstTableMsg, ...mergedMessages] : mergedMessages;
+    return {
+      ...c,
+      messages,
+      profiles: undefined, // profiles omitted in list view
+    };
+  });
 
   return json({ conversations, count });
 });
@@ -707,6 +739,69 @@ router.get('/api/conversations/:id', async (request: IRequest, env: Env) => {
   }
 
   return json({ conversation });
+});
+
+// Lineage: return root + all descendants for a conversation
+router.get('/api/conversations/:id/lineage', async (request: IRequest, env: Env) => {
+  const { id } = request.params;
+  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
+
+  // Get the conversation to identify root
+  const { data: convo, error: convoErr } = await supabase
+    .from('conversations')
+    .select('id, root_conversation_id, parent_conversation_id')
+    .eq('id', id)
+    .single();
+
+  if (convoErr || !convo) return json({ error: 'Conversation not found' }, 404);
+
+  const rootId = convo.root_conversation_id || convo.id;
+
+  // Fetch all in the lineage (root + descendants)
+  const { data, error } = await supabase
+    .from('conversations')
+    .select(`
+      id,
+      parent_conversation_id,
+      root_conversation_id,
+      title,
+      intent_type,
+      user_goal,
+      model_display_name,
+      created_at,
+      view_count
+    `)
+    .eq('root_conversation_id', rootId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Lineage fetch error:', error);
+    return json({ error: 'Failed to fetch lineage' }, 500);
+  }
+
+  // Ensure root is included
+  const nodes = data || [];
+  const hasRoot = nodes.some(n => n.id === rootId);
+  if (!hasRoot) {
+    const { data: rootRow } = await supabase
+      .from('conversations')
+      .select(`
+        id,
+        parent_conversation_id,
+        root_conversation_id,
+        title,
+        intent_type,
+        user_goal,
+        model_display_name,
+        created_at,
+        view_count
+      `)
+      .eq('id', rootId)
+      .single();
+    if (rootRow) nodes.unshift(rootRow);
+  }
+
+  return json({ root_id: rootId, nodes });
 });
 
 // Bookmarks - list for current user
@@ -1006,6 +1101,53 @@ router.post('/api/conversations/:id/continue-stream', async (request: IRequest, 
     headers,
     body: JSON.stringify({ conversation_id: id, mode, user_goal, chat: false }),
   });
+  const respHeaders = new Headers(resp.headers);
+  respHeaders.set('Access-Control-Allow-Origin', '*');
+  respHeaders.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  respHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  const text = await resp.text();
+  return new Response(text, {
+    status: resp.status,
+    headers: respHeaders,
+  });
+});
+
+// Fork conversation up to a message index (no generation)
+router.post('/api/conversations/:id/fork', async (request: IRequest, env: Env) => {
+  const authHeader = request.headers.get('Authorization') || undefined;
+  const { id } = request.params;
+
+  if (!env.SUPABASE_URL) return json({ error: 'Service misconfigured' }, 500);
+  let body: any;
+  try {
+    body = await request.json();
+  } catch {
+    body = {};
+  }
+  const fork_message_index = typeof body?.fork_message_index === 'number' ? body.fork_message_index : undefined;
+  const messages_snapshot = Array.isArray(body?.messages_snapshot) ? body.messages_snapshot : undefined;
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (authHeader) headers['Authorization'] = authHeader;
+
+  const resp = await fetch(`${env.SUPABASE_URL}/functions/v1/continue`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      conversation_id: id,
+      mode: body?.mode || 'continue',
+      // mark as fork to keep context limited
+      mode: 'fork',
+      user_goal: body?.user_goal,
+      fork_message_index,
+      messages_snapshot,
+      chat: false,
+    }),
+  });
+
   const respHeaders = new Headers(resp.headers);
   respHeaders.set('Access-Control-Allow-Origin', '*');
   respHeaders.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
