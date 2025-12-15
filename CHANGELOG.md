@@ -1,5 +1,15 @@
 # Changelog
 
+## 2025-12-15
+- Added conversation Lineage Graph on conversation pages with refresh/collapse controls, node highlighting for the current convo, legend, padding/spacing for branches, and click-to-navigate.
+- Fork handling wired to the graph: forks and continuations branch correctly, sorted by creation time; graph shows full lineage from the root.
+- Lineage endpoint added to the worker (`/api/conversations/:id/lineage`) for root+descendants fetching.
+
+## 2025-12-14
+- Per-message fork actions: create a child conversation sliced up to the selected turn, redirect with streaming; fork intent isolated from parent chains.
+- Copy-to-Markdown buttons (top/bottom) to export conversations for other platforms.
+- Explore/Profile excerpts improved: use first message when description is missing; list API attaches first messages to cards.
+
 ## 2025-12-13
 - Extension “Preview & Edit” now persists data via `chrome.storage` and loads reliably on the share page; attribution/provenance fields (model_id/display/platform_conversation_id, PII flags, source='extension') are preserved when publishing.
 - Grok extraction: added grok.com support, x.com header stripping (“Grok … / Thinking / Beta”), model detection (Grok 4.1 (Beta)), and stronger echo-pruning/role alternation to reduce duplicate AI/human turns.
