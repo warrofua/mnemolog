@@ -619,16 +619,42 @@ router.get('/api/conversations', async (request: IRequest, env: Env) => {
 
 // Trending tags (last 24h)
 router.get('/api/tags/trending', async (request: IRequest, env: Env) => {
-  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const { data, error } = await supabase
-    .from('conversations')
-    .select('tags')
-    .eq('is_public', true)
-    .gte('created_at', since)
-    .limit(500);
+  const supabaseKey = env.SUPABASE_SERVICE_KEY || env.SUPABASE_ANON_KEY;
+  const usingServiceKey = !!env.SUPABASE_SERVICE_KEY;
+  const supabase = createClient(env.SUPABASE_URL, supabaseKey);
+  const windows = [
+    { label: '24h', ms: 24 * 60 * 60 * 1000 },
+    { label: '7d', ms: 7 * 24 * 60 * 60 * 1000 },
+    { label: 'all', ms: null },
+  ];
+  let data: any[] | null = null;
+  let error: any = null;
+  let windowLabel = windows[0].label;
+  for (const window of windows) {
+    let query = supabase
+      .from('conversations')
+      .select('tags')
+      .eq('is_public', true)
+      .order('created_at', { ascending: false })
+      .limit(500);
+    if (window.ms) {
+      const since = new Date(Date.now() - window.ms).toISOString();
+      query = query.gte('created_at', since);
+    }
+    const result = await query;
+    data = result.data || [];
+    error = result.error;
+    if (error) break;
+    if (data.length) {
+      windowLabel = window.label;
+      break;
+    }
+  }
 
   if (error) {
+    if (!usingServiceKey) {
+      console.warn('Trending tags query failed without service key; check RLS/policies.', error);
+    }
     console.error('Trending tags error:', error);
     return json({ error: 'Failed to fetch tags' }, 500);
   }
@@ -647,7 +673,7 @@ router.get('/api/tags/trending', async (request: IRequest, env: Env) => {
     .slice(0, 20)
     .map(([tag, count]) => ({ tag, count }));
 
-  return json({ tags });
+  return json({ tags, window: windowLabel });
 });
 
 // Get single conversation
@@ -744,26 +770,40 @@ router.get('/api/conversations/:id', async (request: IRequest, env: Env) => {
 // Lineage: return root + all descendants for a conversation
 router.get('/api/conversations/:id/lineage', async (request: IRequest, env: Env) => {
   const { id } = request.params;
-  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
+  const authHeader = request.headers.get('Authorization') || undefined;
+  const authClient = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+    global: {
+      headers: authHeader ? { Authorization: authHeader } : {},
+    },
+  });
+  const user = await getUser(request, authClient);
+  const supabaseKey = env.SUPABASE_SERVICE_KEY || env.SUPABASE_ANON_KEY;
+  const usingServiceKey = !!env.SUPABASE_SERVICE_KEY;
+  const supabase = createClient(env.SUPABASE_URL, supabaseKey);
 
   // Get the conversation to identify root
   const { data: convo, error: convoErr } = await supabase
     .from('conversations')
-    .select('id, root_conversation_id, parent_conversation_id')
+    .select('id, root_conversation_id, parent_conversation_id, is_public, user_id')
     .eq('id', id)
     .single();
 
   if (convoErr || !convo) return json({ error: 'Conversation not found' }, 404);
+  if (!convo.is_public && convo.user_id !== user?.id) {
+    return json({ error: 'Conversation not found' }, 404);
+  }
 
   const rootId = convo.root_conversation_id || convo.id;
 
   // Fetch all in the lineage (root + descendants)
-  const { data, error } = await supabase
+  let query = supabase
     .from('conversations')
     .select(`
       id,
       parent_conversation_id,
       root_conversation_id,
+      is_public,
+      user_id,
       title,
       intent_type,
       user_goal,
@@ -773,8 +813,17 @@ router.get('/api/conversations/:id/lineage', async (request: IRequest, env: Env)
     `)
     .eq('root_conversation_id', rootId)
     .order('created_at', { ascending: true });
+  if (user?.id) {
+    query = query.or(`is_public.eq.true,user_id.eq.${user.id}`);
+  } else {
+    query = query.eq('is_public', true);
+  }
+  const { data, error } = await query;
 
   if (error) {
+    if (!usingServiceKey) {
+      console.warn('Lineage query failed without service key; check RLS/policies.', error);
+    }
     console.error('Lineage fetch error:', error);
     return json({ error: 'Failed to fetch lineage' }, 500);
   }
@@ -783,12 +832,14 @@ router.get('/api/conversations/:id/lineage', async (request: IRequest, env: Env)
   const nodes = data || [];
   const hasRoot = nodes.some(n => n.id === rootId);
   if (!hasRoot) {
-    const { data: rootRow } = await supabase
+    let rootQuery = supabase
       .from('conversations')
       .select(`
         id,
         parent_conversation_id,
         root_conversation_id,
+        is_public,
+        user_id,
         title,
         intent_type,
         user_goal,
@@ -796,12 +847,18 @@ router.get('/api/conversations/:id/lineage', async (request: IRequest, env: Env)
         created_at,
         view_count
       `)
-      .eq('id', rootId)
-      .single();
+      .eq('id', rootId);
+    if (user?.id) {
+      rootQuery = rootQuery.or(`is_public.eq.true,user_id.eq.${user.id}`);
+    } else {
+      rootQuery = rootQuery.eq('is_public', true);
+    }
+    const { data: rootRow } = await rootQuery.single();
     if (rootRow) nodes.unshift(rootRow);
   }
 
-  return json({ root_id: rootId, nodes });
+  const sanitizedNodes = nodes.map(({ is_public, user_id, ...rest }) => rest);
+  return json({ root_id: rootId, nodes: sanitizedNodes });
 });
 
 // Bookmarks - list for current user
@@ -1138,7 +1195,6 @@ router.post('/api/conversations/:id/fork', async (request: IRequest, env: Env) =
     headers,
     body: JSON.stringify({
       conversation_id: id,
-      mode: body?.mode || 'continue',
       // mark as fork to keep context limited
       mode: 'fork',
       user_goal: body?.user_goal,

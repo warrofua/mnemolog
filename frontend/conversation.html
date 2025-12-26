@@ -519,7 +519,7 @@
             background: var(--bg);
             position: relative;
             overflow: hidden;
-            margin: 0 1rem 1rem;
+            margin: 0 0 1rem;
         }
         .lineage-legend {
             position: absolute;
@@ -1042,6 +1042,7 @@
             const padding = 40;
             const scaleX = totalLeaves > 1 ? (widthPx - padding * 2) / (totalLeaves - 1) : (widthPx - padding * 2);
             const scaleY = heightPx / Math.max(1, maxDepth + 1);
+            const xOffset = totalLeaves === 1 ? (widthPx / 2) : 0;
 
             // Center nodes horizontally if there are gaps
             const minX = Math.min(...nodes.map(n => n._layout?.x || 0));
@@ -1059,9 +1060,9 @@
                     const from = n._layout;
                     const to = k._layout;
                     if (!from || !to) return;
-                    const x1 = from.x * scaleX;
+                    const x1 = xOffset + from.x * scaleX;
                     const y1 = (from.depth + 1) * scaleY - (scaleY * 0.6);
-                    const x2 = to.x * scaleX;
+                    const x2 = xOffset + to.x * scaleX;
                     const y2 = (to.depth + 1) * scaleY - (scaleY * 0.6);
                     const isFork = k.intent_type === 'fork';
                     svgParts.push(`<line x1=\"${x1}\" y1=\"${y1}\" x2=\"${x2}\" y2=\"${y2}\" stroke=\"currentColor\" stroke-width=\"1.4\" ${isFork ? 'stroke-dasharray=\"4 3\"' : ''} />`);
@@ -1072,7 +1073,7 @@
             nodes.forEach(n => {
                 const lay = n._layout;
                 if (!lay) return;
-                const x = lay.x * scaleX;
+                const x = xOffset + lay.x * scaleX;
                 const y = (lay.depth + 1) * scaleY - (scaleY * 0.6);
                 const isRoot = n.id === rootId;
                 const isFork = n.intent_type === 'fork';
@@ -1402,7 +1403,11 @@
                 });
                 const data = await resp.json();
                 if (!resp.ok) {
-                    alert(data.error || 'Failed to fork conversation.');
+                    if (resp.status === 401 || resp.status === 403) {
+                        alert('Please sign in to fork conversations.');
+                    } else {
+                        alert(data.error || 'Failed to fork conversation.');
+                    }
                     return;
                 }
                 if (data.conversation_id) {
@@ -1556,6 +1561,9 @@
                 currentMessages = currentMessages.filter(m => m !== userMsg && m !== loadingPlaceholder);
                 loadingPlaceholder = null;
                 renderMessages();
+                if (resp.status === 401 || resp.status === 403) {
+                    throw new Error('Please sign in to continue conversations.');
+                }
                 throw new Error(err?.error || 'AI reply failed');
             }
 
@@ -1758,7 +1766,7 @@
         }
 
         function scrollToBottom(force = false) {
-            if (userScrollInterrupt && !force) return;
+            if (userScrollInterrupt) return;
             const container = document.getElementById('messages');
             if (!container) return;
             const target = container.getBoundingClientRect().top + window.scrollY + container.scrollHeight;
@@ -1770,10 +1778,11 @@
 
         // Track user scroll to disable auto-scroll until next force
         (function bindScrollInterrupt() {
+            const threshold = 120;
             const onScroll = () => {
-                userScrollInterrupt = true;
-                clearTimeout(onScroll._t);
-                onScroll._t = setTimeout(() => { userScrollInterrupt = false; }, 800);
+                const doc = document.documentElement;
+                const distanceFromBottom = doc.scrollHeight - (window.scrollY + window.innerHeight);
+                userScrollInterrupt = distanceFromBottom > threshold;
             };
             window.addEventListener('scroll', onScroll, { passive: true });
         })();

@@ -30,18 +30,18 @@ function applyTheme(mode, persist = false) {
 })();
 
 // Initialize Supabase client
-let supabase;
+let supabaseClient;
 
 async function initSupabase() {
-  if (supabase) return supabase;
+  if (supabaseClient) return supabaseClient;
   
   // Dynamically load Supabase if not already loaded
   if (!window.supabase) {
     await loadScript('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2');
   }
   
-  supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
-  return supabase;
+  supabaseClient = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+  return supabaseClient;
 }
 
 function loadScript(src) {
@@ -534,16 +534,15 @@ function buildHeaderHTML() {
             <a href="/api">API</a>
             <a href="/#about">About</a>
             <a href="/faq">FAQ</a>
-            <label class="theme-toggle mobile-only" style="margin-top:-0.2rem;">
-              <input type="checkbox" id="global-theme-toggle-mobile" style="transform: translateY(-1px);" ${currentTheme === 'dark' ? 'checked' : ''}>
-              <span style="font-size:0.9rem;color:var(--text-secondary);">Dark mode</span>
-            </label>
           </div>
           <div class="nav-actions">
             <button class="auth-toggle" data-auth-toggle type="button">Sign in</button>
             <div class="auth-buttons collapsed">
-              <button class="auth-button" onclick="mnemolog.signInWith('google')">Google</button>
-              <button class="auth-button" onclick="mnemolog.signInWith('github')">GitHub</button>
+              <span class="auth-label desktop-only">Sign in with:</span>
+              <div class="auth-provider-buttons">
+                <button class="auth-button" onclick="mnemolog.signInWith('google')">Google</button>
+                <button class="auth-button" onclick="mnemolog.signInWith('github')">GitHub</button>
+              </div>
             </div>
             <div class="user-menu">
               <details>
@@ -559,6 +558,10 @@ function buildHeaderHTML() {
               </div>
             </details>
           </div>
+          <label class="theme-toggle mobile-only">
+            <input type="checkbox" id="global-theme-toggle-mobile" style="transform: translateY(-1px);" ${currentTheme === 'dark' ? 'checked' : ''}>
+            <span style="font-size:0.9rem;color:var(--text-secondary);">Dark mode</span>
+          </label>
         </div>
         </div>
         <button class="mobile-menu-button" aria-label="Toggle menu">

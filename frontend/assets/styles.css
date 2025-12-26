@@ -202,8 +202,9 @@ nav {
 
 .auth-buttons {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
   transition: all 0.2s;
 }
 
@@ -226,6 +227,18 @@ nav {
 .auth-toggle:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.auth-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+}
+
+.auth-provider-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .auth-button {
@@ -428,11 +441,16 @@ nav {
     flex-direction: column;
     width: 100%;
   }
+  .auth-provider-buttons {
+    flex-direction: column;
+    width: 100%;
+  }
+  .auth-provider-buttons .auth-button {
+    width: 100%;
+  }
 
-  /* Nudge dark-mode toggle up slightly inside mobile dropdown */
   .nav-dropdown .theme-toggle {
-    margin-top: -8px;
-    margin-bottom: -2px;
+    margin-top: 0.6rem;
   }
   .auth-toggle {
     display: inline-flex;

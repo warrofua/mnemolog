@@ -326,18 +326,38 @@
 
         .card-meta {
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            gap: 0.75rem;
             margin-bottom: 0.75rem;
             font-size: 0.8rem;
             color: var(--text-secondary);
+            flex-wrap: wrap;
         }
 
-        .card-model {
+        .platform-badge {
             background: var(--bg-warm);
-            padding: 0.2rem 0.6rem;
+            padding: 0.15rem 0.5rem;
             border-radius: 3px;
+            font-weight: 500;
             font-size: 0.75rem;
+        }
+
+        .model-badge, .attrib-badge {
+            background: rgba(184, 134, 11, 0.12);
+            color: var(--accent);
+            padding: 0.15rem 0.5rem;
+            border-radius: 3px;
+            font-weight: 500;
+            font-size: 0.75rem;
+        }
+
+        .view-meta {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            margin-left: auto;
         }
 
         .conversation-card h3 {
@@ -694,12 +714,27 @@
                 const excerptSource = c.description || (c.messages && c.messages[0]?.content) || '';
                 const excerpt = truncate(excerptSource, 200);
                 const tags = (c.tags || []).slice(0, 3).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('');
+                const isContinuation = window.mnemolog?.isContinuation ? window.mnemolog.isContinuation(c) : false;
+                const modelLabel = c.model_display_name || c.model_id || '';
+                const attrib = c.attribution_confidence;
+                const attribText = attrib === 'verified' ? 'Verified' : attrib === 'inferred' ? 'Inferred' : attrib === 'claimed' ? 'Claimed' : '';
+                const views = typeof c.view_count === 'number' ? c.view_count : 0;
 
                 return `
                     <a href="/c/${c.id}" class="conversation-card">
                         <div class="card-meta">
-                            <span class="card-model">${escapeHtml(platform)}</span>
+                            <span class="platform-badge">${escapeHtml(platform || 'Conversation')}</span>
                             <span>${escapeHtml(date)}</span>
+                            ${isContinuation ? `<span class="model-badge">Continuation</span>` : ''}
+                            ${modelLabel ? `<span class="model-badge">${escapeHtml(modelLabel)}</span>` : ''}
+                            ${attribText ? `<span class="attrib-badge">${escapeHtml(attribText)}</span>` : ''}
+                            <span class="view-meta">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                                ${views}
+                            </span>
                         </div>
                         <h3>${escapeHtml(c.title || 'Untitled conversation')}</h3>
                         <p class="card-excerpt">

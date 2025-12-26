@@ -849,9 +849,9 @@
                     <div class="filter-group">
                         <div class="filter-label">Sort By</div>
                         <select class="sort-select" id="sort-select">
+                            <option value="views" selected>Most Viewed</option>
                             <option value="newest">Newest First</option>
                             <option value="oldest">Oldest First</option>
-                            <option value="views">Most Viewed</option>
                         </select>
                     </div>
 
@@ -882,7 +882,7 @@
                 </div>
 
                 <div class="filter-group">
-                    <div class="filter-label">Trending topics (24h)</div>
+                    <div class="filter-label">Trending topics <span id="trending-window">(24h)</span></div>
                     <div class="tag-filters" id="tag-filters">
                         <!-- populated dynamically -->
                     </div>
@@ -968,7 +968,7 @@
             search: '',
             platforms: ['claude', 'chatgpt', 'gemini', 'grok', 'other'],
             tags: [],
-            sort: 'newest',
+            sort: 'views',
             view: 'grid',
             page: 0,
             limit: 12,
@@ -1063,8 +1063,8 @@
             document.querySelectorAll('.tag-pill').forEach(pill => pill.classList.remove('active'));
             state.tags = [];
 
-            document.getElementById('sort-select').value = 'newest';
-            state.sort = 'newest';
+            document.getElementById('sort-select').value = 'views';
+            state.sort = 'views';
 
             document.getElementById('search-input').value = '';
             state.search = '';
@@ -1077,12 +1077,17 @@
 
         async function loadTrendingTags() {
             const container = document.getElementById('tag-filters');
+            const windowEl = document.getElementById('trending-window');
             if (!container) return;
             container.innerHTML = '<div class="skeleton skeleton-text" style="width:120px;height:16px;"></div>';
             try {
                 const res = await fetch('/api/tags/trending');
                 const data = await res.json();
                 if (!res.ok || !data?.tags) throw new Error('Failed');
+                if (windowEl && data.window) {
+                    const label = data.window === 'all' ? 'all time' : data.window;
+                    windowEl.textContent = `(${label})`;
+                }
                 const tags = data.tags.slice(0, 12);
                 if (!tags.length) {
                     container.innerHTML = '<div class="small-text" style="color: var(--text-secondary);">No trending topics yet.</div>';

@@ -38,11 +38,11 @@
           const content = mdMatch[2].trim();
           if (looksLikeHeading(content)) {
             const cls = level === 1 ? 'heading-1' : level === 2 ? 'heading-2' : 'heading-3';
-            return `<span class="heading-line ${cls}">${escapeHtml(content)}</span>`;
+            return `<span class="heading-line ${cls}">${content}</span>`;
           }
         }
         if (bare && !mathSymbols.test(bare) && looksLikeHeading(bare)) {
-          return `<span class="heading-line heading-4">${escapeHtml(bare)}</span>`;
+          return `<span class="heading-line heading-4">${bare}</span>`;
         }
         return line;
       })
