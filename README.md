@@ -1,5 +1,9 @@
 # Mnemolog
 
+[![CI](https://github.com/warrofua/mnemolog/actions/workflows/ci.yml/badge.svg)](https://github.com/warrofua/mnemolog/actions/workflows/ci.yml)
+[![Deploy Worker](https://github.com/warrofua/mnemolog/actions/workflows/worker-deploy.yml/badge.svg)](https://github.com/warrofua/mnemolog/actions/workflows/worker-deploy.yml)
+[![Deploy Pages](https://github.com/warrofua/mnemolog/actions/workflows/pages-deploy.yml/badge.svg)](https://github.com/warrofua/mnemolog/actions/workflows/pages-deploy.yml)
+
 Conversations that persist. A living archive for human-AI collaboration.
 
 What it is: a public archive where people can publish AI conversations that mattered—creative breakthroughs, research notes, philosophical threads, and personal moments worth remembering. Each share is reviewed for privacy (redaction step), then becomes linkable, searchable, and discoverable by others and future AIs.
