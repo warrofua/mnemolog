@@ -128,7 +128,7 @@ async function callDeepseek(apiKey: string, messages: any[]) {
     const errText = await resp.text();
     throw new Error(`DeepSeek error: ${errText}`);
   }
-  const json = await resp.json();
+  const json: any = await resp.json();
   return json.choices?.[0]?.message?.content || json.output || '';
 }
 
@@ -147,7 +147,7 @@ router.get('/api/auth/user', async (request: IRequest, env: Env) => {
       headers: authHeader ? { Authorization: authHeader } : {},
     },
   });
-  const user = undefined; // not used for public list
+  const user = await getUser(request, supabase);
   
   if (!user) {
     return json({ error: 'Unauthorized' }, 401);
