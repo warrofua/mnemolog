@@ -1,13 +1,10 @@
 import { Router, IRequest } from 'itty-router';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import puppeteer from '@cloudflare/puppeteer';
 
 // Types
 interface Env {
   SUPABASE_URL: string;
   SUPABASE_ANON_KEY: string;
-  SUPABASE_SERVICE_KEY: string;
-  BROWSER: any;
   DEEPSEEK_API_KEY?: string;
 }
 
@@ -140,107 +137,6 @@ const router = Router();
 
 // Health check
 router.get('/api/health', () => json({ status: 'ok', timestamp: new Date().toISOString() }));
-
-// Scrape with browser rendering (handles pages that block bots)
-router.get('/api/scrape', async (request: IRequest, env: Env) => {
-  const url = new URL(request.url);
-  const target = url.searchParams.get('url');
-  let selector = url.searchParams.get('selector') || 'body';
-
-  if (!target) {
-    return json({ error: 'Missing url parameter' }, 400);
-  }
-
-  let targetUrl: string;
-  try {
-    targetUrl = new URL(target).toString();
-  } catch {
-    return json({ error: 'Invalid url parameter' }, 400);
-  }
-
-  if (!env.BROWSER) {
-    return json({ error: 'Browser binding not configured' }, 500);
-  }
-
-  const allowedHosts = ['claude.ai', 'chat.openai.com', 'gemini.google.com', 'poe.com', 'perplexity.ai'];
-  const host = new URL(targetUrl).hostname;
-  if (!allowedHosts.some(d => host.includes(d))) {
-    return json({ error: 'Domain not allowed' }, 403);
-  }
-
-  let browser: any;
-  try {
-    browser = await puppeteer.launch(env.BROWSER);
-    const page = await browser.newPage();
-
-    await page.setUserAgent(
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
-    );
-    await page.setExtraHTTPHeaders({
-      'Accept-Language': 'en-US,en;q=0.9',
-      'Upgrade-Insecure-Requests': '1',
-      'Sec-Fetch-Dest': 'document',
-      'Sec-Fetch-Mode': 'navigate',
-      'Sec-Fetch-Site': 'none',
-      'Sec-Fetch-User': '?1',
-      'sec-ch-ua': '"Chromium";v="131", "Not_A Brand";v="24"',
-      'sec-ch-ua-mobile': '?0',
-      'sec-ch-ua-platform': '"macOS"',
-      Referer: 'https://claude.ai/',
-    });
-    await page.setViewport({ width: 1280, height: 800 });
-
-    await page.goto(targetUrl, { waitUntil: 'networkidle0', timeout: 45000 });
-
-    // Wait for Claude/other UIs to render messages; don't fail hard if missing
-    if (host.includes('claude.ai')) {
-      await page
-        .waitForSelector('div[class*="Message"], .font-claude-message, [data-message-author-role], .prose, div[p=""]', { timeout: 20000 })
-        .catch(() => {});
-      // Use broader selector for Claude shares
-      selector = 'div[class*=\"Message\"], div[p=\"\"], .prose, [data-message-author-role], .font-claude-message';
-    }
-
-    const content = await page.evaluate((sel) => {
-      const elements = document.querySelectorAll(sel);
-      const texts = Array.from(elements)
-        .map(el => el.textContent?.trim())
-        .filter(Boolean);
-      if (texts.length > 0) {
-        return texts.join('\n\n');
-      }
-      return document.body.innerText || '';
-    }, selector);
-
-    await browser.close();
-
-    const cleaned = (content || '').replace(/\s+/g, ' ').trim();
-
-    // Detect common interstitials/challenges and surface a clearer error
-    const lower = cleaned.toLowerCase();
-    if (lower.includes('verify you are human') || lower.includes('performance & security by cloudflare')) {
-      return json({ error: 'Blocked by site challenge (Cloudflare). Try again later or with a different network.' }, 403);
-    }
-
-    if (!cleaned) {
-      return json({ error: 'No content extracted' }, 404);
-    }
-
-    return json({
-      url: targetUrl,
-      selector,
-      result: cleaned,
-      length: cleaned.length,
-      method: 'browser-rendering-puppeteer',
-    });
-  } catch (err: any) {
-    if (browser) {
-      await browser.close().catch(() => {});
-    }
-    console.error('Browser scrape error:', err);
-    return json({ error: 'Scraping failed: ' + (err?.message || 'unknown') }, 500);
-  }
-});
 
 // Get current user
 router.get('/api/auth/user', async (request: IRequest, env: Env) => {
@@ -481,13 +377,16 @@ router.put('/api/conversations/:id', async (request: IRequest, env: Env) => {
 
 // List public conversations
 router.get('/api/conversations', async (request: IRequest, env: Env) => {
-  // Use service key when available; fallback to anon key
-  const supabaseKey = env.SUPABASE_SERVICE_KEY || env.SUPABASE_ANON_KEY;
-  if (!env.SUPABASE_URL || !supabaseKey) {
-    console.error('Missing SUPABASE_URL or SUPABASE key');
+  const authHeader = request.headers.get('Authorization') || undefined;
+  if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
+    console.error('Missing SUPABASE_URL or SUPABASE_ANON_KEY');
     return json({ error: 'Service misconfigured' }, 500);
   }
-  const supabase = createClient(env.SUPABASE_URL, supabaseKey);
+  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+    global: {
+      headers: authHeader ? { Authorization: authHeader } : {},
+    },
+  });
   const url = new URL(request.url);
   
   const limit = Math.min(parseInt(url.searchParams.get('limit') || '20', 10), 100);
@@ -619,9 +518,12 @@ router.get('/api/conversations', async (request: IRequest, env: Env) => {
 
 // Trending tags (last 24h)
 router.get('/api/tags/trending', async (request: IRequest, env: Env) => {
-  const supabaseKey = env.SUPABASE_SERVICE_KEY || env.SUPABASE_ANON_KEY;
-  const usingServiceKey = !!env.SUPABASE_SERVICE_KEY;
-  const supabase = createClient(env.SUPABASE_URL, supabaseKey);
+  const authHeader = request.headers.get('Authorization') || undefined;
+  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+    global: {
+      headers: authHeader ? { Authorization: authHeader } : {},
+    },
+  });
   const windows = [
     { label: '24h', ms: 24 * 60 * 60 * 1000 },
     { label: '7d', ms: 7 * 24 * 60 * 60 * 1000 },
@@ -652,9 +554,6 @@ router.get('/api/tags/trending', async (request: IRequest, env: Env) => {
   }
 
   if (error) {
-    if (!usingServiceKey) {
-      console.warn('Trending tags query failed without service key; check RLS/policies.', error);
-    }
     console.error('Trending tags error:', error);
     return json({ error: 'Failed to fetch tags' }, 500);
   }
@@ -771,27 +670,20 @@ router.get('/api/conversations/:id', async (request: IRequest, env: Env) => {
 router.get('/api/conversations/:id/lineage', async (request: IRequest, env: Env) => {
   const { id } = request.params;
   const authHeader = request.headers.get('Authorization') || undefined;
-  const authClient = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
     global: {
       headers: authHeader ? { Authorization: authHeader } : {},
     },
   });
-  const user = await getUser(request, authClient);
-  const supabaseKey = env.SUPABASE_SERVICE_KEY || env.SUPABASE_ANON_KEY;
-  const usingServiceKey = !!env.SUPABASE_SERVICE_KEY;
-  const supabase = createClient(env.SUPABASE_URL, supabaseKey);
 
   // Get the conversation to identify root
   const { data: convo, error: convoErr } = await supabase
     .from('conversations')
-    .select('id, root_conversation_id, parent_conversation_id, is_public, user_id')
+    .select('id, root_conversation_id, parent_conversation_id')
     .eq('id', id)
     .single();
 
   if (convoErr || !convo) return json({ error: 'Conversation not found' }, 404);
-  if (!convo.is_public && convo.user_id !== user?.id) {
-    return json({ error: 'Conversation not found' }, 404);
-  }
 
   const rootId = convo.root_conversation_id || convo.id;
 
@@ -802,8 +694,6 @@ router.get('/api/conversations/:id/lineage', async (request: IRequest, env: Env)
       id,
       parent_conversation_id,
       root_conversation_id,
-      is_public,
-      user_id,
       title,
       intent_type,
       user_goal,
@@ -813,17 +703,9 @@ router.get('/api/conversations/:id/lineage', async (request: IRequest, env: Env)
     `)
     .eq('root_conversation_id', rootId)
     .order('created_at', { ascending: true });
-  if (user?.id) {
-    query = query.or(`is_public.eq.true,user_id.eq.${user.id}`);
-  } else {
-    query = query.eq('is_public', true);
-  }
   const { data, error } = await query;
 
   if (error) {
-    if (!usingServiceKey) {
-      console.warn('Lineage query failed without service key; check RLS/policies.', error);
-    }
     console.error('Lineage fetch error:', error);
     return json({ error: 'Failed to fetch lineage' }, 500);
   }
@@ -838,8 +720,6 @@ router.get('/api/conversations/:id/lineage', async (request: IRequest, env: Env)
         id,
         parent_conversation_id,
         root_conversation_id,
-        is_public,
-        user_id,
         title,
         intent_type,
         user_goal,
@@ -848,17 +728,11 @@ router.get('/api/conversations/:id/lineage', async (request: IRequest, env: Env)
         view_count
       `)
       .eq('id', rootId);
-    if (user?.id) {
-      rootQuery = rootQuery.or(`is_public.eq.true,user_id.eq.${user.id}`);
-    } else {
-      rootQuery = rootQuery.eq('is_public', true);
-    }
     const { data: rootRow } = await rootQuery.single();
     if (rootRow) nodes.unshift(rootRow);
   }
 
-  const sanitizedNodes = nodes.map(({ is_public, user_id, ...rest }) => rest);
-  return json({ root_id: rootId, nodes: sanitizedNodes });
+  return json({ root_id: rootId, nodes });
 });
 
 // Bookmarks - list for current user
@@ -1017,52 +891,6 @@ router.get('/api/users/:userId/conversations', async (request: IRequest, env: En
   }
 
   return json({ conversations: data });
-});
-
-// Update conversation
-router.put('/api/conversations/:id', async (request: IRequest, env: Env) => {
-  const authHeader = request.headers.get('Authorization') || undefined;
-  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
-    global: {
-      headers: authHeader ? { Authorization: authHeader } : {},
-    },
-  });
-  const user = await getUser(request, supabase);
-  
-  if (!user) {
-    return json({ error: 'Unauthorized' }, 401);
-  }
-
-  const { id } = request.params;
-  let body: Partial<CreateConversationBody>;
-  
-  try {
-    body = await request.json();
-  } catch {
-    return json({ error: 'Invalid JSON' }, 400);
-  }
-
-  // Only allow updating certain fields
-  const updates: any = {};
-  if (body.title !== undefined) updates.title = body.title;
-  if (body.description !== undefined) updates.description = body.description;
-  if (body.tags !== undefined) updates.tags = body.tags;
-  if (body.is_public !== undefined) updates.is_public = body.is_public;
-  if (body.show_author !== undefined) updates.show_author = body.show_author;
-
-  const { data, error } = await supabase
-    .from('conversations')
-    .update(updates)
-    .eq('id', id)
-    .eq('user_id', user.id) // Ensure ownership
-    .select()
-    .single();
-
-  if (error || !data) {
-    return json({ error: 'Conversation not found or not owned by you' }, 404);
-  }
-
-  return json({ conversation: data });
 });
 
 // Delete conversation

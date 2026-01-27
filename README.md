@@ -118,7 +118,6 @@ SUPABASE_ANON_KEY=eyJ...
 # Worker (API)
 SUPABASE_URL=https://xxx.supabase.co
 SUPABASE_ANON_KEY=eyJ...
-SUPABASE_SERVICE_KEY=eyJ...  # For server-side operations
 
 # Supabase Edge Function (continue/chat)
 DEEPSEEK_API_KEY=sk-...
@@ -165,6 +164,7 @@ Share flow:
 **Deployment notes**
 - Pages: `cd frontend && npx wrangler pages deploy . --project-name=mnemolog` (ensure `_redirects` ships so `/c/<id>` works).
 - Worker: `cd worker && npm install && npm run deploy` after API changes.
+- GitHub Actions: set repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` for auto-deploy workflows.
 - Link previews: `_worker.js` injects OG/Twitter tags on `/c/<id>` by fetching conversation metadata from the API worker.
 - CSP: `_headers` allows embedding from `x.com/twitter.com/t.co` (frame-ancestors) to play nicely with X’s in-app webview; adjust if you want stricter clickjacking protection.
 - Icons: favicons/logos live in `frontend/assets/mnemolog-fav-icon.svg`, `mnemolog-logo-light.svg`, `mnemolog-logo-dark.svg`; OG previews use the dark logo.

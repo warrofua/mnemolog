@@ -9,7 +9,6 @@ ENVIRONMENT = "production"
 # Add these via `wrangler secret put` for production:
 # SUPABASE_URL
 # SUPABASE_ANON_KEY
-# SUPABASE_SERVICE_KEY
 
 [dev]
 port = 8787
