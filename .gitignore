@@ -3,7 +3,5 @@ node_modules/
 .dev.vars
 dist
 .DS_Store
-assets/config.js
-frontend/assets/config.js
 /feature plans
 /samples
