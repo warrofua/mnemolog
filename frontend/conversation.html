@@ -853,6 +853,9 @@
     <script src="/assets/app.js"></script>
     <script src="/assets/render.js"></script>
     <script>
+        const API_BASE = (typeof CONFIG !== 'undefined' && CONFIG?.API_URL) ? CONFIG.API_URL : '';
+        const apiUrl = (path) => (API_BASE ? `${API_BASE}${path}` : path);
+
         function getConversationId() {
             const path = window.location.pathname;
             // Support /c/<id> (preferred) and /conversation/<id> so redirects still work
@@ -982,7 +985,7 @@
             const tooltip = document.getElementById('lineage-tooltip');
             if (!canvas) return;
             try {
-                const resp = await fetch(`/api/conversations/${convoId}/lineage`);
+                const resp = await fetch(apiUrl(`/api/conversations/${convoId}/lineage`));
                 const data = await resp.json();
                 if (!resp.ok) throw new Error(data.error || 'Failed to load lineage');
                 lineageData = data;
@@ -1393,7 +1396,7 @@
                         content: messageText(m),
                     }));
 
-                const resp = await fetch(`/api/conversations/${currentConversationId}/fork`, {
+                const resp = await fetch(apiUrl(`/api/conversations/${currentConversationId}/fork`), {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1548,7 +1551,7 @@
             currentMessages = [...currentMessages, userMsg, loadingPlaceholder];
             renderMessages();
             scrollToBottom();
-            const resp = await fetch(`/api/conversations/${conversationId}/messages`, {
+            const resp = await fetch(apiUrl(`/api/conversations/${conversationId}/messages`), {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({ content }),
@@ -1661,7 +1664,7 @@
             if (window.mnemolog?.currentSession?.access_token) {
                 headers['Authorization'] = `Bearer ${window.mnemolog.currentSession.access_token}`;
             }
-            const resp = await fetch(`/api/conversations/${conversationId}/continue-stream`, {
+            const resp = await fetch(apiUrl(`/api/conversations/${conversationId}/continue-stream`), {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({ mode, user_goal }),
@@ -1689,7 +1692,7 @@
             if (window.mnemolog?.currentSession?.access_token) {
                 headers['Authorization'] = `Bearer ${window.mnemolog.currentSession.access_token}`;
             }
-            const resp = await fetch(`/api/conversations/${conversationId}/generate`, {
+            const resp = await fetch(apiUrl(`/api/conversations/${conversationId}/generate`), {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({ mode, user_goal }),
