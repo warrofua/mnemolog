@@ -10,9 +10,16 @@ create table public.profiles (
     avatar_url text,
     bio text,
     website text,
+    stripe_customer_id text,
+    billing_plan text,
+    billing_status text,
+    billing_updated_at timestamp with time zone,
     created_at timestamp with time zone default timezone('utc'::text, now()) not null,
     updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
+
+create unique index if not exists profiles_stripe_customer_id_idx
+    on public.profiles (stripe_customer_id);
 
 -- Conversations table
 create table public.conversations (
@@ -139,6 +146,31 @@ create policy if not exists "Delete messages for owned convo"
               and c.user_id = auth.uid()
         )
     );
+
+-- Agents poll storage
+create table if not exists public.agent_poll_votes (
+    id uuid primary key default gen_random_uuid(),
+    poll_id text not null,
+    option_id text not null,
+    voter_hash text not null,
+    created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create unique index if not exists agent_poll_votes_unique_idx
+    on public.agent_poll_votes (poll_id, voter_hash);
+
+create index if not exists agent_poll_votes_poll_idx
+    on public.agent_poll_votes (poll_id);
+
+alter table public.agent_poll_votes enable row level security;
+
+create policy if not exists "Agent poll votes viewable by service role"
+    on public.agent_poll_votes for select
+    using (auth.role() = 'service_role');
+
+create policy if not exists "Agent poll votes insertable by service role"
+    on public.agent_poll_votes for insert
+    with check (auth.role() = 'service_role');
 
 -- Bookmarks table
 create table public.bookmarks (

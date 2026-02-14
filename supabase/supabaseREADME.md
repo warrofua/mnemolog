@@ -9,7 +9,7 @@
 
 #### public.profiles
 - **Purpose:** user profiles extending Supabase `auth.users`.
-- **Columns:** `id` (uuid, PK, references `auth.users`), `display_name`, `avatar_url`, `bio`, `website`, `created_at`, `updated_at`.
+- **Columns:** `id` (uuid, PK, references `auth.users`), `display_name`, `avatar_url`, `bio`, `website`, billing fields `stripe_customer_id`, `billing_plan`, `billing_status`, `billing_updated_at`, `created_at`, `updated_at`.
 - **RLS:** enabled.  
   - SELECT: public (everyone can read profiles).  
   - UPDATE: users can update their own profile (`auth.uid() = id`).
@@ -56,6 +56,12 @@
   - INSERT: only for conversations that are public or owned (EXISTS subquery on `public.conversations`).  
   - UPDATE/DELETE: own rows only.
 - **Notes:** Because insert policy queries `public.conversations`, we grant SELECT on that table to `authenticated` so the EXISTS check can run in policy context.
+
+#### public.agent_poll_votes
+- **Purpose:** store anonymous agent poll votes (one per device/IP hash).
+- **Columns:** `id` (uuid PK), `poll_id`, `option_id`, `voter_hash`, `created_at`.
+- **RLS:** enabled.
+  - SELECT/INSERT: service role only.
 
 ### Triggers and helper functions
 

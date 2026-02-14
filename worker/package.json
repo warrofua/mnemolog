@@ -9,7 +9,8 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
-    "itty-router": "^4.0.27"
+    "itty-router": "^4.0.27",
+    "stripe": "^14.21.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20231218.0",

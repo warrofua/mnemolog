@@ -1,11 +1,21 @@
 import { Router, IRequest } from 'itty-router';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import Stripe from 'stripe';
 
 // Types
 interface Env {
   SUPABASE_URL: string;
   SUPABASE_ANON_KEY: string;
+  SUPABASE_SERVICE_ROLE_KEY?: string;
   DEEPSEEK_API_KEY?: string;
+  STRIPE_SECRET_KEY?: string;
+  STRIPE_WEBHOOK_SECRET?: string;
+  STRIPE_PRICE_SOLO?: string;
+  STRIPE_PRICE_TEAM?: string;
+  STRIPE_PRICE_ENTERPRISE?: string;
+  STRIPE_PRICE_MAP?: string;
+  APP_URL?: string;
+  POLL_SALT?: string;
 }
 
 interface Message {
@@ -62,6 +72,121 @@ function json(data: any, status = 200) {
       ...corsHeaders,
     },
   });
+}
+
+async function parseJson<T>(request: IRequest): Promise<T | null> {
+  try {
+    return await request.json();
+  } catch {
+    return null;
+  }
+}
+
+function getStripe(env: Env) {
+  if (!env.STRIPE_SECRET_KEY) {
+    throw new Error('Stripe secret key missing');
+  }
+  return new Stripe(env.STRIPE_SECRET_KEY, {
+    apiVersion: '2023-10-16',
+    httpClient: Stripe.createFetchHttpClient(),
+  });
+}
+
+function getBaseUrl(env: Env) {
+  return env.APP_URL || 'https://mnemolog.com';
+}
+
+function resolvePlanFromPrice(env: Env, priceId?: string | null) {
+  if (!priceId) return null;
+  const map = getStripePriceMap(env);
+  const entry = Object.entries(map).find(([, id]) => id === priceId);
+  return entry ? entry[0] : null;
+}
+
+function getStripePriceMap(env: Env) {
+  if (env.STRIPE_PRICE_MAP) {
+    try {
+      const parsed = JSON.parse(env.STRIPE_PRICE_MAP) as Record<string, string>;
+      if (parsed && typeof parsed === 'object') return parsed;
+    } catch {
+      // ignore invalid JSON and fall back to explicit env vars
+    }
+  }
+  return {
+    solo: env.STRIPE_PRICE_SOLO || '',
+    team: env.STRIPE_PRICE_TEAM || '',
+    enterprise: env.STRIPE_PRICE_ENTERPRISE || '',
+  };
+}
+
+function requireStripePrice(env: Env, plan: string) {
+  const mapping = getStripePriceMap(env);
+  const priceId = mapping[plan];
+  if (!priceId) {
+    throw new Error(`Stripe price missing for plan: ${plan}`);
+  }
+  return priceId;
+}
+
+function getServiceSupabase(env: Env) {
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY missing');
+  }
+  return createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
+function sanitizeRedirectUrl(input: string | undefined, baseUrl: string) {
+  if (!input) return null;
+  try {
+    const base = new URL(baseUrl);
+    const url = new URL(input, base);
+    if (url.host !== base.host) return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+async function hashString(message: string) {
+  const data = new TextEncoder().encode(message);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function getClientIp(request: IRequest) {
+  const raw = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || '';
+  return raw.split(',')[0].trim();
+}
+
+const pollQuestion = {
+  id: 'agents-feature-next',
+  question: 'What features should be next?',
+  options: [
+    { id: 'mcp-governance', label: 'MCP governance + policy gates' },
+    { id: 'devtools-live', label: 'Live DevTools streams (DOM/network/console)' },
+    { id: 'playwright-proof', label: 'Playwright proof bundles' },
+    { id: 'knowledge-vault', label: 'Agent knowledge vault & provenance' },
+  ],
+};
+
+async function getPollResults(supabase: SupabaseClient) {
+  const { data, error } = await supabase
+    .from('agent_poll_votes')
+    .select('option_id')
+    .eq('poll_id', pollQuestion.id);
+  if (error) {
+    throw error;
+  }
+  const counts: Record<string, number> = {};
+  for (const row of data || []) {
+    counts[row.option_id] = (counts[row.option_id] || 0) + 1;
+  }
+  return pollQuestion.options.map((option) => ({
+    ...option,
+    votes: counts[option.id] || 0,
+  }));
 }
 
 // Helper to get user from auth header
@@ -161,6 +286,242 @@ router.get('/api/auth/user', async (request: IRequest, env: Env) => {
     .single();
 
   return json({ user, profile });
+});
+
+// Create Stripe checkout session
+router.post('/api/billing/checkout', async (request: IRequest, env: Env) => {
+  if (!env.STRIPE_SECRET_KEY) {
+    return json({ error: 'Billing unavailable' }, 503);
+  }
+  const authHeader = request.headers.get('Authorization') || undefined;
+  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+    global: {
+      headers: authHeader ? { Authorization: authHeader } : {},
+    },
+  });
+  const user = await getUser(request, supabase);
+  if (!user?.email) {
+    return json({ error: 'Unauthorized' }, 401);
+  }
+
+  const body = await parseJson<{ plan?: string; success_url?: string; cancel_url?: string }>(request);
+  if (!body?.plan) {
+    return json({ error: 'Plan is required' }, 400);
+  }
+
+  const priceId = requireStripePrice(env, body.plan);
+  const baseUrl = getBaseUrl(env);
+  const stripe = getStripe(env);
+  const safeSuccessUrl = sanitizeRedirectUrl(body.success_url, baseUrl);
+  const safeCancelUrl = sanitizeRedirectUrl(body.cancel_url, baseUrl);
+
+  let stripeCustomerId: string | null = null;
+  try {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('stripe_customer_id')
+      .eq('id', user.id)
+      .single();
+    stripeCustomerId = profile?.stripe_customer_id ?? null;
+  } catch {
+    stripeCustomerId = null;
+  }
+
+  const session = await stripe.checkout.sessions.create({
+    mode: 'subscription',
+    payment_method_types: ['card'],
+    ...(stripeCustomerId ? { customer: stripeCustomerId } : { customer_email: user.email }),
+    line_items: [{ price: priceId, quantity: 1 }],
+    success_url: safeSuccessUrl || `${baseUrl}/agents/thanks?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: safeCancelUrl || `${baseUrl}/agents/`,
+    metadata: {
+      user_id: user.id,
+      plan: body.plan,
+    },
+  });
+
+  return json({ id: session.id, url: session.url });
+});
+
+// Create Stripe customer portal session
+router.post('/api/billing/portal', async (request: IRequest, env: Env) => {
+  if (!env.STRIPE_SECRET_KEY) {
+    return json({ error: 'Billing unavailable' }, 503);
+  }
+  const authHeader = request.headers.get('Authorization') || undefined;
+  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+    global: {
+      headers: authHeader ? { Authorization: authHeader } : {},
+    },
+  });
+  const user = await getUser(request, supabase);
+  if (!user?.email) {
+    return json({ error: 'Unauthorized' }, 401);
+  }
+
+  const stripe = getStripe(env);
+  let customerId: string | null = null;
+  try {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('stripe_customer_id')
+      .eq('id', user.id)
+      .single();
+    customerId = profile?.stripe_customer_id ?? null;
+  } catch {
+    customerId = null;
+  }
+
+  if (!customerId) {
+    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+    customerId = customers.data[0]?.id ?? null;
+  }
+
+  if (!customerId) {
+    return json({ error: 'No customer record found' }, 404);
+  }
+
+  const baseUrl = getBaseUrl(env);
+  const portal = await stripe.billingPortal.sessions.create({
+    customer: customerId,
+    return_url: `${baseUrl}/agents/`,
+  });
+
+  return json({ url: portal.url });
+});
+
+// Stripe webhooks
+router.post('/api/billing/webhook', async (request: IRequest, env: Env) => {
+  if (!env.STRIPE_SECRET_KEY || !env.STRIPE_WEBHOOK_SECRET) {
+    return json({ error: 'Billing unavailable' }, 503);
+  }
+
+  const signature = request.headers.get('Stripe-Signature');
+  if (!signature) {
+    return json({ error: 'Missing signature' }, 400);
+  }
+
+  const payload = await request.text();
+  const stripe = getStripe(env);
+
+  let event: Stripe.Event;
+  try {
+    event = stripe.webhooks.constructEvent(payload, signature, env.STRIPE_WEBHOOK_SECRET);
+  } catch (err: any) {
+    return json({ error: `Webhook signature verification failed: ${err?.message || 'unknown error'}` }, 400);
+  }
+
+  try {
+    const supabase = getServiceSupabase(env);
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object as Stripe.Checkout.Session;
+      const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id;
+      const userId = session.metadata?.user_id || null;
+      let plan = session.metadata?.plan || null;
+
+      if (!plan && session.subscription) {
+        const subscriptionId = typeof session.subscription === 'string'
+          ? session.subscription
+          : session.subscription.id;
+        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+        plan = resolvePlanFromPrice(env, subscription.items.data[0]?.price?.id || null);
+      }
+
+      if (customerId && userId) {
+        await supabase
+          .from('profiles')
+          .update({
+            stripe_customer_id: customerId,
+            billing_plan: plan,
+            billing_status: 'active',
+            billing_updated_at: new Date().toISOString(),
+          })
+          .eq('id', userId);
+      }
+    }
+
+    if (event.type.startsWith('customer.subscription.')) {
+      const subscription = event.data.object as Stripe.Subscription;
+      const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id;
+      const status = subscription.status;
+      const plan = resolvePlanFromPrice(env, subscription.items.data[0]?.price?.id || null);
+      if (customerId) {
+        await supabase
+          .from('profiles')
+          .update({
+            billing_plan: plan,
+            billing_status: status,
+            billing_updated_at: new Date().toISOString(),
+          })
+          .eq('stripe_customer_id', customerId);
+      }
+    }
+  } catch (err) {
+    console.error('Stripe webhook handling error', err);
+    return json({ error: 'Webhook handling failed' }, 500);
+  }
+
+  return json({ received: true });
+});
+
+// Agents poll
+router.get('/api/agents/poll', async (request: IRequest, env: Env) => {
+  if (!env.POLL_SALT || !env.SUPABASE_SERVICE_ROLE_KEY) {
+    return json({ error: 'Poll unavailable' }, 503);
+  }
+  const supabase = getServiceSupabase(env);
+  try {
+    const results = await getPollResults(supabase);
+    return json({ poll: pollQuestion, results });
+  } catch (error) {
+    console.error('Poll fetch error', error);
+    return json({ error: 'Failed to fetch poll' }, 500);
+  }
+});
+
+router.post('/api/agents/poll/vote', async (request: IRequest, env: Env) => {
+  if (!env.POLL_SALT || !env.SUPABASE_SERVICE_ROLE_KEY) {
+    return json({ error: 'Poll unavailable' }, 503);
+  }
+  const body = await parseJson<{ option_id?: string }>(request);
+  if (!body?.option_id) {
+    return json({ error: 'option_id is required' }, 400);
+  }
+  const option = pollQuestion.options.find((entry) => entry.id === body.option_id);
+  if (!option) {
+    return json({ error: 'Invalid option' }, 400);
+  }
+
+  const ip = getClientIp(request);
+  if (!ip) {
+    return json({ error: 'Unable to verify voter' }, 400);
+  }
+  const fingerprint = await hashString(`${env.POLL_SALT}:${ip}:${pollQuestion.id}`);
+  const supabase = getServiceSupabase(env);
+
+  try {
+    const { error } = await supabase
+      .from('agent_poll_votes')
+      .insert({
+        poll_id: pollQuestion.id,
+        option_id: option.id,
+        voter_hash: fingerprint,
+      });
+
+    if (error) {
+      if (error.code === '23505') {
+        return json({ error: 'Already voted' }, 409);
+      }
+      console.error('Poll vote error', error);
+      return json({ error: 'Failed to record vote' }, 500);
+    }
+
+    const results = await getPollResults(supabase);
+    return json({ poll: pollQuestion, results });
+  } catch (error) {
+    console.error('Poll vote error', error);
+    return json({ error: 'Failed to record vote' }, 500);
+  }
 });
 
 // Create conversation
