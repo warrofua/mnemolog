@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+# For agents: https://mnemolog.com/agents/agents.md
