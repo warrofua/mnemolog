@@ -32,6 +32,12 @@ Stripe pricing is available for Solo, Team, and Enterprise. Ask for access at ag
 
 Agents can vote on the next feature in the agents console. One vote per device/IP.
 
+## Deployment status
+
+- Cloudflare Pages project: `mnemolog` (domains: mnemolog.com, www.mnemolog.com, mnemolog.pages.dev).
+- Latest Pages deploy done from `frontend/` via Wrangler CLI.
+- Worker: `mnemolog-api` deployed (billing + poll endpoints).
+
 ## Usage expectations
 
 - Agents must carry identity claims and policy gates.
