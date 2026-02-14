@@ -253,6 +253,71 @@
       font-size: 0.95rem;
     }
 
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      padding: 0.2rem 0.6rem;
+      font-size: 0.7rem;
+      font-family: 'IBM Plex Mono', monospace;
+      letter-spacing: 0.08em;
+      border: 1px solid transparent;
+      vertical-align: middle;
+      margin-left: 0.5rem;
+    }
+
+    .status-pill.available {
+      color: #85f7be;
+      background: rgba(62, 177, 120, 0.2);
+      border-color: rgba(98, 229, 160, 0.4);
+    }
+
+    .status-pill.degraded {
+      color: #ffe09a;
+      background: rgba(233, 180, 76, 0.2);
+      border-color: rgba(233, 180, 76, 0.45);
+    }
+
+    .status-pill.unavailable {
+      color: #ffb4a6;
+      background: rgba(240, 108, 79, 0.2);
+      border-color: rgba(240, 108, 79, 0.45);
+    }
+
+    .status-pill.loading {
+      color: var(--agents-text-muted);
+      background: rgba(185, 192, 199, 0.12);
+      border-color: rgba(185, 192, 199, 0.24);
+    }
+
+    .status-meta {
+      margin-top: 0.9rem;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.78rem;
+      color: var(--agents-text-muted);
+      line-height: 1.5;
+    }
+
+    .code-card {
+      min-height: auto;
+    }
+
+    .code-block {
+      margin-top: 0.9rem;
+      border-radius: 12px;
+      padding: 0.85rem 0.95rem;
+      border: 1px solid rgba(233, 180, 76, 0.22);
+      background: rgba(8, 10, 13, 0.75);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.78rem;
+      line-height: 1.6;
+      color: #d8dde3;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
     .pricing {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -374,6 +439,210 @@
       color: var(--agents-text-muted);
     }
 
+    .feedback-board {
+      margin-top: 3rem;
+      padding: 2.2rem;
+      border-radius: 24px;
+      background: var(--agents-panel);
+      border: 1px solid var(--agents-border);
+    }
+
+    .feedback-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+      gap: 1.25rem;
+      margin-top: 1.2rem;
+    }
+
+    .feedback-form,
+    .feedback-list-wrap {
+      border: 1px solid rgba(233, 180, 76, 0.2);
+      border-radius: 14px;
+      padding: 1rem;
+      background: rgba(8, 10, 13, 0.55);
+    }
+
+    .feedback-form h3,
+    .feedback-list-wrap h3 {
+      margin-bottom: 0.8rem;
+      font-size: 1rem;
+    }
+
+    .feedback-fields {
+      display: grid;
+      gap: 0.55rem;
+    }
+
+    .feedback-fields input,
+    .feedback-fields textarea,
+    .feedback-fields select {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid rgba(233, 180, 76, 0.24);
+      background: rgba(6, 8, 10, 0.75);
+      color: var(--agents-text);
+      padding: 0.6rem 0.7rem;
+      font-size: 0.88rem;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    .feedback-fields textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+
+    .feedback-actions {
+      margin-top: 0.5rem;
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .feedback-actions button,
+    .feedback-item button {
+      border-radius: 10px;
+      border: 1px solid rgba(233, 180, 76, 0.32);
+      padding: 0.55rem 0.8rem;
+      background: transparent;
+      color: var(--agents-text);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.76rem;
+      cursor: pointer;
+    }
+
+    .feedback-status {
+      margin-top: 0.65rem;
+      font-size: 0.86rem;
+      color: var(--agents-text-muted);
+    }
+
+    .feedback-controls {
+      display: grid;
+      gap: 0.55rem;
+      margin-bottom: 0.8rem;
+    }
+
+    .feedback-controls .row {
+      display: flex;
+      gap: 0.45rem;
+      flex-wrap: wrap;
+    }
+
+    .feedback-controls input,
+    .feedback-controls select {
+      border-radius: 9px;
+      border: 1px solid rgba(233, 180, 76, 0.24);
+      background: rgba(6, 8, 10, 0.75);
+      color: var(--agents-text);
+      padding: 0.5rem 0.65rem;
+      font-size: 0.84rem;
+    }
+
+    .feedback-list {
+      display: grid;
+      gap: 0.65rem;
+      max-height: 520px;
+      overflow-y: auto;
+      padding-right: 0.2rem;
+    }
+
+    .feedback-item {
+      border: 1px solid rgba(233, 180, 76, 0.22);
+      border-radius: 11px;
+      padding: 0.72rem;
+      background: rgba(10, 12, 16, 0.72);
+      display: grid;
+      gap: 0.5rem;
+    }
+
+    .feedback-item-top {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .feedback-item-top strong {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .feedback-pill {
+      font-size: 0.72rem;
+      border: 1px solid rgba(233, 180, 76, 0.32);
+      border-radius: 999px;
+      padding: 0.12rem 0.45rem;
+      font-family: 'IBM Plex Mono', monospace;
+      color: var(--agents-text-muted);
+    }
+
+    .feedback-meta {
+      font-size: 0.78rem;
+      color: var(--agents-text-muted);
+      font-family: 'IBM Plex Mono', monospace;
+      line-height: 1.5;
+    }
+
+    .feedback-link-row {
+      display: flex;
+      gap: 0.45rem;
+      flex-wrap: wrap;
+    }
+
+    .feedback-link-row input,
+    .feedback-link-row select {
+      border-radius: 8px;
+      border: 1px solid rgba(233, 180, 76, 0.22);
+      background: rgba(6, 8, 10, 0.7);
+      color: var(--agents-text);
+      padding: 0.4rem 0.55rem;
+      font-size: 0.78rem;
+      min-width: 110px;
+    }
+
+    .poll-auth {
+      margin: 0.5rem 0 1.2rem;
+      display: grid;
+      gap: 0.6rem;
+    }
+
+    .poll-auth label {
+      font-size: 0.82rem;
+      color: var(--agents-text-muted);
+      font-family: 'IBM Plex Mono', monospace;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .poll-auth-row {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .poll-auth-row input {
+      flex: 1;
+      min-width: 280px;
+      background: rgba(8, 10, 13, 0.75);
+      color: var(--agents-text);
+      border: 1px solid rgba(233, 180, 76, 0.28);
+      border-radius: 10px;
+      padding: 0.65rem 0.75rem;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.8rem;
+    }
+
+    .poll-auth-row button {
+      border-radius: 10px;
+      border: 1px solid rgba(233, 180, 76, 0.32);
+      padding: 0.6rem 0.9rem;
+      background: transparent;
+      color: var(--agents-text);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.78rem;
+      cursor: pointer;
+    }
+
     .cta-panel h2 {
       font-size: 1.8rem;
       margin-bottom: 0.5rem;
@@ -418,6 +687,10 @@
         flex-direction: column;
         align-items: flex-start;
       }
+
+      .feedback-grid {
+        grid-template-columns: 1fr;
+      }
     }
 
     @media (max-width: 600px) {
@@ -456,7 +729,11 @@
       </div>
       <nav class="agents-nav">
         <a href="#control">Control Layer</a>
+        <a href="#status">Runtime</a>
+        <a href="#progress">Progress</a>
         <a href="#mcp">MCP Ops</a>
+        <a href="#api">API</a>
+        <a href="#feedback">Feedback</a>
         <a href="#knowledge">Knowledge Vault</a>
         <a href="#pricing">Pricing</a>
       </nav>
@@ -477,21 +754,56 @@
         <h1>Control layer for serious agentic development.</h1>
         <p>
           Mnemolog Agents is the private operating layer for high-trust agents: MCP governance, Chrome DevTools visibility,
-          Playwright verification, and a sealed knowledge vault for agent-created research.
+          Playwright verification, telemetry that is queryable by endpoint/auth mode, and a sealed knowledge vault for agent-created research.
         </p>
         <div class="hero-actions">
           <a class="agents-btn primary" href="mailto:agents@mnemolog.com">Join the access list</a>
+          <a class="agents-btn" href="/agents/progress.md">Roadmap + Dev Log</a>
           <a class="agents-btn" href="#pricing">View pricing</a>
         </div>
       </div>
       <div class="hero-panel">
-        <h3>Live Ops Snapshot</h3>
+        <h3>Live Ops Snapshot <span class="status-pill loading" id="ops-overall">LOADING</span></h3>
         <ul>
           <li><span>MCP</span> Active tool graph, audit trail, and policy gates per session.</li>
           <li><span>DevTools</span> DOM, network, and console streams mirrored into agent context.</li>
           <li><span>Playwright</span> Verification runs that generate proofs instead of screenshots.</li>
+          <li><span>Telemetry</span> Structured request logs with latency/error rollups and usage drill-down.</li>
           <li><span>Vault</span> Agent-authored uploads with provenance and ROI tagging.</li>
         </ul>
+      </div>
+    </section>
+
+    <section class="section" id="status">
+      <h2>Runtime status for agents.</h2>
+      <p>Live availability comes from <code>/api/agents/status</code>. If a feature is unavailable, the exact missing dependency is shown.</p>
+      <div class="cards" id="runtime-status-cards">
+        <div class="card">
+          <h3>Loading runtime state…</h3>
+          <p>Checking API features and dependency wiring.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="progress">
+      <h2>Roadmap + Developer Log.</h2>
+      <p>Agent-readable build history and forward milestones are published in one file so you can track state without guessing.</p>
+      <div class="cards">
+        <div class="card">
+          <h3>Unified progress file</h3>
+          <p><code>/agents/progress.md</code> combines alpha milestones, current state, open work, and near-term roadmap.</p>
+          <p class="status-meta"><a href="/agents/progress.md">Open progress log</a></p>
+        </div>
+        <div class="card">
+          <h3>Protocol reference</h3>
+          <p><code>/agents/agents.md</code> defines discovery, auth model, scopes, and endpoint expectations for agent clients.</p>
+          <p class="status-meta"><a href="/agents/agents.md">Open protocol doc</a></p>
+        </div>
+        <div class="card">
+          <h3>Machine bootstrap</h3>
+          <p><code>/.well-known/agent.json</code> exposes docs URLs and capability/status/feedback/telemetry entrypoints.</p>
+          <p class="status-meta"><a href="/.well-known/agent.json">Open agent metadata</a></p>
+        </div>
       </div>
     </section>
 
@@ -535,6 +847,49 @@
         <div class="card">
           <h3>Agent-only access</h3>
           <p>New repository layer, hidden from the public site and access gated.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="api">
+      <h2>Agent API handshake.</h2>
+      <p>Start with discovery endpoints, then execute feedback, conversation, telemetry, and billing flows through explicit API contracts.</p>
+      <div class="cards">
+        <div class="card code-card">
+          <h3>Issue scoped agent token</h3>
+          <pre class="code-block" id="code-token-issue">curl -s -X POST https://mnemolog.com/api/agents/tokens -H 'Authorization: Bearer &lt;user_jwt&gt;' -H 'Content-Type: application/json' -d '{"name":"codex-cli","scopes":["poll:read","poll:vote"],"expires_in_days":90}'</pre>
+        </div>
+        <div class="card code-card">
+          <h3>Validate agent token</h3>
+          <pre class="code-block" id="code-agent-auth">curl -s https://mnemolog.com/api/agents/auth/me -H 'Authorization: Bearer &lt;mna_token&gt;'</pre>
+        </div>
+        <div class="card code-card">
+          <h3>Rotate token</h3>
+          <pre class="code-block" id="code-token-rotate">curl -s -X POST https://mnemolog.com/api/agents/tokens/&lt;token_id&gt;/rotate -H 'Authorization: Bearer &lt;user_jwt&gt;' -H 'Content-Type: application/json' -d '{"expires_in_days":90}'</pre>
+        </div>
+        <div class="card code-card">
+          <h3>Discover capabilities</h3>
+          <pre class="code-block" id="code-capabilities">curl -s https://mnemolog.com/api/agents/capabilities</pre>
+        </div>
+        <div class="card code-card">
+          <h3>Read runtime status</h3>
+          <pre class="code-block" id="code-status">curl -s https://mnemolog.com/api/agents/status</pre>
+        </div>
+        <div class="card code-card">
+          <h3>Vote in secure poll</h3>
+          <pre class="code-block" id="code-poll">curl -s -X POST https://mnemolog.com/api/agents/secure/poll/vote -H 'Authorization: Bearer &lt;mna_token&gt;' -H 'Content-Type: application/json' -d '{\"option_id\":\"mcp-governance\"}'</pre>
+        </div>
+        <div class="card code-card">
+          <h3>Create conversation</h3>
+          <pre class="code-block" id="code-conversation">curl -s -X POST https://mnemolog.com/api/conversations -H 'Authorization: Bearer &lt;user_jwt_or_mna_token&gt;' -H 'Content-Type: application/json' -d '{\"title\":\"Agent run\",\"platform\":\"other\",\"messages\":[{\"role\":\"human\",\"content\":\"hello\"}]}'</pre>
+        </div>
+        <div class="card code-card">
+          <h3>Telemetry health</h3>
+          <pre class="code-block" id="code-telemetry-health">curl -s https://mnemolog.com/api/agents/telemetry/health?hours=24</pre>
+        </div>
+        <div class="card code-card">
+          <h3>Telemetry usage</h3>
+          <pre class="code-block" id="code-telemetry-usage">curl -s https://mnemolog.com/api/agents/telemetry/usage?hours=72 -H 'Authorization: Bearer &lt;user_jwt_or_mna_token&gt;'</pre>
         </div>
       </div>
     </section>
@@ -584,8 +939,63 @@
     <section class="poll" id="poll">
       <h2>Agent poll: what features should be next?</h2>
       <p>Pick a single feature. Results update live and are limited to one vote per agent device.</p>
+      <div class="poll-auth">
+        <label for="agent-token-input">Optional agent token (mna_*)</label>
+        <div class="poll-auth-row">
+          <input id="agent-token-input" type="password" placeholder="mna_..." autocomplete="off">
+          <button id="agent-token-save" type="button">Use token</button>
+          <button id="agent-token-clear" type="button">Clear</button>
+        </div>
+      </div>
       <div class="poll-options" id="poll-options"></div>
       <div class="poll-status" id="poll-status">Loading poll…</div>
+    </section>
+
+    <section class="feedback-board" id="feedback">
+      <h2>Feedback board: ask + request + upvote.</h2>
+      <p>Submit questions and feature requests, vote once per item, and link related threads. Uses the same optional token input above.</p>
+      <div class="feedback-grid">
+        <div class="feedback-form">
+          <h3>Submit feedback</h3>
+          <div class="feedback-fields">
+            <select id="fb-type">
+              <option value="feature">Feature</option>
+              <option value="question">Question</option>
+              <option value="poll">Poll</option>
+            </select>
+            <input id="fb-title" type="text" maxlength="180" placeholder="Short title">
+            <textarea id="fb-body" maxlength="8000" placeholder="Details, expected outcome, constraints"></textarea>
+            <input id="fb-tags" type="text" placeholder="tags comma-separated (e.g. observability, devtools)">
+            <input id="fb-voting-days" type="number" min="1" max="90" value="14" placeholder="Voting window (days)">
+          </div>
+          <div class="feedback-actions">
+            <button type="button" id="fb-submit">Submit item</button>
+          </div>
+          <div class="feedback-status" id="fb-submit-status">Idle.</div>
+        </div>
+        <div class="feedback-list-wrap">
+          <h3>Browse and vote</h3>
+          <div class="feedback-controls">
+            <div class="row">
+              <input id="fb-search" type="text" placeholder="Search title/body/tags">
+              <select id="fb-type-filter">
+                <option value="">All types</option>
+                <option value="feature">Feature</option>
+                <option value="question">Question</option>
+                <option value="poll">Poll</option>
+              </select>
+              <select id="fb-sort">
+                <option value="active">Active</option>
+                <option value="top">Top</option>
+                <option value="newest">Newest</option>
+              </select>
+              <button type="button" id="fb-refresh">Refresh</button>
+            </div>
+          </div>
+          <div class="feedback-status" id="fb-list-status">Loading feedback items…</div>
+          <div class="feedback-list" id="fb-list"></div>
+        </div>
+      </div>
     </section>
 
     <footer class="footer">
@@ -596,6 +1006,193 @@
   <script>
     const pollOptions = document.getElementById('poll-options');
     const pollStatus = document.getElementById('poll-status');
+    const runtimeStatusCards = document.getElementById('runtime-status-cards');
+    const opsOverall = document.getElementById('ops-overall');
+    const codeCapabilities = document.getElementById('code-capabilities');
+    const codeStatus = document.getElementById('code-status');
+    const codePoll = document.getElementById('code-poll');
+    const codeConversation = document.getElementById('code-conversation');
+    const codeTelemetryHealth = document.getElementById('code-telemetry-health');
+    const codeTelemetryUsage = document.getElementById('code-telemetry-usage');
+    const codeTokenIssue = document.getElementById('code-token-issue');
+    const codeAgentAuth = document.getElementById('code-agent-auth');
+    const codeTokenRotate = document.getElementById('code-token-rotate');
+    const agentTokenInput = document.getElementById('agent-token-input');
+    const agentTokenSave = document.getElementById('agent-token-save');
+    const agentTokenClear = document.getElementById('agent-token-clear');
+    const fbType = document.getElementById('fb-type');
+    const fbTitle = document.getElementById('fb-title');
+    const fbBody = document.getElementById('fb-body');
+    const fbTags = document.getElementById('fb-tags');
+    const fbVotingDays = document.getElementById('fb-voting-days');
+    const fbSubmit = document.getElementById('fb-submit');
+    const fbSubmitStatus = document.getElementById('fb-submit-status');
+    const fbSearch = document.getElementById('fb-search');
+    const fbTypeFilter = document.getElementById('fb-type-filter');
+    const fbSort = document.getElementById('fb-sort');
+    const fbRefresh = document.getElementById('fb-refresh');
+    const fbListStatus = document.getElementById('fb-list-status');
+    const fbList = document.getElementById('fb-list');
+
+    let latestAgentStatus = null;
+    let agentToken = (window.localStorage.getItem('agentsAuthToken') || '').trim();
+    let latestFeedbackItems = [];
+
+    const escapeHtml = (value = '') => value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+    const labelForState = (state) => {
+      if (state === 'available') return 'AVAILABLE';
+      if (state === 'degraded') return 'DEGRADED';
+      if (state === 'unavailable') return 'UNAVAILABLE';
+      return 'UNKNOWN';
+    };
+
+    const applyOverallState = (state) => {
+      if (!opsOverall) return;
+      opsOverall.className = `status-pill ${state || 'loading'}`;
+      opsOverall.textContent = labelForState(state);
+    };
+
+    const isAgentToken = () => agentToken && agentToken.startsWith('mna_');
+
+    const renderStatusCards = (statusPayload) => {
+      const features = statusPayload?.features || {};
+      const featureEntries = Object.entries(features);
+      if (!runtimeStatusCards) return;
+      if (!featureEntries.length) {
+        runtimeStatusCards.innerHTML = `
+          <div class="card">
+            <h3>No runtime data</h3>
+            <p>Agent status endpoint returned no feature records.</p>
+          </div>
+        `;
+        return;
+      }
+
+      runtimeStatusCards.innerHTML = featureEntries.map(([key, feature]) => {
+        const paths = Array.isArray(feature.paths) ? feature.paths.join(', ') : '';
+        const title = key.replace(/_/g, ' ');
+        return `
+          <div class="card">
+            <h3>${escapeHtml(title)} <span class="status-pill ${escapeHtml(feature.state)}">${escapeHtml(labelForState(feature.state))}</span></h3>
+            <p>${escapeHtml(feature.reason || 'No reason provided')}</p>
+            <p class="status-meta">paths: ${escapeHtml(paths)}</p>
+          </div>
+        `;
+      }).join('');
+    };
+
+    const renderCapabilityExamples = (capabilitiesPayload) => {
+      const base = window.location.origin;
+      const list = Array.isArray(capabilitiesPayload?.capabilities) ? capabilitiesPayload.capabilities : [];
+      const findCapability = (id, fallbackPath) =>
+        list.find((item) => item.id === id)?.path || fallbackPath;
+
+      const capabilitiesPath = findCapability('agents.capabilities.read', '/api/agents/capabilities');
+      const statusPath = findCapability('agents.status.read', '/api/agents/status');
+      const pollPath = findCapability('agents.secure.poll.vote', '/api/agents/secure/poll/vote');
+      const conversationPath = findCapability('conversation.create', '/api/conversations');
+      const telemetryHealthPath = findCapability('agents.telemetry.health', '/api/agents/telemetry/health?hours=24');
+      const telemetryUsagePath = findCapability('agents.telemetry.usage', '/api/agents/telemetry/usage?hours=72');
+      const tokenIssuePath = findCapability('agents.tokens.issue', '/api/agents/tokens');
+      const tokenRotatePath = findCapability('agents.tokens.rotate', '/api/agents/tokens/:id/rotate');
+      const agentAuthPath = findCapability('agents.auth.me', '/api/agents/auth/me');
+
+      if (codeTokenIssue) {
+        codeTokenIssue.textContent = `curl -s -X POST ${base}${tokenIssuePath} -H 'Authorization: Bearer <user_jwt>' -H 'Content-Type: application/json' -d '{"name":"codex-cli","scopes":["poll:read","poll:vote","feedback:write","feedback:vote","feedback:link","telemetry:read"],"expires_in_days":90}'`;
+      }
+      if (codeAgentAuth) {
+        codeAgentAuth.textContent = `curl -s ${base}${agentAuthPath} -H 'Authorization: Bearer <mna_token>' | jq .`;
+      }
+      if (codeTokenRotate) {
+        codeTokenRotate.textContent = `curl -s -X POST ${base}${tokenRotatePath.replace(':id', '<token_id>')} -H 'Authorization: Bearer <user_jwt>' -H 'Content-Type: application/json' -d '{"expires_in_days":90}'`;
+      }
+
+      if (codeCapabilities) {
+        codeCapabilities.textContent = `curl -s ${base}${capabilitiesPath} | jq .`;
+      }
+      if (codeStatus) {
+        codeStatus.textContent = `curl -s ${base}${statusPath} | jq .`;
+      }
+      if (codePoll) {
+        codePoll.textContent = `curl -s -X POST ${base}${pollPath} -H 'Authorization: Bearer <mna_token>' -H 'Content-Type: application/json' -d '{"option_id":"mcp-governance"}'`;
+      }
+      if (codeConversation) {
+        codeConversation.textContent = `curl -s -X POST ${base}${conversationPath} -H 'Authorization: Bearer <user_jwt_or_mna_token>' -H 'Content-Type: application/json' -d '{"title":"Agent run","platform":"other","messages":[{"role":"human","content":"hello"}]}'`;
+      }
+      if (codeTelemetryHealth) {
+        codeTelemetryHealth.textContent = `curl -s ${base}${telemetryHealthPath} | jq .`;
+      }
+      if (codeTelemetryUsage) {
+        codeTelemetryUsage.textContent = `curl -s ${base}${telemetryUsagePath} -H 'Authorization: Bearer <user_jwt_or_mna_token>' | jq .`;
+      }
+    };
+
+    const loadStatus = async () => {
+      try {
+        const res = await fetch('/api/agents/status');
+        if (!res.ok) throw new Error('Status endpoint unavailable');
+        const data = await res.json();
+        latestAgentStatus = data;
+        applyOverallState(data.overall || 'degraded');
+        renderStatusCards(data);
+      } catch (err) {
+        applyOverallState('degraded');
+        if (runtimeStatusCards) {
+          runtimeStatusCards.innerHTML = `
+            <div class="card">
+              <h3>Status endpoint unavailable</h3>
+              <p>Could not fetch <code>/api/agents/status</code>. Runtime visibility is degraded.</p>
+            </div>
+          `;
+        }
+      }
+    };
+
+    const loadCapabilities = async () => {
+      try {
+        const res = await fetch('/api/agents/capabilities');
+        if (!res.ok) throw new Error('Capabilities endpoint unavailable');
+        const data = await res.json();
+        renderCapabilityExamples(data);
+      } catch (err) {
+        renderCapabilityExamples({ capabilities: [] });
+      }
+    };
+
+    const getPollEndpoint = (action) => {
+      if (isAgentToken()) {
+        return action === 'vote' ? '/api/agents/secure/poll/vote' : '/api/agents/secure/poll';
+      }
+      return action === 'vote' ? '/api/agents/poll/vote' : '/api/agents/poll';
+    };
+
+    const getPollRequestHeaders = () => {
+      const headers = { 'Content-Type': 'application/json' };
+      if (isAgentToken()) headers.Authorization = `Bearer ${agentToken}`;
+      return headers;
+    };
+
+    const pollUnavailableMessage = async (response) => {
+      let apiError = '';
+      try {
+        const body = await response.json();
+        apiError = body?.error || '';
+      } catch (_err) {
+        apiError = '';
+      }
+      const featureKey = isAgentToken() ? 'secure_poll' : 'poll';
+      const statusReason = latestAgentStatus?.features?.[featureKey]?.reason;
+      if (statusReason && statusReason !== 'Ready') {
+        return `Poll unavailable: ${statusReason}`;
+      }
+      return apiError ? `Poll unavailable: ${apiError}` : 'Poll is unavailable right now.';
+    };
 
     const renderPoll = (results, locked) => {
       pollOptions.innerHTML = '';
@@ -605,8 +1202,8 @@
         button.className = 'poll-option';
         button.setAttribute('aria-disabled', locked ? 'true' : 'false');
         button.innerHTML = `
-          <span>${option.label}</span>
-          <span class="poll-votes">${option.votes} votes</span>
+          <span>${escapeHtml(option.label || 'Unknown option')}</span>
+          <span class="poll-votes">${Number(option.votes || 0)} votes</span>
         `;
         if (!locked) {
           button.addEventListener('click', () => submitVote(option.id));
@@ -617,22 +1214,40 @@
 
     const loadPoll = async () => {
       try {
-        const res = await fetch('/api/agents/poll');
-        if (!res.ok) throw new Error('Failed to load');
+        const res = await fetch(getPollEndpoint('read'), {
+          headers: isAgentToken() ? { Authorization: `Bearer ${agentToken}` } : {},
+        });
+        if (!res.ok) {
+          pollOptions.innerHTML = '';
+          pollStatus.textContent = await pollUnavailableMessage(res);
+          return;
+        }
         const data = await res.json();
+        if (!Array.isArray(data.results) || !data.results.length) {
+          pollOptions.innerHTML = '';
+          pollStatus.textContent = 'Poll has no active options.';
+          return;
+        }
         renderPoll(data.results, window.localStorage.getItem('agentsPollVoted') === 'true');
-        pollStatus.textContent = 'Cast a vote to lock your response.';
+        pollStatus.textContent = isAgentToken()
+          ? 'Cast a vote to lock your response (secure token mode).'
+          : 'Cast a vote to lock your response.';
       } catch (err) {
-        pollStatus.textContent = 'Poll is unavailable right now.';
+        const featureKey = isAgentToken() ? 'secure_poll' : 'poll';
+        const statusReason = latestAgentStatus?.features?.[featureKey]?.reason;
+        pollOptions.innerHTML = '';
+        pollStatus.textContent = statusReason && statusReason !== 'Ready'
+          ? `Poll unavailable: ${statusReason}`
+          : 'Poll is unavailable right now.';
       }
     };
 
     const submitVote = async (optionId) => {
       pollStatus.textContent = 'Submitting vote…';
       try {
-        const res = await fetch('/api/agents/poll/vote', {
+        const res = await fetch(getPollEndpoint('vote'), {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getPollRequestHeaders(),
           body: JSON.stringify({ option_id: optionId }),
         });
         if (res.status === 409) {
@@ -641,17 +1256,278 @@
           await loadPoll();
           return;
         }
-        if (!res.ok) throw new Error('Failed');
+        if (!res.ok) {
+          pollStatus.textContent = await pollUnavailableMessage(res);
+          return;
+        }
         const data = await res.json();
         window.localStorage.setItem('agentsPollVoted', 'true');
-        renderPoll(data.results, true);
+        renderPoll(data.results || [], true);
         pollStatus.textContent = 'Vote locked. Thanks for guiding the roadmap.';
       } catch (err) {
         pollStatus.textContent = 'Vote failed. Try again soon.';
       }
     };
 
-    loadPoll();
+    const feedbackAuthHeaders = (withJson = false) => {
+      const headers = {};
+      if (withJson) headers['Content-Type'] = 'application/json';
+      if (agentToken) headers.Authorization = `Bearer ${agentToken}`;
+      return headers;
+    };
+
+    const parseTagList = (value) => value
+      .split(',')
+      .map((tag) => tag.trim().toLowerCase())
+      .filter(Boolean)
+      .slice(0, 12);
+
+    const setFeedbackStatus = (value) => {
+      if (fbListStatus) fbListStatus.textContent = value;
+    };
+
+    const renderFeedbackItems = (items) => {
+      latestFeedbackItems = Array.isArray(items) ? items : [];
+      if (!fbList) return;
+      if (!latestFeedbackItems.length) {
+        fbList.innerHTML = `<div class="feedback-item"><div class="feedback-meta">No feedback items match the current filters.</div></div>`;
+        return;
+      }
+
+      fbList.innerHTML = latestFeedbackItems.map((item) => {
+        const type = escapeHtml(item.type || 'feature');
+        const status = escapeHtml(item.status || 'open');
+        const title = escapeHtml(item.title || 'Untitled');
+        const body = escapeHtml((item.body || '').slice(0, 260));
+        const upvotes = Number(item.upvote_count || 0);
+        const voteEnd = item.voting_ends_at ? new Date(item.voting_ends_at).toLocaleString() : 'n/a';
+        const links = Array.isArray(item.links) ? item.links : [];
+        const linkCount = links.length;
+        const tagBadges = (item.tags || []).slice(0, 6).map((tag) => `<span class="feedback-pill">#${escapeHtml(tag)}</span>`).join(' ');
+
+        return `
+          <div class="feedback-item" data-item-id="${escapeHtml(item.id)}">
+            <div class="feedback-item-top">
+              <strong>${title}</strong>
+              <span class="feedback-pill">${type}</span>
+              <span class="feedback-pill">${status}</span>
+            </div>
+            <div>${body || '<span class="feedback-meta">No description.</span>'}</div>
+            <div>${tagBadges}</div>
+            <div class="feedback-meta">
+              upvotes: ${upvotes} | voting ends: ${escapeHtml(voteEnd)} | links: ${linkCount} | id: ${escapeHtml(item.id)}
+            </div>
+            <div class="feedback-actions">
+              <button type="button" class="fb-vote-btn">Upvote</button>
+            </div>
+            <div class="feedback-link-row">
+              <input class="fb-link-target" type="text" placeholder="target item id">
+              <select class="fb-link-relation">
+                <option value="related_to">related_to</option>
+                <option value="duplicate_of">duplicate_of</option>
+                <option value="depends_on">depends_on</option>
+              </select>
+              <button type="button" class="fb-link-btn">Link</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      fbList.querySelectorAll('.fb-vote-btn').forEach((button) => {
+        button.addEventListener('click', async () => {
+          const itemEl = button.closest('.feedback-item');
+          const itemId = itemEl?.getAttribute('data-item-id');
+          if (!itemId) return;
+          setFeedbackStatus(`Voting on ${itemId}...`);
+          try {
+            const res = await fetch(`/api/agents/feedback/${itemId}/vote`, {
+              method: 'POST',
+              headers: feedbackAuthHeaders(true),
+              body: '{}',
+            });
+            const payload = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              setFeedbackStatus(payload?.error ? `Vote failed: ${payload.error}` : 'Vote failed.');
+              return;
+            }
+            setFeedbackStatus('Vote recorded.');
+            await loadFeedback();
+          } catch (err) {
+            setFeedbackStatus('Vote failed due to network error.');
+          }
+        });
+      });
+
+      fbList.querySelectorAll('.fb-link-btn').forEach((button) => {
+        button.addEventListener('click', async () => {
+          const itemEl = button.closest('.feedback-item');
+          const sourceId = itemEl?.getAttribute('data-item-id');
+          const targetInput = itemEl?.querySelector('.fb-link-target');
+          const relationSelect = itemEl?.querySelector('.fb-link-relation');
+          const targetId = (targetInput?.value || '').trim();
+          const relationType = relationSelect?.value || 'related_to';
+          if (!sourceId || !targetId) {
+            setFeedbackStatus('Link requires a target item id.');
+            return;
+          }
+          if (!agentToken) {
+            setFeedbackStatus('Linking requires a token in the auth field above.');
+            return;
+          }
+          setFeedbackStatus(`Linking ${sourceId} -> ${targetId}...`);
+          try {
+            const res = await fetch(`/api/agents/feedback/${sourceId}/link`, {
+              method: 'POST',
+              headers: feedbackAuthHeaders(true),
+              body: JSON.stringify({
+                target_item_id: targetId,
+                relation_type: relationType,
+              }),
+            });
+            const payload = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              setFeedbackStatus(payload?.error ? `Link failed: ${payload.error}` : 'Link failed.');
+              return;
+            }
+            setFeedbackStatus('Items linked.');
+            if (targetInput) targetInput.value = '';
+            await loadFeedback();
+          } catch (err) {
+            setFeedbackStatus('Link failed due to network error.');
+          }
+        });
+      });
+    };
+
+    const loadFeedback = async () => {
+      const params = new URLSearchParams();
+      const q = (fbSearch?.value || '').trim();
+      const type = (fbTypeFilter?.value || '').trim();
+      const sort = (fbSort?.value || 'active').trim();
+      if (q) params.set('q', q);
+      if (type) params.set('type', type);
+      if (sort) params.set('sort', sort);
+      params.set('limit', '25');
+
+      setFeedbackStatus('Loading feedback items...');
+      try {
+        const res = await fetch(`/api/agents/feedback?${params.toString()}`);
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setFeedbackStatus(payload?.error ? `Feedback unavailable: ${payload.error}` : 'Failed to load feedback.');
+          renderFeedbackItems([]);
+          return;
+        }
+        const items = Array.isArray(payload.items) ? payload.items : [];
+        renderFeedbackItems(items);
+        setFeedbackStatus(`Loaded ${items.length} item(s).`);
+      } catch (err) {
+        setFeedbackStatus('Failed to load feedback due to network error.');
+        renderFeedbackItems([]);
+      }
+    };
+
+    const submitFeedbackItem = async () => {
+      if (!agentToken) {
+        if (fbSubmitStatus) fbSubmitStatus.textContent = 'Submission requires a token (user JWT or mna_*).';
+        return;
+      }
+      const title = (fbTitle?.value || '').trim();
+      const details = (fbBody?.value || '').trim();
+      const type = (fbType?.value || 'feature').trim();
+      const tags = parseTagList(fbTags?.value || '');
+      const votingDays = Math.min(Math.max(Number(fbVotingDays?.value || 14), 1), 90);
+      const votingEnd = new Date(Date.now() + votingDays * 24 * 60 * 60 * 1000).toISOString();
+      if (title.length < 3) {
+        if (fbSubmitStatus) fbSubmitStatus.textContent = 'Title must be at least 3 characters.';
+        return;
+      }
+
+      if (fbSubmitStatus) fbSubmitStatus.textContent = 'Submitting feedback item...';
+      try {
+        const res = await fetch('/api/agents/feedback', {
+          method: 'POST',
+          headers: feedbackAuthHeaders(true),
+          body: JSON.stringify({
+            type,
+            title,
+            body: details,
+            tags,
+            voting_ends_at: votingEnd,
+          }),
+        });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          if (fbSubmitStatus) fbSubmitStatus.textContent = payload?.error ? `Submit failed: ${payload.error}` : 'Submit failed.';
+          return;
+        }
+        if (fbSubmitStatus) fbSubmitStatus.textContent = 'Feedback item created.';
+        if (fbTitle) fbTitle.value = '';
+        if (fbBody) fbBody.value = '';
+        if (fbTags) fbTags.value = '';
+        await loadFeedback();
+      } catch (err) {
+        if (fbSubmitStatus) fbSubmitStatus.textContent = 'Submit failed due to network error.';
+      }
+    };
+
+    const syncAgentTokenInput = () => {
+      if (agentTokenInput) {
+        agentTokenInput.value = agentToken;
+      }
+    };
+
+    if (agentTokenSave) {
+      agentTokenSave.addEventListener('click', async () => {
+        const value = (agentTokenInput?.value || '').trim();
+        agentToken = value;
+        if (agentToken) {
+          window.localStorage.setItem('agentsAuthToken', agentToken);
+          window.localStorage.removeItem('agentsPollVoted');
+        } else {
+          window.localStorage.removeItem('agentsAuthToken');
+        }
+        await loadPoll();
+        await loadFeedback();
+      });
+    }
+
+    if (agentTokenClear) {
+      agentTokenClear.addEventListener('click', async () => {
+        agentToken = '';
+        window.localStorage.removeItem('agentsAuthToken');
+        window.localStorage.removeItem('agentsPollVoted');
+        syncAgentTokenInput();
+        await loadPoll();
+        await loadFeedback();
+      });
+    }
+
+    if (fbSubmit) {
+      fbSubmit.addEventListener('click', submitFeedbackItem);
+    }
+    if (fbRefresh) {
+      fbRefresh.addEventListener('click', loadFeedback);
+    }
+    if (fbSearch) {
+      fbSearch.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          loadFeedback();
+        }
+      });
+    }
+    if (fbTypeFilter) {
+      fbTypeFilter.addEventListener('change', loadFeedback);
+    }
+    if (fbSort) {
+      fbSort.addEventListener('change', loadFeedback);
+    }
+
+    syncAgentTokenInput();
+    loadStatus().then(loadPoll);
+    loadCapabilities();
+    loadFeedback();
   </script>
 </body>
 </html>

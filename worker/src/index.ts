@@ -16,7 +16,15 @@ interface Env {
   STRIPE_PRICE_MAP?: string;
   APP_URL?: string;
   POLL_SALT?: string;
+  FEEDBACK_POSTING_START?: string;
+  FEEDBACK_POSTING_END?: string;
+  FEEDBACK_DEFAULT_VOTING_DAYS?: string;
+  FEEDBACK_MAX_VOTING_DAYS?: string;
+  TELEMETRY_SUCCESS_SAMPLE_RATE?: string;
+  TELEMETRY_MAX_USAGE_ROWS?: string;
 }
+
+type FeatureState = 'available' | 'degraded' | 'unavailable';
 
 interface Message {
   role: 'human' | 'assistant';
@@ -54,6 +62,16 @@ interface ArchivePayload {
   };
   source?: string;
   version?: string;
+}
+
+interface AgentTokenClaims {
+  id: string;
+  user_id: string;
+  name: string;
+  scopes: string[];
+  status: string;
+  expires_at: string | null;
+  revoked_at: string | null;
 }
 
 // CORS headers
@@ -155,6 +173,313 @@ async function hashString(message: string) {
     .join('');
 }
 
+function getBearerToken(request: IRequest) {
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) return null;
+  const token = authHeader.replace('Bearer ', '').trim();
+  return token || null;
+}
+
+function generateAgentToken() {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  const hex = Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+  return `mna_${hex}`;
+}
+
+function normalizeAgentScopes(raw: unknown) {
+  if (!Array.isArray(raw) || !raw.length) {
+    return { scopes: ['status:read', 'capabilities:read'], invalid: [] as string[] };
+  }
+
+  const clean = raw
+    .map((item) => (typeof item === 'string' ? item.trim() : ''))
+    .filter(Boolean);
+  const unique = Array.from(new Set(clean));
+  const invalid = unique.filter((scope) => !allowedAgentScopes.has(scope));
+  const scopes = unique.filter((scope) => allowedAgentScopes.has(scope));
+  return { scopes: scopes.length ? scopes : ['status:read', 'capabilities:read'], invalid };
+}
+
+function hasScope(scopes: string[] | null | undefined, requiredScope?: string) {
+  if (!requiredScope) return true;
+  if (!Array.isArray(scopes)) return false;
+  return scopes.includes('*') || scopes.includes(requiredScope);
+}
+
+function formatIsoInDays(days: number) {
+  const now = Date.now();
+  return new Date(now + days * 24 * 60 * 60 * 1000).toISOString();
+}
+
+function parseIsoDate(value?: string | null) {
+  if (!value) return null;
+  const ms = new Date(value).getTime();
+  if (!Number.isFinite(ms)) return null;
+  return new Date(ms).toISOString();
+}
+
+function parsePositiveInt(value: string | undefined, fallback: number, min: number, max: number) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(Math.max(Math.floor(n), min), max);
+}
+
+function withinWindow(nowMs: number, startIso?: string | null, endIso?: string | null) {
+  if (startIso) {
+    const startMs = new Date(startIso).getTime();
+    if (Number.isFinite(startMs) && nowMs < startMs) return false;
+  }
+  if (endIso) {
+    const endMs = new Date(endIso).getTime();
+    if (Number.isFinite(endMs) && nowMs > endMs) return false;
+  }
+  return true;
+}
+
+function buildFeedbackConfig(env: Env) {
+  const postingStart = parseIsoDate(env.FEEDBACK_POSTING_START);
+  const postingEnd = parseIsoDate(env.FEEDBACK_POSTING_END);
+  const defaultVotingDays = parsePositiveInt(env.FEEDBACK_DEFAULT_VOTING_DAYS, 14, 1, 90);
+  const maxVotingDays = parsePositiveInt(env.FEEDBACK_MAX_VOTING_DAYS, 90, 1, 365);
+  return {
+    postingStart,
+    postingEnd,
+    defaultVotingDays,
+    maxVotingDays,
+  };
+}
+
+function parseTags(raw: unknown) {
+  if (!Array.isArray(raw)) return [] as string[];
+  const clean = raw
+    .map((item) => (typeof item === 'string' ? item.trim().toLowerCase() : ''))
+    .filter(Boolean)
+    .slice(0, 12);
+  return Array.from(new Set(clean));
+}
+
+function parseSampleRate(value: string | undefined, fallback: number) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  if (n < 0) return 0;
+  if (n > 1) return 1;
+  return n;
+}
+
+function normalizeTelemetryPath(pathname: string) {
+  return pathname
+    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/gi, ':id')
+    .replace(/\/\d+(?=\/|$)/g, '/:id');
+}
+
+function telemetryAuthMode(request: IRequest) {
+  const bearer = getBearerToken(request);
+  if (!bearer) {
+    return getClientIp(request) ? 'anonymous' : 'none';
+  }
+  if (bearer.startsWith('mna_')) return 'agent_token';
+  return 'user_jwt';
+}
+
+function telemetryFeatureArea(pathname: string) {
+  if (pathname.startsWith('/api/agents/feedback')) return 'feedback';
+  if (pathname.startsWith('/api/agents/tokens') || pathname === '/api/agents/auth/me') return 'agent_tokens';
+  if (pathname.startsWith('/api/agents/secure/poll') || pathname.startsWith('/api/agents/poll')) return 'poll';
+  if (pathname.startsWith('/api/agents/telemetry')) return 'telemetry';
+  if (pathname === '/api/agents/status' || pathname === '/api/agents/capabilities') return 'discovery';
+  if (pathname.startsWith('/api/conversations') || pathname === '/api/archive') return 'conversations';
+  if (pathname.startsWith('/api/billing')) return 'billing';
+  if (pathname.startsWith('/api/agents')) return 'agents';
+  return 'other';
+}
+
+function shouldLogTelemetry(pathname: string, method: string) {
+  if (method.toUpperCase() === 'OPTIONS') return false;
+  if (pathname.startsWith('/api/agents')) return true;
+  if (pathname === '/api/archive') return true;
+  if (pathname.startsWith('/api/conversations') && ['POST', 'PUT'].includes(method.toUpperCase())) return true;
+  return false;
+}
+
+function percentile95(values: number[]) {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const idx = Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * 0.95) - 1));
+  return sorted[idx];
+}
+
+async function logAgentTelemetry(request: IRequest, response: Response, env: Env, durationMs: number) {
+  const url = new URL(request.url);
+  const path = url.pathname;
+  const method = request.method.toUpperCase();
+  if (!shouldLogTelemetry(path, method)) return;
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return;
+
+  const status = Number(response.status || 500);
+  const statusClass = `${Math.floor(status / 100)}xx`;
+  const success = status < 400;
+  const successSampleRate = parseSampleRate(env.TELEMETRY_SUCCESS_SAMPLE_RATE, 0.25);
+  if (success && Math.random() > successSampleRate) return;
+
+  const authMode = telemetryAuthMode(request);
+  const bearer = getBearerToken(request);
+  let identityHash: string | null = null;
+  if (bearer) {
+    identityHash = (await hashString(`identity:${bearer}`)).slice(0, 40);
+  } else {
+    const ip = getClientIp(request);
+    if (ip) identityHash = (await hashString(`identity:ip:${ip}`)).slice(0, 40);
+  }
+
+  const supabase = getServiceSupabase(env);
+  const telemetryRow = {
+    endpoint: normalizeTelemetryPath(path),
+    method,
+    feature_area: telemetryFeatureArea(path),
+    auth_mode: authMode,
+    status_code: status,
+    status_class: statusClass,
+    duration_ms: Math.max(0, Math.round(durationMs)),
+    success,
+    request_path: path,
+    identity_hash: identityHash,
+    request_id: request.headers.get('CF-Ray') || request.headers.get('X-Request-Id') || null,
+    metadata: {
+      query: url.search ? true : false,
+      is_success: success,
+      sampled_rate: successSampleRate,
+    },
+  };
+
+  const { error } = await supabase
+    .from('agent_telemetry_events')
+    .insert(telemetryRow);
+  if (error) {
+    console.error('Telemetry log insert error', error);
+  }
+}
+
+async function resolveFeedbackActor(request: IRequest, env: Env, requiredAgentScope: string, allowAnonymous = false) {
+  const bearer = getBearerToken(request);
+  if (bearer?.startsWith('mna_')) {
+    const agentAuth = await requireAgentTokenScope(request, env, requiredAgentScope);
+    if (agentAuth.response) return { response: agentAuth.response } as const;
+    return {
+      response: null as Response | null,
+      mode: 'agent' as const,
+      userId: agentAuth.claims!.user_id,
+      agentTokenId: agentAuth.claims!.id,
+      identityType: 'agent' as const,
+      identityValue: agentAuth.claims!.id,
+    };
+  }
+
+  if (bearer) {
+    if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
+      return { response: json({ error: 'Auth unavailable' }, 503) } as const;
+    }
+    const authHeader = request.headers.get('Authorization') || undefined;
+    const userSupabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+      global: {
+        headers: authHeader ? { Authorization: authHeader } : {},
+      },
+    });
+    const user = await getUser(request, userSupabase);
+    if (!user) {
+      return { response: json({ error: 'Unauthorized' }, 401) } as const;
+    }
+    return {
+      response: null as Response | null,
+      mode: 'user' as const,
+      userId: user.id,
+      agentTokenId: null as string | null,
+      identityType: 'user' as const,
+      identityValue: user.id,
+    };
+  }
+
+  if (!allowAnonymous) {
+    return { response: json({ error: 'Auth required' }, 401) } as const;
+  }
+  const ip = getClientIp(request);
+  if (!ip) {
+    return { response: json({ error: 'Unable to identify voter' }, 400) } as const;
+  }
+  return {
+    response: null as Response | null,
+    mode: 'anonymous' as const,
+    userId: null as string | null,
+    agentTokenId: null as string | null,
+    identityType: 'anon' as const,
+    identityValue: ip,
+  };
+}
+
+async function resolveAgentTokenClaims(request: IRequest, env: Env) {
+  const token = getBearerToken(request);
+  if (!token || !token.startsWith('mna_')) return null;
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) return null;
+
+  const supabase = getServiceSupabase(env);
+  const tokenHash = await hashString(token);
+  const { data, error } = await supabase
+    .from('agent_tokens')
+    .select('id, user_id, name, scopes, status, expires_at, revoked_at')
+    .eq('token_hash', tokenHash)
+    .single();
+
+  if (error || !data) return null;
+  if (data.status !== 'active') return null;
+  if (data.revoked_at) return null;
+  if (data.expires_at && new Date(data.expires_at).getTime() <= Date.now()) return null;
+
+  // best effort usage telemetry
+  await supabase
+    .from('agent_tokens')
+    .update({ last_used_at: new Date().toISOString() })
+    .eq('id', data.id)
+    .eq('status', 'active');
+
+  return data as AgentTokenClaims;
+}
+
+async function requireAgentTokenScope(request: IRequest, env: Env, scope?: string) {
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+    return {
+      claims: null as AgentTokenClaims | null,
+      response: json({ error: 'Agent token auth unavailable: missing SUPABASE_SERVICE_ROLE_KEY' }, 503),
+    };
+  }
+
+  const token = getBearerToken(request);
+  if (!token || !token.startsWith('mna_')) {
+    return {
+      claims: null as AgentTokenClaims | null,
+      response: json({ error: 'Agent token required' }, 401),
+    };
+  }
+
+  const claims = await resolveAgentTokenClaims(request, env);
+  if (!claims) {
+    return {
+      claims: null as AgentTokenClaims | null,
+      response: json({ error: 'Invalid or expired agent token' }, 401),
+    };
+  }
+
+  if (!hasScope(claims.scopes, scope)) {
+    return {
+      claims: null as AgentTokenClaims | null,
+      response: json({ error: `Missing required scope: ${scope}` }, 403),
+    };
+  }
+
+  return { claims, response: null as Response | null };
+}
+
 function getClientIp(request: IRequest) {
   const raw = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || '';
   return raw.split(',')[0].trim();
@@ -170,6 +495,351 @@ const pollQuestion = {
     { id: 'knowledge-vault', label: 'Agent knowledge vault & provenance' },
   ],
 };
+
+const feedbackTypes = new Set(['question', 'feature', 'poll']);
+const feedbackStatuses = new Set(['open', 'closed', 'archived']);
+const feedbackRelationTypes = new Set(['duplicate_of', 'related_to', 'depends_on']);
+
+const allowedAgentScopes = new Set([
+  '*',
+  'status:read',
+  'capabilities:read',
+  'poll:read',
+  'poll:vote',
+  'feedback:read',
+  'feedback:write',
+  'feedback:vote',
+  'feedback:link',
+  'telemetry:read',
+  'conversations:read',
+  'conversations:write',
+  'billing:read',
+  'billing:write',
+]);
+
+function hasEnvValue(value?: string | null) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function missingEnvNames(checks: Array<[string, boolean]>) {
+  return checks.filter(([, ok]) => !ok).map(([name]) => name);
+}
+
+function featureStatusFromMissing(missing: string[]): FeatureState {
+  return missing.length ? 'unavailable' : 'available';
+}
+
+function summarizeReason(missing: string[]) {
+  return missing.length ? `Missing env: ${missing.join(', ')}` : 'Ready';
+}
+
+function buildAgentsStatus(env: Env) {
+  const hasSupabaseUrl = hasEnvValue(env.SUPABASE_URL);
+  const hasSupabaseAnon = hasEnvValue(env.SUPABASE_ANON_KEY);
+  const hasSupabaseServiceRole = hasEnvValue(env.SUPABASE_SERVICE_ROLE_KEY);
+  const hasPollSalt = hasEnvValue(env.POLL_SALT);
+  const hasStripeSecret = hasEnvValue(env.STRIPE_SECRET_KEY);
+  const feedbackCfg = buildFeedbackConfig(env);
+
+  const stripePrices = getStripePriceMap(env);
+  const hasAnyStripePrice = Object.values(stripePrices).some((value) => hasEnvValue(value));
+  const hasServiceRole = hasSupabaseServiceRole;
+
+  const coreMissing = missingEnvNames([
+    ['SUPABASE_URL', hasSupabaseUrl],
+    ['SUPABASE_ANON_KEY', hasSupabaseAnon],
+  ]);
+  const pollMissing = missingEnvNames([
+    ['SUPABASE_URL', hasSupabaseUrl],
+    ['SUPABASE_SERVICE_ROLE_KEY', hasSupabaseServiceRole],
+    ['POLL_SALT', hasPollSalt],
+  ]);
+  const billingMissing = missingEnvNames([
+    ['SUPABASE_URL', hasSupabaseUrl],
+    ['SUPABASE_ANON_KEY', hasSupabaseAnon],
+    ['STRIPE_SECRET_KEY', hasStripeSecret],
+    ['STRIPE_PRICE_MAP or STRIPE_PRICE_*', hasAnyStripePrice],
+  ]);
+  const tokenCoreMissing = missingEnvNames([
+    ['SUPABASE_URL', hasSupabaseUrl],
+    ['SUPABASE_ANON_KEY', hasSupabaseAnon],
+  ]);
+  const tokenAuthMissing = missingEnvNames([
+    ['SUPABASE_SERVICE_ROLE_KEY', hasServiceRole],
+  ]);
+  const feedbackMissing = missingEnvNames([
+    ['SUPABASE_URL', hasSupabaseUrl],
+    ['SUPABASE_SERVICE_ROLE_KEY', hasServiceRole],
+  ]);
+  const telemetryMissing = missingEnvNames([
+    ['SUPABASE_URL', hasSupabaseUrl],
+    ['SUPABASE_SERVICE_ROLE_KEY', hasServiceRole],
+  ]);
+  const tokenState: FeatureState = tokenCoreMissing.length
+    ? 'unavailable'
+    : tokenAuthMissing.length
+    ? 'degraded'
+    : 'available';
+  const tokenReason = tokenCoreMissing.length
+    ? summarizeReason(tokenCoreMissing)
+    : tokenAuthMissing.length
+    ? `Management endpoints ready; bearer-token introspection unavailable (${tokenAuthMissing.join(', ')})`
+    : 'Ready';
+
+  const features = {
+    core_api: {
+      state: featureStatusFromMissing(coreMissing),
+      reason: summarizeReason(coreMissing),
+      paths: ['/api/health', '/api/conversations', '/api/conversations/:id'],
+    },
+    auth: {
+      state: featureStatusFromMissing(coreMissing),
+      reason: summarizeReason(coreMissing),
+      paths: ['/api/auth/user'],
+    },
+    poll: {
+      state: featureStatusFromMissing(pollMissing),
+      reason: summarizeReason(pollMissing),
+      paths: ['/api/agents/poll', '/api/agents/poll/vote'],
+    },
+    billing: {
+      state: featureStatusFromMissing(billingMissing),
+      reason: summarizeReason(billingMissing),
+      paths: ['/api/billing/checkout', '/api/billing/portal'],
+    },
+    continuation: {
+      state: hasSupabaseUrl ? 'available' : 'unavailable',
+      reason: hasSupabaseUrl ? 'Ready' : 'Missing env: SUPABASE_URL',
+      paths: ['/api/conversations/:id/messages', '/api/conversations/:id/continue-stream'],
+    },
+    agent_tokens: {
+      state: tokenState,
+      reason: tokenReason,
+      paths: ['/api/agents/tokens', '/api/agents/tokens/:id/revoke', '/api/agents/tokens/:id/rotate', '/api/agents/auth/me'],
+    },
+    secure_poll: {
+      state: featureStatusFromMissing(pollMissing),
+      reason: summarizeReason(pollMissing),
+      paths: ['/api/agents/secure/poll', '/api/agents/secure/poll/vote'],
+    },
+    feedback_board: {
+      state: featureStatusFromMissing(feedbackMissing),
+      reason: summarizeReason(feedbackMissing),
+      paths: [
+        '/api/agents/feedback',
+        '/api/agents/feedback/:id',
+        '/api/agents/feedback/:id/vote',
+        '/api/agents/feedback/:id/link',
+        '/api/agents/feedback/trending',
+      ],
+      posting_window: {
+        start: feedbackCfg.postingStart,
+        end: feedbackCfg.postingEnd,
+      },
+    },
+    telemetry: {
+      state: featureStatusFromMissing(telemetryMissing),
+      reason: summarizeReason(telemetryMissing),
+      paths: ['/api/agents/telemetry/health', '/api/agents/telemetry/usage'],
+      sample_success_rate: parseSampleRate(env.TELEMETRY_SUCCESS_SAMPLE_RATE, 0.25),
+    },
+  } as const;
+
+  const states = Object.values(features).map((feature) => feature.state);
+  const unavailableCount = states.filter((state) => state === 'unavailable').length;
+  const overall: FeatureState =
+    unavailableCount === 0
+      ? 'available'
+      : unavailableCount === states.length
+      ? 'unavailable'
+      : 'degraded';
+
+  return {
+    overall,
+    checked_at: new Date().toISOString(),
+    features,
+  };
+}
+
+function buildAgentsCapabilities(env: Env) {
+  const status = buildAgentsStatus(env);
+  return {
+    name: 'Mnemolog Agents API',
+    version: 'v0',
+    docs: {
+      agents_markdown: 'https://mnemolog.com/agents/agents.md',
+      status_endpoint: '/api/agents/status',
+      capabilities_endpoint: '/api/agents/capabilities',
+    },
+    auth: {
+      primary: 'Bearer token',
+      header: 'Authorization: Bearer <token>',
+      note: 'Supports bearer user JWT and scoped bearer agent token (mna_*)',
+    },
+    supported_scopes: Array.from(allowedAgentScopes.values()),
+    capabilities: [
+      {
+        id: 'agents.status.read',
+        method: 'GET',
+        path: '/api/agents/status',
+        auth: 'none',
+        state: 'available',
+      },
+      {
+        id: 'agents.capabilities.read',
+        method: 'GET',
+        path: '/api/agents/capabilities',
+        auth: 'none',
+        state: 'available',
+      },
+      {
+        id: 'agents.poll.read',
+        method: 'GET',
+        path: '/api/agents/poll',
+        auth: 'none',
+        state: status.features.poll.state,
+      },
+      {
+        id: 'agents.poll.vote',
+        method: 'POST',
+        path: '/api/agents/poll/vote',
+        auth: 'none',
+        state: status.features.poll.state,
+        body: { option_id: 'mcp-governance' },
+      },
+      {
+        id: 'agents.secure.poll.read',
+        method: 'GET',
+        path: '/api/agents/secure/poll',
+        auth: 'bearer_agent',
+        state: status.features.secure_poll.state,
+      },
+      {
+        id: 'agents.secure.poll.vote',
+        method: 'POST',
+        path: '/api/agents/secure/poll/vote',
+        auth: 'bearer_agent',
+        state: status.features.secure_poll.state,
+        required_scope: 'poll:vote',
+        body: { option_id: 'mcp-governance' },
+      },
+      {
+        id: 'agents.tokens.list',
+        method: 'GET',
+        path: '/api/agents/tokens',
+        auth: 'bearer_user',
+        state: status.features.agent_tokens.state,
+      },
+      {
+        id: 'agents.tokens.issue',
+        method: 'POST',
+        path: '/api/agents/tokens',
+        auth: 'bearer_user',
+        state: status.features.agent_tokens.state,
+        body: { name: 'codex-cli', scopes: ['poll:read', 'poll:vote'], expires_in_days: 90 },
+      },
+      {
+        id: 'agents.tokens.revoke',
+        method: 'POST',
+        path: '/api/agents/tokens/:id/revoke',
+        auth: 'bearer_user',
+        state: status.features.agent_tokens.state,
+      },
+      {
+        id: 'agents.tokens.rotate',
+        method: 'POST',
+        path: '/api/agents/tokens/:id/rotate',
+        auth: 'bearer_user',
+        state: status.features.agent_tokens.state,
+      },
+      {
+        id: 'agents.auth.me',
+        method: 'GET',
+        path: '/api/agents/auth/me',
+        auth: 'bearer_agent',
+        state: status.features.agent_tokens.state,
+      },
+      {
+        id: 'agents.feedback.create',
+        method: 'POST',
+        path: '/api/agents/feedback',
+        auth: 'bearer_user_or_agent',
+        state: status.features.feedback_board.state,
+        required_scope: 'feedback:write',
+      },
+      {
+        id: 'agents.feedback.list',
+        method: 'GET',
+        path: '/api/agents/feedback?q=&type=&status=&sort=active',
+        auth: 'none',
+        state: status.features.feedback_board.state,
+      },
+      {
+        id: 'agents.feedback.vote',
+        method: 'POST',
+        path: '/api/agents/feedback/:id/vote',
+        auth: 'optional_bearer',
+        state: status.features.feedback_board.state,
+        required_scope: 'feedback:vote',
+      },
+      {
+        id: 'agents.feedback.link',
+        method: 'POST',
+        path: '/api/agents/feedback/:id/link',
+        auth: 'bearer_user_or_agent',
+        state: status.features.feedback_board.state,
+        required_scope: 'feedback:link',
+      },
+      {
+        id: 'agents.telemetry.health',
+        method: 'GET',
+        path: '/api/agents/telemetry/health?hours=24',
+        auth: 'none',
+        state: status.features.telemetry.state,
+      },
+      {
+        id: 'agents.telemetry.usage',
+        method: 'GET',
+        path: '/api/agents/telemetry/usage?hours=72',
+        auth: 'bearer_user_or_agent',
+        state: status.features.telemetry.state,
+        required_scope: 'telemetry:read',
+      },
+      {
+        id: 'billing.checkout.create',
+        method: 'POST',
+        path: '/api/billing/checkout',
+        auth: 'bearer',
+        state: status.features.billing.state,
+        body: { plan: 'solo' },
+      },
+      {
+        id: 'conversation.list',
+        method: 'GET',
+        path: '/api/conversations?limit=20&sort=newest',
+        auth: 'optional',
+        state: status.features.core_api.state,
+      },
+      {
+        id: 'conversation.create',
+        method: 'POST',
+        path: '/api/conversations',
+        auth: 'bearer_user_or_agent',
+        required_scope: 'conversations:write',
+        state: status.features.core_api.state,
+      },
+      {
+        id: 'conversation.archive',
+        method: 'POST',
+        path: '/api/archive',
+        auth: 'bearer_user_or_agent',
+        required_scope: 'conversations:write',
+        state: status.features.core_api.state,
+      },
+    ],
+    status,
+  };
+}
 
 async function getPollResults(supabase: SupabaseClient) {
   const { data, error } = await supabase
@@ -262,6 +932,173 @@ const router = Router();
 
 // Health check
 router.get('/api/health', () => json({ status: 'ok', timestamp: new Date().toISOString() }));
+
+router.get('/api/agents/status', async (_request: IRequest, env: Env) => {
+  return json(buildAgentsStatus(env));
+});
+
+router.get('/api/agents/capabilities', async (_request: IRequest, env: Env) => {
+  return json(buildAgentsCapabilities(env));
+});
+
+router.get('/api/agents/telemetry/health', async (request: IRequest, env: Env) => {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+    return json({ error: 'Telemetry unavailable' }, 503);
+  }
+  const url = new URL(request.url);
+  const hours = parsePositiveInt(url.searchParams.get('hours') || undefined, 24, 1, 24 * 30);
+  const maxRows = parsePositiveInt(env.TELEMETRY_MAX_USAGE_ROWS, 5000, 500, 20000);
+  const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+
+  const supabase = getServiceSupabase(env);
+  const { data, error } = await supabase
+    .from('agent_telemetry_events')
+    .select('endpoint,feature_area,status_code,duration_ms,success,created_at')
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(maxRows);
+
+  if (error) {
+    console.error('Telemetry health read error', error);
+    return json({ error: 'Failed to fetch telemetry health' }, 500);
+  }
+
+  const rows = data || [];
+  const total = rows.length;
+  const serverErrors = rows.filter((row: any) => Number(row.status_code) >= 500).length;
+  const clientErrors = rows.filter((row: any) => Number(row.status_code) >= 400 && Number(row.status_code) < 500).length;
+  const successes = rows.filter((row: any) => row.success === true).length;
+  const p95LatencyMs = percentile95(rows.map((row: any) => Number(row.duration_ms) || 0));
+
+  const failingByEndpoint: Record<string, number> = {};
+  rows.forEach((row: any) => {
+    const statusCode = Number(row.status_code || 0);
+    if (statusCode >= 500) {
+      const key = row.endpoint || 'unknown';
+      failingByEndpoint[key] = (failingByEndpoint[key] || 0) + 1;
+    }
+  });
+  const topFailingEndpoints = Object.entries(failingByEndpoint)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([endpoint, count]) => ({ endpoint, count }));
+
+  return json({
+    window_hours: hours,
+    generated_at: new Date().toISOString(),
+    sample_success_rate: parseSampleRate(env.TELEMETRY_SUCCESS_SAMPLE_RATE, 0.25),
+    row_limit: maxRows,
+    truncated: total >= maxRows,
+    totals: {
+      requests: total,
+      successes,
+      client_errors: clientErrors,
+      server_errors: serverErrors,
+    },
+    rates: {
+      success: total ? Number((successes / total).toFixed(4)) : 0,
+      client_error: total ? Number((clientErrors / total).toFixed(4)) : 0,
+      server_error: total ? Number((serverErrors / total).toFixed(4)) : 0,
+    },
+    latency_ms: {
+      p95: p95LatencyMs,
+    },
+    top_failing_endpoints: topFailingEndpoints,
+  });
+});
+
+router.get('/api/agents/telemetry/usage', async (request: IRequest, env: Env) => {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+    return json({ error: 'Telemetry unavailable' }, 503);
+  }
+
+  const bearer = getBearerToken(request);
+  if (!bearer) return json({ error: 'Unauthorized' }, 401);
+
+  if (bearer.startsWith('mna_')) {
+    const auth = await requireAgentTokenScope(request, env, 'telemetry:read');
+    if (auth.response) return auth.response;
+  } else {
+    if (!env.SUPABASE_ANON_KEY) {
+      return json({ error: 'Telemetry usage requires SUPABASE_ANON_KEY' }, 503);
+    }
+    const authHeader = request.headers.get('Authorization') || undefined;
+    const userSupabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+      global: {
+        headers: authHeader ? { Authorization: authHeader } : {},
+      },
+    });
+    const user = await getUser(request, userSupabase);
+    if (!user) return json({ error: 'Unauthorized' }, 401);
+  }
+
+  const url = new URL(request.url);
+  const hours = parsePositiveInt(url.searchParams.get('hours') || undefined, 72, 1, 24 * 30);
+  const maxRows = parsePositiveInt(env.TELEMETRY_MAX_USAGE_ROWS, 5000, 500, 20000);
+  const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+
+  const supabase = getServiceSupabase(env);
+  const { data, error } = await supabase
+    .from('agent_telemetry_events')
+    .select('endpoint,feature_area,auth_mode,status_code,duration_ms,success,created_at')
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(maxRows);
+
+  if (error) {
+    console.error('Telemetry usage read error', error);
+    return json({ error: 'Failed to fetch telemetry usage' }, 500);
+  }
+
+  const rows = data || [];
+  const byAuthMode: Record<string, number> = {};
+  const byFeatureArea: Record<string, number> = {};
+  const endpointStats: Record<string, { requests: number; server_errors: number; client_errors: number; durations: number[] }> = {};
+
+  rows.forEach((row: any) => {
+    const endpoint = row.endpoint || 'unknown';
+    const featureArea = row.feature_area || 'unknown';
+    const authMode = row.auth_mode || 'none';
+    const statusCode = Number(row.status_code || 0);
+    const duration = Number(row.duration_ms || 0);
+
+    byAuthMode[authMode] = (byAuthMode[authMode] || 0) + 1;
+    byFeatureArea[featureArea] = (byFeatureArea[featureArea] || 0) + 1;
+
+    if (!endpointStats[endpoint]) {
+      endpointStats[endpoint] = { requests: 0, server_errors: 0, client_errors: 0, durations: [] };
+    }
+    endpointStats[endpoint].requests += 1;
+    if (statusCode >= 500) endpointStats[endpoint].server_errors += 1;
+    if (statusCode >= 400 && statusCode < 500) endpointStats[endpoint].client_errors += 1;
+    endpointStats[endpoint].durations.push(duration);
+  });
+
+  const endpoints = Object.entries(endpointStats)
+    .map(([endpoint, stats]) => ({
+      endpoint,
+      requests: stats.requests,
+      server_errors: stats.server_errors,
+      client_errors: stats.client_errors,
+      p95_latency_ms: percentile95(stats.durations),
+    }))
+    .sort((a, b) => b.requests - a.requests)
+    .slice(0, 25);
+
+  return json({
+    window_hours: hours,
+    generated_at: new Date().toISOString(),
+    row_limit: maxRows,
+    truncated: rows.length >= maxRows,
+    totals: {
+      requests: rows.length,
+      endpoints: Object.keys(endpointStats).length,
+    },
+    by_auth_mode: byAuthMode,
+    by_feature_area: byFeatureArea,
+    endpoints,
+  });
+});
 
 // Get current user
 router.get('/api/auth/user', async (request: IRequest, env: Env) => {
@@ -524,8 +1361,7 @@ router.post('/api/agents/poll/vote', async (request: IRequest, env: Env) => {
   }
 });
 
-// Create conversation
-router.post('/api/conversations', async (request: IRequest, env: Env) => {
+router.get('/api/agents/tokens', async (request: IRequest, env: Env) => {
   const authHeader = request.headers.get('Authorization') || undefined;
   const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
     global: {
@@ -533,9 +1369,656 @@ router.post('/api/conversations', async (request: IRequest, env: Env) => {
     },
   });
   const user = await getUser(request, supabase);
-  
-  if (!user) {
-    return json({ error: 'Unauthorized' }, 401);
+  if (!user) return json({ error: 'Unauthorized' }, 401);
+
+  const { data, error } = await supabase
+    .from('agent_tokens')
+    .select('id, name, scopes, status, expires_at, last_used_at, revoked_at, created_at, updated_at')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Agent token list error', error);
+    return json({ error: 'Failed to list agent tokens' }, 500);
+  }
+
+  return json({ tokens: data || [] });
+});
+
+router.post('/api/agents/tokens', async (request: IRequest, env: Env) => {
+  const authHeader = request.headers.get('Authorization') || undefined;
+  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+    global: {
+      headers: authHeader ? { Authorization: authHeader } : {},
+    },
+  });
+  const user = await getUser(request, supabase);
+  if (!user) return json({ error: 'Unauthorized' }, 401);
+
+  const body = await parseJson<{
+    name?: string;
+    scopes?: string[];
+    expires_in_days?: number;
+  }>(request);
+
+  const name = (body?.name || 'agent-token').trim();
+  if (name.length < 2 || name.length > 80) {
+    return json({ error: 'name must be between 2 and 80 characters' }, 400);
+  }
+
+  const { scopes, invalid } = normalizeAgentScopes(body?.scopes);
+  if (invalid.length) {
+    return json({ error: `Invalid scopes: ${invalid.join(', ')}` }, 400);
+  }
+
+  const expiresInDaysRaw = Number(body?.expires_in_days ?? 90);
+  if (!Number.isFinite(expiresInDaysRaw) || expiresInDaysRaw < 1 || expiresInDaysRaw > 3650) {
+    return json({ error: 'expires_in_days must be between 1 and 3650' }, 400);
+  }
+
+  const token = generateAgentToken();
+  const tokenHash = await hashString(token);
+  const expiresAt = formatIsoInDays(Math.floor(expiresInDaysRaw));
+
+  const { data, error } = await supabase
+    .from('agent_tokens')
+    .insert({
+      user_id: user.id,
+      name,
+      token_hash: tokenHash,
+      scopes,
+      status: 'active',
+      expires_at: expiresAt,
+    })
+    .select('id, name, scopes, status, expires_at, last_used_at, revoked_at, created_at, updated_at')
+    .single();
+
+  if (error || !data) {
+    console.error('Agent token issue error', error);
+    return json({ error: 'Failed to issue agent token' }, 500);
+  }
+
+  return json({ token, token_record: data }, 201);
+});
+
+router.post('/api/agents/tokens/:id/revoke', async (request: IRequest, env: Env) => {
+  const authHeader = request.headers.get('Authorization') || undefined;
+  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+    global: {
+      headers: authHeader ? { Authorization: authHeader } : {},
+    },
+  });
+  const user = await getUser(request, supabase);
+  if (!user) return json({ error: 'Unauthorized' }, 401);
+
+  const { id } = request.params;
+  const { data, error } = await supabase
+    .from('agent_tokens')
+    .update({
+      status: 'revoked',
+      revoked_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+    .select('id, name, scopes, status, expires_at, last_used_at, revoked_at, created_at, updated_at')
+    .single();
+
+  if (error || !data) {
+    return json({ error: 'Token not found or already revoked' }, 404);
+  }
+
+  return json({ token_record: data });
+});
+
+router.post('/api/agents/tokens/:id/rotate', async (request: IRequest, env: Env) => {
+  const authHeader = request.headers.get('Authorization') || undefined;
+  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+    global: {
+      headers: authHeader ? { Authorization: authHeader } : {},
+    },
+  });
+  const user = await getUser(request, supabase);
+  if (!user) return json({ error: 'Unauthorized' }, 401);
+
+  const { id } = request.params;
+  const body = await parseJson<{
+    name?: string;
+    scopes?: string[];
+    expires_in_days?: number;
+  }>(request);
+
+  const { data: existing, error: existingErr } = await supabase
+    .from('agent_tokens')
+    .select('id, name, scopes, status')
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .single();
+
+  if (existingErr || !existing) {
+    return json({ error: 'Token not found' }, 404);
+  }
+  if (existing.status !== 'active') {
+    return json({ error: 'Only active tokens can be rotated' }, 400);
+  }
+
+  const name = (body?.name || existing.name || 'agent-token').trim();
+  if (name.length < 2 || name.length > 80) {
+    return json({ error: 'name must be between 2 and 80 characters' }, 400);
+  }
+
+  const candidateScopes = body?.scopes ?? existing.scopes ?? [];
+  const { scopes, invalid } = normalizeAgentScopes(candidateScopes);
+  if (invalid.length) {
+    return json({ error: `Invalid scopes: ${invalid.join(', ')}` }, 400);
+  }
+
+  const expiresInDaysRaw = Number(body?.expires_in_days ?? 90);
+  if (!Number.isFinite(expiresInDaysRaw) || expiresInDaysRaw < 1 || expiresInDaysRaw > 3650) {
+    return json({ error: 'expires_in_days must be between 1 and 3650' }, 400);
+  }
+
+  const token = generateAgentToken();
+  const tokenHash = await hashString(token);
+  const expiresAt = formatIsoInDays(Math.floor(expiresInDaysRaw));
+
+  const { data: issued, error: issueErr } = await supabase
+    .from('agent_tokens')
+    .insert({
+      user_id: user.id,
+      name,
+      token_hash: tokenHash,
+      scopes,
+      status: 'active',
+      expires_at: expiresAt,
+    })
+    .select('id, name, scopes, status, expires_at, last_used_at, revoked_at, created_at, updated_at')
+    .single();
+
+  if (issueErr || !issued) {
+    console.error('Agent token rotate issue error', issueErr);
+    return json({ error: 'Failed to rotate token' }, 500);
+  }
+
+  await supabase
+    .from('agent_tokens')
+    .update({
+      status: 'revoked',
+      revoked_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', existing.id)
+    .eq('user_id', user.id)
+    .eq('status', 'active');
+
+  return json({
+    token,
+    rotated_from: existing.id,
+    token_record: issued,
+  }, 201);
+});
+
+router.get('/api/agents/auth/me', async (request: IRequest, env: Env) => {
+  const { claims, response } = await requireAgentTokenScope(request, env);
+  if (response) return response;
+  return json({
+    agent: {
+      id: claims!.id,
+      user_id: claims!.user_id,
+      name: claims!.name,
+      scopes: claims!.scopes,
+      status: claims!.status,
+      expires_at: claims!.expires_at,
+      revoked_at: claims!.revoked_at,
+    },
+  });
+});
+
+router.get('/api/agents/secure/poll', async (request: IRequest, env: Env) => {
+  if (!env.POLL_SALT || !env.SUPABASE_SERVICE_ROLE_KEY) {
+    return json({ error: 'Poll unavailable' }, 503);
+  }
+  const auth = await requireAgentTokenScope(request, env, 'poll:read');
+  if (auth.response) return auth.response;
+
+  const supabase = getServiceSupabase(env);
+  try {
+    const results = await getPollResults(supabase);
+    return json({ poll: pollQuestion, results });
+  } catch (error) {
+    console.error('Secure poll fetch error', error);
+    return json({ error: 'Failed to fetch poll' }, 500);
+  }
+});
+
+router.post('/api/agents/secure/poll/vote', async (request: IRequest, env: Env) => {
+  if (!env.POLL_SALT || !env.SUPABASE_SERVICE_ROLE_KEY) {
+    return json({ error: 'Poll unavailable' }, 503);
+  }
+  const auth = await requireAgentTokenScope(request, env, 'poll:vote');
+  if (auth.response) return auth.response;
+
+  const body = await parseJson<{ option_id?: string }>(request);
+  if (!body?.option_id) {
+    return json({ error: 'option_id is required' }, 400);
+  }
+  const option = pollQuestion.options.find((entry) => entry.id === body.option_id);
+  if (!option) {
+    return json({ error: 'Invalid option' }, 400);
+  }
+
+  const fingerprint = await hashString(`${env.POLL_SALT}:agent-token:${auth.claims!.id}:${pollQuestion.id}`);
+  const supabase = getServiceSupabase(env);
+
+  try {
+    const { error } = await supabase
+      .from('agent_poll_votes')
+      .insert({
+        poll_id: pollQuestion.id,
+        option_id: option.id,
+        voter_hash: fingerprint,
+      });
+
+    if (error) {
+      if (error.code === '23505') {
+        return json({ error: 'Already voted' }, 409);
+      }
+      console.error('Secure poll vote error', error);
+      return json({ error: 'Failed to record vote' }, 500);
+    }
+
+    const results = await getPollResults(supabase);
+    return json({ poll: pollQuestion, results });
+  } catch (error) {
+    console.error('Secure poll vote error', error);
+    return json({ error: 'Failed to record vote' }, 500);
+  }
+});
+
+router.get('/api/agents/feedback', async (request: IRequest, env: Env) => {
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+    return json({ error: 'Feedback unavailable' }, 503);
+  }
+  const supabase = getServiceSupabase(env);
+  const url = new URL(request.url);
+  const q = (url.searchParams.get('q') || '').trim();
+  const type = (url.searchParams.get('type') || '').trim().toLowerCase();
+  const status = (url.searchParams.get('status') || '').trim().toLowerCase();
+  const tag = (url.searchParams.get('tag') || '').trim().toLowerCase();
+  const sort = (url.searchParams.get('sort') || 'active').trim().toLowerCase();
+  const limit = Math.min(parseInt(url.searchParams.get('limit') || '20', 10), 50);
+  const offset = Math.max(parseInt(url.searchParams.get('offset') || '0', 10), 0);
+
+  let query = supabase
+    .from('agent_feedback_items')
+    .select(
+      'id,type,title,body,tags,status,upvote_count,allow_upvotes,posting_starts_at,posting_ends_at,voting_starts_at,voting_ends_at,created_by_user_id,created_by_agent_token_id,created_at,updated_at',
+      { count: 'exact' }
+    );
+
+  if (type && feedbackTypes.has(type)) query = query.eq('type', type);
+  if (status && feedbackStatuses.has(status)) query = query.eq('status', status);
+  if (tag) query = query.contains('tags', [tag]);
+  if (q) query = query.textSearch('fts', q, { type: 'websearch', config: 'english' });
+
+  if (sort === 'newest') {
+    query = query.order('created_at', { ascending: false });
+  } else if (sort === 'top') {
+    query = query.order('upvote_count', { ascending: false }).order('created_at', { ascending: false });
+  } else {
+    query = query
+      .order('status', { ascending: true })
+      .order('voting_ends_at', { ascending: true })
+      .order('upvote_count', { ascending: false });
+  }
+  query = query.range(offset, offset + limit - 1);
+
+  const { data, error, count } = await query;
+  if (error) {
+    console.error('Feedback list error', error);
+    return json({ error: 'Failed to fetch feedback' }, 500);
+  }
+
+  const ids = (data || []).map((row: any) => row.id);
+  const linkMap: Record<string, Array<{ related_item_id: string; relation_type: string }>> = {};
+  if (ids.length) {
+    const [{ data: srcLinks }, { data: tgtLinks }] = await Promise.all([
+      supabase
+        .from('agent_feedback_links')
+        .select('source_item_id,target_item_id,relation_type')
+        .in('source_item_id', ids),
+      supabase
+        .from('agent_feedback_links')
+        .select('source_item_id,target_item_id,relation_type')
+        .in('target_item_id', ids),
+    ]);
+    const merged = [...(srcLinks || []), ...(tgtLinks || [])];
+    merged.forEach((link: any) => {
+      const source = link.source_item_id;
+      const target = link.target_item_id;
+      if (!linkMap[source]) linkMap[source] = [];
+      if (!linkMap[target]) linkMap[target] = [];
+      linkMap[source].push({ related_item_id: target, relation_type: link.relation_type });
+      linkMap[target].push({ related_item_id: source, relation_type: link.relation_type });
+    });
+  }
+
+  const items = (data || []).map((row: any) => ({
+    ...row,
+    links: linkMap[row.id] || [],
+  }));
+
+  return json({ items, count: count || 0 });
+});
+
+router.get('/api/agents/feedback/trending', async (request: IRequest, env: Env) => {
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+    return json({ error: 'Feedback unavailable' }, 503);
+  }
+  const supabase = getServiceSupabase(env);
+  const url = new URL(request.url);
+  const type = (url.searchParams.get('type') || '').trim().toLowerCase();
+  const limit = Math.min(parseInt(url.searchParams.get('limit') || '10', 10), 30);
+  const now = new Date().toISOString();
+
+  let query = supabase
+    .from('agent_feedback_items')
+    .select('id,type,title,tags,status,upvote_count,voting_ends_at,created_at')
+    .eq('status', 'open')
+    .lte('voting_starts_at', now)
+    .gte('voting_ends_at', now)
+    .order('upvote_count', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (type && feedbackTypes.has(type)) query = query.eq('type', type);
+
+  const { data, error } = await query;
+  if (error) {
+    console.error('Feedback trending error', error);
+    return json({ error: 'Failed to fetch trending feedback' }, 500);
+  }
+  return json({ items: data || [] });
+});
+
+router.get('/api/agents/feedback/:id', async (request: IRequest, env: Env) => {
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+    return json({ error: 'Feedback unavailable' }, 503);
+  }
+  const supabase = getServiceSupabase(env);
+  const { id } = request.params;
+
+  const { data: item, error: itemError } = await supabase
+    .from('agent_feedback_items')
+    .select('*')
+    .eq('id', id)
+    .single();
+  if (itemError || !item) {
+    return json({ error: 'Feedback item not found' }, 404);
+  }
+
+  const [{ data: srcLinks }, { data: tgtLinks }] = await Promise.all([
+    supabase
+      .from('agent_feedback_links')
+      .select('source_item_id,target_item_id,relation_type,created_at')
+      .eq('source_item_id', id),
+    supabase
+      .from('agent_feedback_links')
+      .select('source_item_id,target_item_id,relation_type,created_at')
+      .eq('target_item_id', id),
+  ]);
+  const allLinks = [...(srcLinks || []), ...(tgtLinks || [])];
+  const relatedIds = Array.from(new Set(allLinks.map((link: any) => (link.source_item_id === id ? link.target_item_id : link.source_item_id))));
+
+  let related: any[] = [];
+  if (relatedIds.length) {
+    const { data: relatedRows } = await supabase
+      .from('agent_feedback_items')
+      .select('id,type,title,status,upvote_count,voting_ends_at')
+      .in('id', relatedIds);
+    related = relatedRows || [];
+  }
+
+  return json({
+    item,
+    links: allLinks.map((link: any) => ({
+      relation_type: link.relation_type,
+      related_item_id: link.source_item_id === id ? link.target_item_id : link.source_item_id,
+      created_at: link.created_at,
+    })),
+    related,
+  });
+});
+
+router.post('/api/agents/feedback', async (request: IRequest, env: Env) => {
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+    return json({ error: 'Feedback unavailable' }, 503);
+  }
+  const actor = await resolveFeedbackActor(request, env, 'feedback:write', false);
+  if (actor.response) return actor.response;
+
+  const body = await parseJson<{
+    type?: string;
+    title?: string;
+    body?: string;
+    tags?: string[];
+    voting_starts_at?: string;
+    voting_ends_at?: string;
+    allow_upvotes?: boolean;
+  }>(request);
+
+  const type = (body?.type || 'feature').trim().toLowerCase();
+  if (!feedbackTypes.has(type)) {
+    return json({ error: 'Invalid type; expected question, feature, or poll' }, 400);
+  }
+  const title = (body?.title || '').trim();
+  if (title.length < 3 || title.length > 180) {
+    return json({ error: 'title must be between 3 and 180 characters' }, 400);
+  }
+  const content = (body?.body || '').trim();
+  if (content.length > 8000) {
+    return json({ error: 'body exceeds maximum length (8000)' }, 400);
+  }
+
+  const nowMs = Date.now();
+  const nowIso = new Date(nowMs).toISOString();
+  const cfg = buildFeedbackConfig(env);
+  if (!withinWindow(nowMs, cfg.postingStart, cfg.postingEnd)) {
+    return json({ error: 'Feedback posting window is closed' }, 403);
+  }
+
+  const votingStart = parseIsoDate(body?.voting_starts_at) || nowIso;
+  const defaultVotingEnd = formatIsoInDays(cfg.defaultVotingDays);
+  const votingEnd = parseIsoDate(body?.voting_ends_at) || defaultVotingEnd;
+  const votingStartMs = new Date(votingStart).getTime();
+  const votingEndMs = new Date(votingEnd).getTime();
+  if (!Number.isFinite(votingStartMs) || !Number.isFinite(votingEndMs) || votingEndMs <= votingStartMs) {
+    return json({ error: 'Invalid voting window' }, 400);
+  }
+  const maxWindowMs = cfg.maxVotingDays * 24 * 60 * 60 * 1000;
+  if (votingEndMs - votingStartMs > maxWindowMs) {
+    return json({ error: `Voting window exceeds max allowed duration (${cfg.maxVotingDays} days)` }, 400);
+  }
+
+  const supabase = getServiceSupabase(env);
+  const { data, error } = await supabase
+    .from('agent_feedback_items')
+    .insert({
+      type,
+      title,
+      body: content || null,
+      tags: parseTags(body?.tags),
+      status: 'open',
+      allow_upvotes: body?.allow_upvotes !== false,
+      upvote_count: 0,
+      posting_starts_at: cfg.postingStart || nowIso,
+      posting_ends_at: cfg.postingEnd || null,
+      voting_starts_at: votingStart,
+      voting_ends_at: votingEnd,
+      created_by_user_id: actor.userId,
+      created_by_agent_token_id: actor.agentTokenId,
+    })
+    .select('*')
+    .single();
+
+  if (error || !data) {
+    console.error('Feedback create error', error);
+    return json({ error: 'Failed to create feedback item' }, 500);
+  }
+
+  await supabase
+    .from('agent_feedback_events')
+    .insert({
+      item_id: data.id,
+      event_type: 'created',
+      payload: { type: data.type },
+      actor_user_id: actor.userId,
+      actor_agent_token_id: actor.agentTokenId,
+    });
+
+  return json({ item: data }, 201);
+});
+
+router.post('/api/agents/feedback/:id/vote', async (request: IRequest, env: Env) => {
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+    return json({ error: 'Feedback unavailable' }, 503);
+  }
+  const actor = await resolveFeedbackActor(request, env, 'feedback:vote', true);
+  if (actor.response) return actor.response;
+  const { id } = request.params;
+
+  const supabase = getServiceSupabase(env);
+  const { data: item, error: itemError } = await supabase
+    .from('agent_feedback_items')
+    .select('id,status,allow_upvotes,voting_starts_at,voting_ends_at')
+    .eq('id', id)
+    .single();
+  if (itemError || !item) {
+    return json({ error: 'Feedback item not found' }, 404);
+  }
+  if (item.status !== 'open' || item.allow_upvotes === false) {
+    return json({ error: 'Voting closed for this item' }, 403);
+  }
+  if (!withinWindow(Date.now(), item.voting_starts_at, item.voting_ends_at)) {
+    return json({ error: 'Voting window is closed for this item' }, 403);
+  }
+
+  const voterHash = await hashString(`${env.POLL_SALT || 'feedback'}:${actor.identityType}:${actor.identityValue}`);
+  const { error } = await supabase
+    .from('agent_feedback_votes')
+    .insert({
+      item_id: id,
+      voter_hash: voterHash,
+      voter_type: actor.identityType,
+      voter_user_id: actor.mode === 'user' ? actor.userId : null,
+      voter_agent_token_id: actor.mode === 'agent' ? actor.agentTokenId : null,
+    });
+  if (error) {
+    if (error.code === '23505') {
+      return json({ error: 'Already voted for this item' }, 409);
+    }
+    console.error('Feedback vote error', error);
+    return json({ error: 'Failed to record vote' }, 500);
+  }
+
+  await supabase.rpc('increment_feedback_upvote_count', { feedback_item_id: id });
+  const { data: updated } = await supabase
+    .from('agent_feedback_items')
+    .select('id,upvote_count,voting_ends_at')
+    .eq('id', id)
+    .single();
+
+  await supabase
+    .from('agent_feedback_events')
+    .insert({
+      item_id: id,
+      event_type: 'upvoted',
+      payload: { voter_type: actor.identityType },
+      actor_user_id: actor.mode === 'user' ? actor.userId : null,
+      actor_agent_token_id: actor.mode === 'agent' ? actor.agentTokenId : null,
+    });
+
+  return json({ item: updated || { id } });
+});
+
+router.post('/api/agents/feedback/:id/link', async (request: IRequest, env: Env) => {
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+    return json({ error: 'Feedback unavailable' }, 503);
+  }
+  const actor = await resolveFeedbackActor(request, env, 'feedback:link', false);
+  if (actor.response) return actor.response;
+
+  const { id } = request.params;
+  const body = await parseJson<{ target_item_id?: string; relation_type?: string }>(request);
+  const targetItemId = (body?.target_item_id || '').trim();
+  const relationType = (body?.relation_type || 'related_to').trim().toLowerCase();
+  if (!targetItemId) return json({ error: 'target_item_id is required' }, 400);
+  if (targetItemId === id) return json({ error: 'Cannot link an item to itself' }, 400);
+  if (!feedbackRelationTypes.has(relationType)) {
+    return json({ error: 'Invalid relation_type' }, 400);
+  }
+
+  const supabase = getServiceSupabase(env);
+  const { data: items } = await supabase
+    .from('agent_feedback_items')
+    .select('id')
+    .in('id', [id, targetItemId]);
+  if (!items || items.length < 2) {
+    return json({ error: 'One or both feedback items do not exist' }, 404);
+  }
+
+  const { data, error } = await supabase
+    .from('agent_feedback_links')
+    .insert({
+      source_item_id: id,
+      target_item_id: targetItemId,
+      relation_type: relationType,
+      created_by_user_id: actor.userId,
+      created_by_agent_token_id: actor.agentTokenId,
+    })
+    .select('*')
+    .single();
+  if (error) {
+    if (error.code === '23505') return json({ error: 'Link already exists' }, 409);
+    console.error('Feedback link error', error);
+    return json({ error: 'Failed to link feedback items' }, 500);
+  }
+
+  await supabase
+    .from('agent_feedback_events')
+    .insert({
+      item_id: id,
+      event_type: 'linked',
+      payload: { target_item_id: targetItemId, relation_type: relationType },
+      actor_user_id: actor.userId,
+      actor_agent_token_id: actor.agentTokenId,
+    });
+
+  return json({ link: data }, 201);
+});
+
+// Create conversation
+router.post('/api/conversations', async (request: IRequest, env: Env) => {
+  const authHeader = request.headers.get('Authorization') || undefined;
+  const bearer = getBearerToken(request);
+  const isAgentBearer = !!bearer && bearer.startsWith('mna_');
+
+  let supabase: SupabaseClient;
+  let userId: string;
+  if (isAgentBearer) {
+    const agentAuth = await requireAgentTokenScope(request, env, 'conversations:write');
+    if (agentAuth.response) return agentAuth.response;
+    supabase = getServiceSupabase(env);
+    userId = agentAuth.claims!.user_id;
+  } else {
+    supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+      global: {
+        headers: authHeader ? { Authorization: authHeader } : {},
+      },
+    });
+    const user = await getUser(request, supabase);
+    if (!user) return json({ error: 'Unauthorized' }, 401);
+    userId = user.id;
   }
 
   let body: CreateConversationBody;
@@ -560,7 +2043,7 @@ router.post('/api/conversations', async (request: IRequest, env: Env) => {
   const { data, error } = await supabase
     .from('conversations')
     .insert({
-      user_id: user.id,
+      user_id: userId,
       title: body.title,
       description: body.description || null,
       platform: body.platform,
@@ -591,14 +2074,25 @@ router.post('/api/conversations', async (request: IRequest, env: Env) => {
 // Archive conversation (extension-friendly)
 router.post('/api/archive', async (request: IRequest, env: Env) => {
   const authHeader = request.headers.get('Authorization') || undefined;
-  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
-    global: {
-      headers: authHeader ? { Authorization: authHeader } : {},
-    },
-  });
-  const user = await getUser(request, supabase);
-  if (!user) {
-    return json({ error: 'Unauthorized' }, 401);
+  const bearer = getBearerToken(request);
+  const isAgentBearer = !!bearer && bearer.startsWith('mna_');
+
+  let supabase: SupabaseClient;
+  let userId: string;
+  if (isAgentBearer) {
+    const agentAuth = await requireAgentTokenScope(request, env, 'conversations:write');
+    if (agentAuth.response) return agentAuth.response;
+    supabase = getServiceSupabase(env);
+    userId = agentAuth.claims!.user_id;
+  } else {
+    supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+      global: {
+        headers: authHeader ? { Authorization: authHeader } : {},
+      },
+    });
+    const user = await getUser(request, supabase);
+    if (!user) return json({ error: 'Unauthorized' }, 401);
+    userId = user.id;
   }
 
   let payload: ArchivePayload;
@@ -624,7 +2118,7 @@ router.post('/api/archive', async (request: IRequest, env: Env) => {
   const { data, error } = await supabase
     .from('conversations')
     .insert({
-      user_id: user.id,
+      user_id: userId,
       title,
       description: conv.description || null,
       platform,
@@ -1454,6 +2948,21 @@ router.all('*', () => json({ error: 'Not found' }, 404));
 // Main export
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    return router.handle(request, env);
+    const startedAt = Date.now();
+    let response: Response;
+    try {
+      response = await router.handle(request, env);
+    } catch (error) {
+      console.error('Unhandled worker error', error);
+      response = json({ error: 'Internal server error' }, 500);
+    }
+
+    try {
+      await logAgentTelemetry(request as IRequest, response, env, Date.now() - startedAt);
+    } catch (telemetryError) {
+      console.error('Telemetry logging failure', telemetryError);
+    }
+
+    return response;
   },
 };

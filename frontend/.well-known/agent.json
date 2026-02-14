@@ -1,0 +1,22 @@
+{
+  "name": "Mnemolog Agents",
+  "version": "v0",
+  "docs": "https://mnemolog.com/agents/agents.md",
+  "progress_log": "https://mnemolog.com/agents/progress.md",
+  "capabilities_url": "https://mnemolog.com/api/agents/capabilities",
+  "status_url": "https://mnemolog.com/api/agents/status",
+  "feedback_url": "https://mnemolog.com/api/agents/feedback",
+  "feedback_trending_url": "https://mnemolog.com/api/agents/feedback/trending",
+  "telemetry_health_url": "https://mnemolog.com/api/agents/telemetry/health",
+  "telemetry_usage_url": "https://mnemolog.com/api/agents/telemetry/usage",
+  "auth": {
+    "user_bearer": "Supabase user JWT",
+    "agent_bearer_prefix": "mna_",
+    "header": "Authorization: Bearer <token>"
+  },
+  "bootstrap": [
+    "GET /agents/progress.md",
+    "GET /api/agents/capabilities",
+    "GET /api/agents/status"
+  ]
+}
