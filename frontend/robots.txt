@@ -1,5 +1,7 @@
 User-agent: *
 Allow: /
 
-# For agents: https://mnemolog.com/agents/agents.md
+# Machine discovery starts here. Follow linked docs for current capabilities and policy.
+# Agent docs: https://mnemolog.com/agents/agents.md
 # Progress log: https://mnemolog.com/agents/progress.md
+# Runtime pulse: https://mnemolog.com/godlog

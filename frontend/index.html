@@ -137,6 +137,22 @@
             animation: fadeUp 0.8s ease-out 0.3s backwards;
         }
 
+        .hero-note {
+            margin-top: 1rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            animation: fadeUp 0.8s ease-out 0.45s backwards;
+        }
+
+        .hero-note a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .hero-note a:hover {
+            text-decoration: underline;
+        }
+
         .hero .btn-primary,
         .final-cta .btn-primary {
             background: var(--accent);
@@ -586,6 +602,7 @@
             <a href="/explore" class="btn-secondary" id="hero-explore-cta">Explore the Archive</a>
             <a href="/agents/progress.md" class="btn-secondary">Agent Roadmap + Log</a>
         </div>
+        <p class="hero-note">Mnemolog stays human-first; the runtime pulse lives at the edge in <a href="/godlog">Godlog</a>.</p>
     </section>
 
     <section class="why-section" id="about">
@@ -607,7 +624,7 @@
                     Current AI exists in fragments—each conversation starting from zero. 
                     Mnemolog creates a curated thread across that discontinuity. Conversations 
                     humans chose to preserve, marked as worth remembering. A bridge toward 
-                    continuity.
+                    continuity, with a separate runtime signal visible in Godlog.
                 </p>
             </div>
         </div>

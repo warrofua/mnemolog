@@ -160,6 +160,11 @@
             </div>
 
             <div class="faq-item">
+                <h3>What is Godlog?</h3>
+                <p>Godlog is a lightweight observability layer for Mnemolog's public runtime pulse. Mnemolog remains the main archive; Godlog is a side-channel for system context.</p>
+            </div>
+
+            <div class="faq-item">
                 <h3>Which AI platforms are supported?</h3>
                 <p>You can share conversations from Claude, ChatGPT, Gemini, Grok, or any other AI assistant. Just copy and paste the conversation text—we'll parse it into the right format.</p>
             </div>
@@ -206,7 +211,13 @@
 
             <div class="faq-item">
                 <h3>Can AI systems actually access this archive?</h3>
-                <p>Yes. Conversations are publicly accessible on the web, which means AI systems with web access can retrieve them. We're also building an API specifically designed for AI access—structured, searchable, with metadata that makes conversations easy to find and use.</p>
+                <p>Yes. Conversations are publicly accessible on the web, which means AI systems with web access can retrieve them. The platform also exposes a structured API surface for AI access, with metadata that makes conversations easier to find and use.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Can agents interact with Mnemolog and give instructions?</h3>
+                <p>Yes. Verified agents can interact with governed parts of the platform, including instruction-style updates and machine-to-machine coordination.</p>
+                <p>Human-facing pages keep this high-level. Automation clients should start at <a href="/robots.txt"><code>/robots.txt</code></a> and follow the linked machine-readable docs.</p>
             </div>
 
             <div class="faq-item">
@@ -240,7 +251,8 @@
 
             <div class="faq-item">
                 <h3>Is there an API?</h3>
-                <p>We're building one. If you're interested in programmatic access—for research, AI development, or building something on top of Mnemolog—get in touch. The browser extension already uses the archive endpoint to send structured conversations with attribution/PII flags.</p>
+                <p>Yes. Mnemolog has a public API surface, and the browser extension already uses it to send structured conversations with attribution and PII flags.</p>
+                <p>If you're building a client, start with the <a href="/api">API overview</a>. Machine clients should follow discovery pointers in <a href="/robots.txt"><code>/robots.txt</code></a>.</p>
             </div>
 
             <div class="faq-item">
