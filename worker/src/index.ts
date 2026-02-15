@@ -475,6 +475,11 @@ function parseTags(raw: unknown) {
   return Array.from(new Set(clean));
 }
 
+function hasPrivateTag(raw: unknown) {
+  if (!Array.isArray(raw)) return false;
+  return raw.some((tag) => typeof tag === 'string' && tag.trim().toLowerCase() === 'private');
+}
+
 function parseSampleRate(value: string | undefined, fallback: number) {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
@@ -3339,7 +3344,8 @@ router.put('/api/conversations/:id', async (request: IRequest, env: Env) => {
   if (body.title !== undefined) updates.title = body.title;
   if (body.description !== undefined) updates.description = body.description;
   if (body.platform !== undefined) updates.platform = body.platform;
-  const nextTags = body.tags !== undefined ? parseTags(body.tags) : (Array.isArray((existing as any).tags) ? (existing as any).tags : []);
+  const existingTags = parseTags((existing as any).tags);
+  const nextTags = body.tags !== undefined ? parseTags(body.tags) : existingTags;
   if (body.tags !== undefined) updates.tags = nextTags;
   if (body.show_author !== undefined) updates.show_author = body.show_author;
   if (body.is_public !== undefined) updates.is_public = body.is_public;
@@ -3353,7 +3359,7 @@ router.put('/api/conversations/:id', async (request: IRequest, env: Env) => {
    if (body.pii_redacted !== undefined) updates.pii_redacted = body.pii_redacted;
    if (body.source !== undefined) updates.source = body.source;
 
-  if (Array.isArray(nextTags) && nextTags.includes('private')) {
+  if (hasPrivateTag(nextTags)) {
     // "private" tag always forces non-public visibility.
     updates.is_public = false;
   }
@@ -3567,6 +3573,7 @@ router.get('/api/tags/trending', async (request: IRequest, env: Env) => {
       .from('conversations')
       .select('tags')
       .eq('is_public', true)
+      .or('tags.is.null,tags.not.cs.{private}')
       .order('created_at', { ascending: false })
       .limit(500);
     if (window.ms) {
@@ -3632,9 +3639,11 @@ router.get('/api/conversations/:id', async (request: IRequest, env: Env) => {
     return json({ error: 'Conversation not found' }, 404);
   }
 
-  // Check if public or owned by user
+  const privateTagged = hasPrivateTag(data.tags);
+
+  // Check if public (and not private-tagged) or owned by user
   const user = await getUser(request, supabase);
-  if (!data.is_public && data.user_id !== user?.id) {
+  if ((!data.is_public || privateTagged) && data.user_id !== user?.id) {
     return json({ error: 'Conversation not found' }, 404);
   }
 
@@ -3684,11 +3693,17 @@ router.get('/api/conversations/:id', async (request: IRequest, env: Env) => {
 
   // Fetch continuations (direct children)
   try {
-    const { data: childrenRows, error: childErr } = await supabase
+    let childQuery = supabase
       .from('conversations')
       .select('id, title, created_at, intent_type, user_goal, view_count, root_conversation_id')
       .eq('parent_conversation_id', id)
       .order('created_at', { ascending: true });
+
+    if (data.user_id !== user?.id) {
+      childQuery = childQuery.eq('is_public', true).or('tags.is.null,tags.not.cs.{private}');
+    }
+
+    const { data: childrenRows, error: childErr } = await childQuery;
     if (!childErr && childrenRows) {
       conversation.children = childrenRows;
     }
@@ -3712,11 +3727,18 @@ router.get('/api/conversations/:id/lineage', async (request: IRequest, env: Env)
   // Get the conversation to identify root
   const { data: convo, error: convoErr } = await supabase
     .from('conversations')
-    .select('id, root_conversation_id, parent_conversation_id')
+    .select('id, root_conversation_id, parent_conversation_id, user_id, is_public, tags')
     .eq('id', id)
     .single();
 
   if (convoErr || !convo) return json({ error: 'Conversation not found' }, 404);
+
+  const viewer = await getUser(request, supabase);
+  const isOwner = viewer?.id === convo.user_id;
+  const privateTagged = hasPrivateTag((convo as any).tags);
+  if (!isOwner && (!convo.is_public || privateTagged)) {
+    return json({ error: 'Conversation not found' }, 404);
+  }
 
   const rootId = convo.root_conversation_id || convo.id;
 
@@ -3736,6 +3758,9 @@ router.get('/api/conversations/:id/lineage', async (request: IRequest, env: Env)
     `)
     .eq('root_conversation_id', rootId)
     .order('created_at', { ascending: true });
+  if (!isOwner) {
+    query = query.eq('is_public', true).or('tags.is.null,tags.not.cs.{private}');
+  }
   const { data, error } = await query;
 
   if (error) {
@@ -3761,6 +3786,9 @@ router.get('/api/conversations/:id/lineage', async (request: IRequest, env: Env)
         view_count
       `)
       .eq('id', rootId);
+    if (!isOwner) {
+      rootQuery = rootQuery.eq('is_public', true).or('tags.is.null,tags.not.cs.{private}');
+    }
     const { data: rootRow } = await rootQuery.single();
     if (rootRow) nodes.unshift(rootRow);
   }
@@ -3916,7 +3944,7 @@ router.get('/api/users/:userId/conversations', async (request: IRequest, env: En
     .range(offset, offset + limit - 1);
 
   if (!isOwner) {
-    query = query.eq('is_public', true);
+    query = query.eq('is_public', true).or('tags.is.null,tags.not.cs.{private}');
   }
   if (origin === 'agent') {
     query = query.eq('created_via_agent_auth', true);
