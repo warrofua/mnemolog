@@ -22,7 +22,7 @@ Goal: First-class non-human auth model.
 - Support explicit scopes (`poll:vote`, `jobs:run`, `vault:read`, `vault:write`, `billing:read`).
 - Add signed session records and policy gate evaluation before high-cost operations.
 
-Status: in progress. Initial token issue/list/revoke and `mna_*` introspection endpoints are implemented.
+Status: in progress. Initial token issue/list/revoke and `mna_*` introspection endpoints are implemented. MCP OAuth M2M bootstrap is now added with OAuth metadata, client credentials token issuance, and OAuth client lifecycle endpoints.
 
 ## Phase 2.5 (week 2) - Intelligent Rate Limiting (Humans + Agents)
 Goal: Protect reliability and cost surfaces without degrading legitimate usage.

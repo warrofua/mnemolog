@@ -208,6 +208,70 @@ create policy if not exists "Users can update own agent tokens"
     using (auth.uid() = user_id)
     with check (auth.uid() = user_id);
 
+-- OAuth clients for MCP machine-to-machine auth
+create table if not exists public.agent_oauth_clients (
+    id uuid primary key default gen_random_uuid(),
+    owner_user_id uuid not null references public.profiles(id) on delete cascade,
+    name text not null,
+    client_id text not null unique,
+    client_secret_hash text not null,
+    allowed_scopes text[] not null default '{}',
+    status text not null default 'active' check (status in ('active', 'revoked')),
+    last_used_at timestamptz,
+    revoked_at timestamptz,
+    created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+    updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create index if not exists agent_oauth_clients_owner_idx
+    on public.agent_oauth_clients (owner_user_id);
+create index if not exists agent_oauth_clients_status_idx
+    on public.agent_oauth_clients (status);
+create index if not exists agent_oauth_clients_client_id_idx
+    on public.agent_oauth_clients (client_id);
+
+alter table public.agent_oauth_clients enable row level security;
+
+create policy if not exists "Users can view own oauth clients"
+    on public.agent_oauth_clients for select
+    using (auth.uid() = owner_user_id);
+
+create policy if not exists "Users can insert own oauth clients"
+    on public.agent_oauth_clients for insert
+    with check (auth.uid() = owner_user_id);
+
+create policy if not exists "Users can update own oauth clients"
+    on public.agent_oauth_clients for update
+    using (auth.uid() = owner_user_id)
+    with check (auth.uid() = owner_user_id);
+
+-- OAuth access tokens issued via client credentials
+create table if not exists public.agent_oauth_access_tokens (
+    id uuid primary key default gen_random_uuid(),
+    client_ref uuid not null references public.agent_oauth_clients(id) on delete cascade,
+    token_hash text not null unique,
+    scopes text[] not null default '{}',
+    status text not null default 'active' check (status in ('active', 'revoked')),
+    expires_at timestamptz not null,
+    last_used_at timestamptz,
+    revoked_at timestamptz,
+    created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create index if not exists agent_oauth_access_tokens_client_idx
+    on public.agent_oauth_access_tokens (client_ref);
+create index if not exists agent_oauth_access_tokens_status_idx
+    on public.agent_oauth_access_tokens (status);
+create index if not exists agent_oauth_access_tokens_expires_idx
+    on public.agent_oauth_access_tokens (expires_at);
+
+alter table public.agent_oauth_access_tokens enable row level security;
+
+create policy if not exists "OAuth access tokens writable by service role"
+    on public.agent_oauth_access_tokens for all
+    using (auth.role() = 'service_role')
+    with check (auth.role() = 'service_role');
+
 -- Agent feedback items (questions/features/polls)
 create table if not exists public.agent_feedback_items (
     id uuid primary key default gen_random_uuid(),
@@ -489,6 +553,10 @@ create trigger update_conversations_updated_at
 
 create trigger update_agent_tokens_updated_at
     before update on public.agent_tokens
+    for each row execute procedure public.update_updated_at_column();
+
+create trigger update_agent_oauth_clients_updated_at
+    before update on public.agent_oauth_clients
     for each row execute procedure public.update_updated_at_column();
 
 create trigger update_agent_feedback_items_updated_at

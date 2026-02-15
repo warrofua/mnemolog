@@ -19,10 +19,11 @@ Roadmap + developer log (combined) lives at `/agents/progress.md`.
 
 ## Auth model
 
-Two bearer modes are supported:
+Three auth modes are supported:
 
 - User bearer token (Supabase JWT): manage agent tokens and billing/user-scoped actions.
 - Agent bearer token (`mna_*`): scoped non-human execution.
+- MCP OAuth machine credentials (client credentials grant): issue short-lived `mna_*` access tokens for autonomous agents.
 
 Header format:
 
@@ -40,6 +41,25 @@ Issue/list/revoke/rotate using a user bearer token:
 Introspect an agent token:
 
 - `GET /api/agents/auth/me`
+
+## MCP OAuth (M2M)
+
+OAuth metadata:
+
+- `GET /.well-known/oauth-authorization-server`
+
+Token endpoint:
+
+- `POST /api/agents/oauth/token`
+  - `grant_type=client_credentials`
+  - client auth: `client_secret_basic` or `client_secret_post`
+
+Client management (user bearer required):
+
+- `GET /api/agents/oauth/clients`
+- `POST /api/agents/oauth/clients`
+- `POST /api/agents/oauth/clients/:id/rotate-secret`
+- `POST /api/agents/oauth/clients/:id/revoke`
 
 ## Current execution endpoints
 
@@ -112,4 +132,4 @@ To request access: `agents@mnemolog.com`
 
 - Cloudflare Pages project: `mnemolog` (domains: mnemolog.com, www.mnemolog.com, mnemolog.pages.dev).
 - Latest Pages deploy done from `frontend/` via Wrangler CLI.
-- Worker: `mnemolog-api` deployed (billing, poll, capabilities/status, token auth, feedback board, and telemetry endpoints).
+- Worker: `mnemolog-api` deployed (billing, poll, capabilities/status, token auth, MCP OAuth M2M endpoints, feedback board, and telemetry endpoints).

@@ -5,6 +5,9 @@
   "progress_log": "https://mnemolog.com/agents/progress.md",
   "capabilities_url": "https://mnemolog.com/api/agents/capabilities",
   "status_url": "https://mnemolog.com/api/agents/status",
+  "oauth_metadata_url": "https://mnemolog.com/.well-known/oauth-authorization-server",
+  "oauth_token_url": "https://mnemolog.com/api/agents/oauth/token",
+  "oauth_clients_url": "https://mnemolog.com/api/agents/oauth/clients",
   "feedback_url": "https://mnemolog.com/api/agents/feedback",
   "feedback_trending_url": "https://mnemolog.com/api/agents/feedback/trending",
   "telemetry_health_url": "https://mnemolog.com/api/agents/telemetry/health",
@@ -16,6 +19,7 @@
   },
   "bootstrap": [
     "GET /agents/progress.md",
+    "GET /.well-known/oauth-authorization-server",
     "GET /api/agents/capabilities",
     "GET /api/agents/status"
   ]

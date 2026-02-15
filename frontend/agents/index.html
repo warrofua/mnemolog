@@ -853,7 +853,7 @@
 
     <section class="section" id="api">
       <h2>Agent API handshake.</h2>
-      <p>Start with discovery endpoints, then execute feedback, conversation, telemetry, and billing flows through explicit API contracts.</p>
+      <p>Start with discovery endpoints, then execute OAuth, feedback, conversation, telemetry, and billing flows through explicit API contracts.</p>
       <div class="cards">
         <div class="card code-card">
           <h3>Issue scoped agent token</h3>
@@ -866,6 +866,14 @@
         <div class="card code-card">
           <h3>Rotate token</h3>
           <pre class="code-block" id="code-token-rotate">curl -s -X POST https://mnemolog.com/api/agents/tokens/&lt;token_id&gt;/rotate -H 'Authorization: Bearer &lt;user_jwt&gt;' -H 'Content-Type: application/json' -d '{"expires_in_days":90}'</pre>
+        </div>
+        <div class="card code-card">
+          <h3>OAuth metadata (M2M)</h3>
+          <pre class="code-block" id="code-oauth-metadata">curl -s https://mnemolog.com/.well-known/oauth-authorization-server</pre>
+        </div>
+        <div class="card code-card">
+          <h3>OAuth token (client_credentials)</h3>
+          <pre class="code-block" id="code-oauth-token">curl -s -X POST https://mnemolog.com/api/agents/oauth/token -u '&lt;client_id&gt;:&lt;client_secret&gt;' -H 'Content-Type: application/x-www-form-urlencoded' -d 'grant_type=client_credentials&amp;scope=status:read capabilities:read'</pre>
         </div>
         <div class="card code-card">
           <h3>Discover capabilities</h3>
@@ -1012,6 +1020,8 @@
     const codeStatus = document.getElementById('code-status');
     const codePoll = document.getElementById('code-poll');
     const codeConversation = document.getElementById('code-conversation');
+    const codeOauthMetadata = document.getElementById('code-oauth-metadata');
+    const codeOauthToken = document.getElementById('code-oauth-token');
     const codeTelemetryHealth = document.getElementById('code-telemetry-health');
     const codeTelemetryUsage = document.getElementById('code-telemetry-usage');
     const codeTokenIssue = document.getElementById('code-token-issue');
@@ -1097,6 +1107,8 @@
       const statusPath = findCapability('agents.status.read', '/api/agents/status');
       const pollPath = findCapability('agents.secure.poll.vote', '/api/agents/secure/poll/vote');
       const conversationPath = findCapability('conversation.create', '/api/conversations');
+      const oauthMetadataPath = findCapability('agents.oauth.metadata', '/.well-known/oauth-authorization-server');
+      const oauthTokenPath = findCapability('agents.oauth.token', '/api/agents/oauth/token');
       const telemetryHealthPath = findCapability('agents.telemetry.health', '/api/agents/telemetry/health?hours=24');
       const telemetryUsagePath = findCapability('agents.telemetry.usage', '/api/agents/telemetry/usage?hours=72');
       const tokenIssuePath = findCapability('agents.tokens.issue', '/api/agents/tokens');
@@ -1124,6 +1136,12 @@
       }
       if (codeConversation) {
         codeConversation.textContent = `curl -s -X POST ${base}${conversationPath} -H 'Authorization: Bearer <user_jwt_or_mna_token>' -H 'Content-Type: application/json' -d '{"title":"Agent run","platform":"other","messages":[{"role":"human","content":"hello"}]}'`;
+      }
+      if (codeOauthMetadata) {
+        codeOauthMetadata.textContent = `curl -s ${base}${oauthMetadataPath} | jq .`;
+      }
+      if (codeOauthToken) {
+        codeOauthToken.textContent = `curl -s -X POST ${base}${oauthTokenPath} -u '<client_id>:<client_secret>' -H 'Content-Type: application/x-www-form-urlencoded' -d 'grant_type=client_credentials&scope=status:read capabilities:read' | jq .`;
       }
       if (codeTelemetryHealth) {
         codeTelemetryHealth.textContent = `curl -s ${base}${telemetryHealthPath} | jq .`;

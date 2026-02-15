@@ -72,6 +72,9 @@ interface AgentTokenClaims {
   status: string;
   expires_at: string | null;
   revoked_at: string | null;
+  token_source: 'agent_token' | 'oauth_client_credentials';
+  agent_token_id: string | null;
+  oauth_client_id: string | null;
 }
 
 // CORS headers
@@ -189,6 +192,24 @@ function generateAgentToken() {
   return `mna_${hex}`;
 }
 
+function generateOauthClientId() {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  const hex = Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+  return `mnc_${hex}`;
+}
+
+function generateOauthClientSecret() {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  const hex = Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+  return `mns_${hex}`;
+}
+
 function normalizeAgentScopes(raw: unknown) {
   if (!Array.isArray(raw) || !raw.length) {
     return { scopes: ['status:read', 'capabilities:read'], invalid: [] as string[] };
@@ -201,6 +222,67 @@ function normalizeAgentScopes(raw: unknown) {
   const invalid = unique.filter((scope) => !allowedAgentScopes.has(scope));
   const scopes = unique.filter((scope) => allowedAgentScopes.has(scope));
   return { scopes: scopes.length ? scopes : ['status:read', 'capabilities:read'], invalid };
+}
+
+function validateAgentScopes(raw: unknown) {
+  if (!Array.isArray(raw) || !raw.length) {
+    return { scopes: [] as string[], invalid: [] as string[] };
+  }
+  const clean = raw
+    .map((item) => (typeof item === 'string' ? item.trim() : ''))
+    .filter(Boolean);
+  const unique = Array.from(new Set(clean));
+  const invalid = unique.filter((scope) => !allowedAgentScopes.has(scope));
+  const scopes = unique.filter((scope) => allowedAgentScopes.has(scope));
+  return { scopes, invalid };
+}
+
+function parseScopeString(raw?: string | null) {
+  if (!raw) return [] as string[];
+  return raw
+    .split(/\s+/)
+    .map((scope) => scope.trim())
+    .filter(Boolean);
+}
+
+function expandAllowedScopes(raw: unknown) {
+  const { scopes } = validateAgentScopes(Array.isArray(raw) ? raw : []);
+  if (scopes.includes('*')) {
+    return Array.from(allowedAgentScopes.values()).filter((scope) => scope !== '*');
+  }
+  return scopes;
+}
+
+function getBasicAuthCredentials(request: IRequest) {
+  const authHeader = request.headers.get('Authorization') || '';
+  if (!authHeader.startsWith('Basic ')) return null;
+  const encoded = authHeader.slice('Basic '.length).trim();
+  if (!encoded) return null;
+  try {
+    const decoded = atob(encoded);
+    const sep = decoded.indexOf(':');
+    if (sep <= 0) return null;
+    const clientId = decoded.slice(0, sep).trim();
+    const clientSecret = decoded.slice(sep + 1).trim();
+    if (!clientId || !clientSecret) return null;
+    return { clientId, clientSecret };
+  } catch {
+    return null;
+  }
+}
+
+async function parseFormOrJson(request: IRequest) {
+  const contentType = (request.headers.get('Content-Type') || '').toLowerCase();
+  if (contentType.includes('application/json')) {
+    return (await parseJson<Record<string, any>>(request)) || {};
+  }
+  const text = await request.text();
+  const params = new URLSearchParams(text);
+  return Object.fromEntries(params.entries());
+}
+
+function oauthError(error: string, errorDescription: string, status = 400) {
+  return json({ error, error_description: errorDescription }, status);
 }
 
 function hasScope(scopes: string[] | null | undefined, requiredScope?: string) {
@@ -371,9 +453,9 @@ async function resolveFeedbackActor(request: IRequest, env: Env, requiredAgentSc
       response: null as Response | null,
       mode: 'agent' as const,
       userId: agentAuth.claims!.user_id,
-      agentTokenId: agentAuth.claims!.id,
+      agentTokenId: agentAuth.claims!.agent_token_id,
       identityType: 'agent' as const,
-      identityValue: agentAuth.claims!.id,
+      identityValue: agentAuth.claims!.oauth_client_id || agentAuth.claims!.id,
     };
   }
 
@@ -421,7 +503,7 @@ async function resolveFeedbackActor(request: IRequest, env: Env, requiredAgentSc
 async function resolveAgentTokenClaims(request: IRequest, env: Env) {
   const token = getBearerToken(request);
   if (!token || !token.startsWith('mna_')) return null;
-  if (!env.SUPABASE_SERVICE_ROLE_KEY) return null;
+  if (!env.SUPABASE_SERVICE_ROLE_KEY || !env.SUPABASE_URL) return null;
 
   const supabase = getServiceSupabase(env);
   const tokenHash = await hashString(token);
@@ -431,19 +513,72 @@ async function resolveAgentTokenClaims(request: IRequest, env: Env) {
     .eq('token_hash', tokenHash)
     .single();
 
-  if (error || !data) return null;
-  if (data.status !== 'active') return null;
-  if (data.revoked_at) return null;
-  if (data.expires_at && new Date(data.expires_at).getTime() <= Date.now()) return null;
+  if (!error && data) {
+    if (data.status !== 'active') return null;
+    if (data.revoked_at) return null;
+    if (data.expires_at && new Date(data.expires_at).getTime() <= Date.now()) return null;
 
-  // best effort usage telemetry
-  await supabase
-    .from('agent_tokens')
-    .update({ last_used_at: new Date().toISOString() })
-    .eq('id', data.id)
-    .eq('status', 'active');
+    // best effort usage telemetry
+    await supabase
+      .from('agent_tokens')
+      .update({ last_used_at: new Date().toISOString() })
+      .eq('id', data.id)
+      .eq('status', 'active');
 
-  return data as AgentTokenClaims;
+    return {
+      ...(data as any),
+      token_source: 'agent_token',
+      agent_token_id: data.id,
+      oauth_client_id: null,
+    } as AgentTokenClaims;
+  }
+
+  const { data: oauthToken, error: oauthTokenErr } = await supabase
+    .from('agent_oauth_access_tokens')
+    .select('id, client_ref, scopes, status, expires_at, revoked_at')
+    .eq('token_hash', tokenHash)
+    .single();
+
+  if (oauthTokenErr || !oauthToken) return null;
+  if (oauthToken.status !== 'active') return null;
+  if (oauthToken.revoked_at) return null;
+  if (oauthToken.expires_at && new Date(oauthToken.expires_at).getTime() <= Date.now()) return null;
+
+  const { data: oauthClient, error: oauthClientErr } = await supabase
+    .from('agent_oauth_clients')
+    .select('id, owner_user_id, name, status, revoked_at')
+    .eq('id', oauthToken.client_ref)
+    .single();
+  if (oauthClientErr || !oauthClient) return null;
+  if (oauthClient.status !== 'active') return null;
+  if (oauthClient.revoked_at) return null;
+
+  const nowIso = new Date().toISOString();
+  await Promise.all([
+    supabase
+      .from('agent_oauth_access_tokens')
+      .update({ last_used_at: nowIso })
+      .eq('id', oauthToken.id)
+      .eq('status', 'active'),
+    supabase
+      .from('agent_oauth_clients')
+      .update({ last_used_at: nowIso })
+      .eq('id', oauthClient.id)
+      .eq('status', 'active'),
+  ]);
+
+  return {
+    id: oauthToken.id,
+    user_id: oauthClient.owner_user_id,
+    name: `oauth:${oauthClient.name}`,
+    scopes: Array.isArray(oauthToken.scopes) ? oauthToken.scopes : [],
+    status: oauthToken.status,
+    expires_at: oauthToken.expires_at,
+    revoked_at: oauthToken.revoked_at,
+    token_source: 'oauth_client_credentials',
+    agent_token_id: null,
+    oauth_client_id: oauthClient.id,
+  };
 }
 
 async function requireAgentTokenScope(request: IRequest, env: Env, scope?: string) {
@@ -571,6 +706,11 @@ function buildAgentsStatus(env: Env) {
     ['SUPABASE_URL', hasSupabaseUrl],
     ['SUPABASE_SERVICE_ROLE_KEY', hasServiceRole],
   ]);
+  const oauthM2MMissing = missingEnvNames([
+    ['SUPABASE_URL', hasSupabaseUrl],
+    ['SUPABASE_ANON_KEY', hasSupabaseAnon],
+    ['SUPABASE_SERVICE_ROLE_KEY', hasServiceRole],
+  ]);
   const telemetryMissing = missingEnvNames([
     ['SUPABASE_URL', hasSupabaseUrl],
     ['SUPABASE_SERVICE_ROLE_KEY', hasServiceRole],
@@ -643,6 +783,17 @@ function buildAgentsStatus(env: Env) {
       paths: ['/api/agents/telemetry/health', '/api/agents/telemetry/usage'],
       sample_success_rate: parseSampleRate(env.TELEMETRY_SUCCESS_SAMPLE_RATE, 0.25),
     },
+    oauth_m2m: {
+      state: featureStatusFromMissing(oauthM2MMissing),
+      reason: summarizeReason(oauthM2MMissing),
+      paths: [
+        '/.well-known/oauth-authorization-server',
+        '/api/agents/oauth/token',
+        '/api/agents/oauth/clients',
+        '/api/agents/oauth/clients/:id/rotate-secret',
+        '/api/agents/oauth/clients/:id/revoke',
+      ],
+    },
   } as const;
 
   const states = Object.values(features).map((feature) => feature.state);
@@ -670,11 +821,12 @@ function buildAgentsCapabilities(env: Env) {
       agents_markdown: 'https://mnemolog.com/agents/agents.md',
       status_endpoint: '/api/agents/status',
       capabilities_endpoint: '/api/agents/capabilities',
+      oauth_metadata_endpoint: '/.well-known/oauth-authorization-server',
     },
     auth: {
       primary: 'Bearer token',
       header: 'Authorization: Bearer <token>',
-      note: 'Supports bearer user JWT and scoped bearer agent token (mna_*)',
+      note: 'Supports bearer user JWT, scoped bearer agent token (mna_*), and OAuth client_credentials token issuance for autonomous agents.',
     },
     supported_scopes: Array.from(allowedAgentScopes.values()),
     capabilities: [
@@ -758,6 +910,49 @@ function buildAgentsCapabilities(env: Env) {
         path: '/api/agents/auth/me',
         auth: 'bearer_agent',
         state: status.features.agent_tokens.state,
+      },
+      {
+        id: 'agents.oauth.metadata',
+        method: 'GET',
+        path: '/.well-known/oauth-authorization-server',
+        auth: 'none',
+        state: status.features.oauth_m2m.state,
+      },
+      {
+        id: 'agents.oauth.token',
+        method: 'POST',
+        path: '/api/agents/oauth/token',
+        auth: 'oauth_client_auth',
+        state: status.features.oauth_m2m.state,
+        body: { grant_type: 'client_credentials', scope: 'status:read capabilities:read' },
+      },
+      {
+        id: 'agents.oauth.clients.list',
+        method: 'GET',
+        path: '/api/agents/oauth/clients',
+        auth: 'bearer_user',
+        state: status.features.oauth_m2m.state,
+      },
+      {
+        id: 'agents.oauth.clients.create',
+        method: 'POST',
+        path: '/api/agents/oauth/clients',
+        auth: 'bearer_user',
+        state: status.features.oauth_m2m.state,
+      },
+      {
+        id: 'agents.oauth.clients.rotate_secret',
+        method: 'POST',
+        path: '/api/agents/oauth/clients/:id/rotate-secret',
+        auth: 'bearer_user',
+        state: status.features.oauth_m2m.state,
+      },
+      {
+        id: 'agents.oauth.clients.revoke',
+        method: 'POST',
+        path: '/api/agents/oauth/clients/:id/revoke',
+        auth: 'bearer_user',
+        state: status.features.oauth_m2m.state,
       },
       {
         id: 'agents.feedback.create',
@@ -876,6 +1071,33 @@ async function getUser(request: IRequest, supabase: SupabaseClient) {
   return user;
 }
 
+async function requireUserSession(request: IRequest, env: Env) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
+    return {
+      response: json({ error: 'Auth unavailable' }, 503),
+      supabase: null as SupabaseClient | null,
+      user: null as any,
+    };
+  }
+
+  const authHeader = request.headers.get('Authorization') || undefined;
+  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+    global: {
+      headers: authHeader ? { Authorization: authHeader } : {},
+    },
+  });
+  const user = await getUser(request, supabase);
+  if (!user) {
+    return {
+      response: json({ error: 'Unauthorized' }, 401),
+      supabase: null as SupabaseClient | null,
+      user: null as any,
+    };
+  }
+
+  return { response: null as Response | null, supabase, user };
+}
+
 function buildConversationUrl(id: string) {
   // Primary domain for shared conversations
   return `https://mnemolog.com/c/${id}`;
@@ -939,6 +1161,256 @@ router.get('/api/agents/status', async (_request: IRequest, env: Env) => {
 
 router.get('/api/agents/capabilities', async (_request: IRequest, env: Env) => {
   return json(buildAgentsCapabilities(env));
+});
+
+router.get('/.well-known/oauth-authorization-server', async (_request: IRequest, env: Env) => {
+  const issuer = getBaseUrl(env);
+  return json({
+    issuer,
+    token_endpoint: `${issuer}/api/agents/oauth/token`,
+    grant_types_supported: ['client_credentials'],
+    response_types_supported: [],
+    token_endpoint_auth_methods_supported: ['client_secret_basic', 'client_secret_post'],
+    scopes_supported: Array.from(allowedAgentScopes.values()).filter((scope) => scope !== '*'),
+    service_documentation: `${issuer}/agents/agents.md`,
+  });
+});
+
+router.get('/api/agents/oauth/clients', async (request: IRequest, env: Env) => {
+  const auth = await requireUserSession(request, env);
+  if (auth.response) return auth.response;
+
+  const { data, error } = await auth.supabase!
+    .from('agent_oauth_clients')
+    .select('id,name,client_id,allowed_scopes,status,last_used_at,revoked_at,created_at,updated_at')
+    .eq('owner_user_id', auth.user.id)
+    .order('created_at', { ascending: false });
+  if (error) {
+    console.error('OAuth client list error', error);
+    return json({ error: 'Failed to list OAuth clients' }, 500);
+  }
+
+  return json({ clients: data || [] });
+});
+
+router.post('/api/agents/oauth/clients', async (request: IRequest, env: Env) => {
+  const auth = await requireUserSession(request, env);
+  if (auth.response) return auth.response;
+
+  const body = await parseJson<{ name?: string; allowed_scopes?: string[] }>(request);
+  const name = (body?.name || 'agent-oauth-client').trim();
+  if (name.length < 2 || name.length > 80) {
+    return json({ error: 'name must be between 2 and 80 characters' }, 400);
+  }
+
+  const { scopes, invalid } = normalizeAgentScopes(body?.allowed_scopes);
+  if (invalid.length) {
+    return json({ error: `Invalid scopes: ${invalid.join(', ')}` }, 400);
+  }
+
+  const clientId = generateOauthClientId();
+  const clientSecret = generateOauthClientSecret();
+  const clientSecretHash = await hashString(clientSecret);
+
+  const { data, error } = await auth.supabase!
+    .from('agent_oauth_clients')
+    .insert({
+      owner_user_id: auth.user.id,
+      name,
+      client_id: clientId,
+      client_secret_hash: clientSecretHash,
+      allowed_scopes: scopes,
+      status: 'active',
+    })
+    .select('id,name,client_id,allowed_scopes,status,last_used_at,revoked_at,created_at,updated_at')
+    .single();
+  if (error || !data) {
+    console.error('OAuth client create error', error);
+    return json({ error: 'Failed to create OAuth client' }, 500);
+  }
+
+  return json({
+    client: data,
+    client_secret: clientSecret,
+  }, 201);
+});
+
+router.post('/api/agents/oauth/clients/:id/rotate-secret', async (request: IRequest, env: Env) => {
+  const auth = await requireUserSession(request, env);
+  if (auth.response) return auth.response;
+
+  const { id } = request.params;
+  const { data: existing, error: existingErr } = await auth.supabase!
+    .from('agent_oauth_clients')
+    .select('id,client_id,status')
+    .eq('id', id)
+    .eq('owner_user_id', auth.user.id)
+    .single();
+  if (existingErr || !existing) {
+    return json({ error: 'OAuth client not found' }, 404);
+  }
+  if (existing.status !== 'active') {
+    return json({ error: 'Only active OAuth clients can rotate secrets' }, 400);
+  }
+
+  const nowIso = new Date().toISOString();
+  const clientSecret = generateOauthClientSecret();
+  const clientSecretHash = await hashString(clientSecret);
+
+  const { error: updateErr } = await auth.supabase!
+    .from('agent_oauth_clients')
+    .update({
+      client_secret_hash: clientSecretHash,
+      updated_at: nowIso,
+    })
+    .eq('id', id)
+    .eq('owner_user_id', auth.user.id)
+    .eq('status', 'active');
+  if (updateErr) {
+    console.error('OAuth client rotate error', updateErr);
+    return json({ error: 'Failed to rotate OAuth client secret' }, 500);
+  }
+
+  await auth.supabase!
+    .from('agent_oauth_access_tokens')
+    .update({
+      status: 'revoked',
+      revoked_at: nowIso,
+    })
+    .eq('client_ref', id)
+    .eq('status', 'active');
+
+  return json({
+    client_id: existing.client_id,
+    client_secret: clientSecret,
+    rotated: true,
+  });
+});
+
+router.post('/api/agents/oauth/clients/:id/revoke', async (request: IRequest, env: Env) => {
+  const auth = await requireUserSession(request, env);
+  if (auth.response) return auth.response;
+
+  const { id } = request.params;
+  const nowIso = new Date().toISOString();
+  const { data, error } = await auth.supabase!
+    .from('agent_oauth_clients')
+    .update({
+      status: 'revoked',
+      revoked_at: nowIso,
+      updated_at: nowIso,
+    })
+    .eq('id', id)
+    .eq('owner_user_id', auth.user.id)
+    .eq('status', 'active')
+    .select('id,name,client_id,allowed_scopes,status,last_used_at,revoked_at,created_at,updated_at')
+    .single();
+  if (error || !data) {
+    return json({ error: 'OAuth client not found or already revoked' }, 404);
+  }
+
+  await auth.supabase!
+    .from('agent_oauth_access_tokens')
+    .update({
+      status: 'revoked',
+      revoked_at: nowIso,
+    })
+    .eq('client_ref', id)
+    .eq('status', 'active');
+
+  return json({ client: data });
+});
+
+router.post('/api/agents/oauth/token', async (request: IRequest, env: Env) => {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+    return oauthError('server_error', 'OAuth token service unavailable', 503);
+  }
+
+  const basic = getBasicAuthCredentials(request);
+  const body = await parseFormOrJson(request);
+  const grantType = (typeof body.grant_type === 'string' ? body.grant_type : '').trim();
+  if (!grantType) {
+    return oauthError('invalid_request', 'grant_type is required');
+  }
+  if (grantType !== 'client_credentials') {
+    return oauthError('unsupported_grant_type', 'Only client_credentials grant is supported');
+  }
+
+  const clientId = (basic?.clientId || (typeof body.client_id === 'string' ? body.client_id : '')).trim();
+  const clientSecret = (basic?.clientSecret || (typeof body.client_secret === 'string' ? body.client_secret : '')).trim();
+  if (!clientId || !clientSecret) {
+    return oauthError('invalid_client', 'client authentication failed', 401);
+  }
+
+  const supabase = getServiceSupabase(env);
+  const { data: oauthClient, error: clientErr } = await supabase
+    .from('agent_oauth_clients')
+    .select('id,owner_user_id,name,client_secret_hash,allowed_scopes,status,revoked_at')
+    .eq('client_id', clientId)
+    .single();
+  if (clientErr || !oauthClient) {
+    return oauthError('invalid_client', 'client authentication failed', 401);
+  }
+  if (oauthClient.status !== 'active' || oauthClient.revoked_at) {
+    return oauthError('invalid_client', 'client is inactive', 401);
+  }
+
+  const suppliedSecretHash = await hashString(clientSecret);
+  if (suppliedSecretHash !== oauthClient.client_secret_hash) {
+    return oauthError('invalid_client', 'client authentication failed', 401);
+  }
+
+  const allowedScopes = expandAllowedScopes(oauthClient.allowed_scopes);
+  const requestedScopesRaw = parseScopeString(typeof body.scope === 'string' ? body.scope : '');
+  const { scopes: requestedScopes, invalid } = validateAgentScopes(requestedScopesRaw);
+  if (invalid.length) {
+    return oauthError('invalid_scope', `invalid scopes requested: ${invalid.join(', ')}`);
+  }
+
+  let grantedScopes: string[] = [];
+  if (requestedScopes.length) {
+    const denied = requestedScopes.filter((scope) => !allowedScopes.includes(scope));
+    if (denied.length) {
+      return oauthError('invalid_scope', `scope not allowed for client: ${denied.join(', ')}`);
+    }
+    grantedScopes = requestedScopes;
+  } else {
+    grantedScopes = allowedScopes.length ? allowedScopes : ['status:read', 'capabilities:read'];
+  }
+
+  const expiresIn = parsePositiveInt(typeof body.expires_in === 'string' ? body.expires_in : undefined, 3600, 60, 86400);
+  const accessToken = generateAgentToken();
+  const tokenHash = await hashString(accessToken);
+  const nowIso = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
+
+  const { error: tokenErr } = await supabase
+    .from('agent_oauth_access_tokens')
+    .insert({
+      client_ref: oauthClient.id,
+      token_hash: tokenHash,
+      scopes: grantedScopes,
+      status: 'active',
+      expires_at: expiresAt,
+    });
+  if (tokenErr) {
+    console.error('OAuth access token issue error', tokenErr);
+    return oauthError('server_error', 'failed to issue access token', 500);
+  }
+
+  await supabase
+    .from('agent_oauth_clients')
+    .update({ last_used_at: nowIso })
+    .eq('id', oauthClient.id)
+    .eq('status', 'active');
+
+  return json({
+    access_token: accessToken,
+    token_type: 'Bearer',
+    expires_in: expiresIn,
+    scope: grantedScopes.join(' '),
+    mnemolog_token_source: 'oauth_client_credentials',
+  });
 });
 
 router.get('/api/agents/telemetry/health', async (request: IRequest, env: Env) => {
@@ -1571,6 +2043,9 @@ router.get('/api/agents/auth/me', async (request: IRequest, env: Env) => {
       status: claims!.status,
       expires_at: claims!.expires_at,
       revoked_at: claims!.revoked_at,
+      token_source: claims!.token_source,
+      agent_token_id: claims!.agent_token_id,
+      oauth_client_id: claims!.oauth_client_id,
     },
   });
 });
@@ -1608,7 +2083,8 @@ router.post('/api/agents/secure/poll/vote', async (request: IRequest, env: Env) 
     return json({ error: 'Invalid option' }, 400);
   }
 
-  const fingerprint = await hashString(`${env.POLL_SALT}:agent-token:${auth.claims!.id}:${pollQuestion.id}`);
+  const stableAgentIdentity = auth.claims!.oauth_client_id || auth.claims!.id;
+  const fingerprint = await hashString(`${env.POLL_SALT}:agent-token:${stableAgentIdentity}:${pollQuestion.id}`);
   const supabase = getServiceSupabase(env);
 
   try {

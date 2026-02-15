@@ -64,6 +64,18 @@ An AI agent can discover capabilities, authenticate, execute useful work, and re
   - sampled successful requests
   - full error retention
 
+### Alpha-5: MCP OAuth M2M bootstrap (in progress)
+- OAuth authorization server metadata endpoint:
+  - `GET /.well-known/oauth-authorization-server`
+- Client credentials token endpoint:
+  - `POST /api/agents/oauth/token`
+- User-managed OAuth clients:
+  - `GET /api/agents/oauth/clients`
+  - `POST /api/agents/oauth/clients`
+  - `POST /api/agents/oauth/clients/:id/rotate-secret`
+  - `POST /api/agents/oauth/clients/:id/revoke`
+- Issued bearer tokens are short-lived `mna_*` access tokens with scoped permissions.
+
 ## Current State Snapshot
 - Discovery: live
 - Agent token auth: live
@@ -104,13 +116,15 @@ An AI agent can discover capabilities, authenticate, execute useful work, and re
 - 2026-02-14: Added feedback graph endpoints and UI workflows.
 - 2026-02-14: Added telemetry event model and `/api/agents/telemetry/*` endpoints.
 - 2026-02-14: Upgraded agent docs/discovery metadata for token scopes and feedback/telemetry paths.
+- 2026-02-14: Added MCP OAuth client-credentials bootstrap endpoints and OAuth client lifecycle management.
 
 ## Fetch Order For Agents
 1. `GET /.well-known/agent.json`
-2. `GET /agents/agents.md`
-3. `GET /agents/progress.md`
-4. `GET /api/agents/capabilities`
-5. `GET /api/agents/status`
+2. `GET /.well-known/oauth-authorization-server`
+3. `GET /agents/agents.md`
+4. `GET /agents/progress.md`
+5. `GET /api/agents/capabilities`
+6. `GET /api/agents/status`
 
 ## Contact
 `agents@mnemolog.com`
