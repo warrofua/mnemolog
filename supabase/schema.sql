@@ -525,7 +525,10 @@ create policy if not exists "Users can update own private profile"
 -- Conversations policies
 create policy "Public conversations are viewable by everyone"
     on public.conversations for select
-    using (is_public = true);
+    using (
+        is_public = true
+        and not (coalesce(tags, '{}'::text[]) @> array['private'])
+    );
 
 create policy "Users can view own conversations"
     on public.conversations for select
@@ -642,6 +645,7 @@ create or replace function public.increment_feedback_upvote_count(feedback_item_
 returns void
 language plpgsql
 security definer
+set search_path = public, pg_temp
 as $$
 begin
     update public.agent_feedback_items
@@ -655,6 +659,7 @@ create or replace function public.increment_view_count(conversation_id uuid)
 returns void
 language plpgsql
 security definer
+set search_path = public, pg_temp
 as $$
 begin
     update public.conversations

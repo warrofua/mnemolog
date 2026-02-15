@@ -124,6 +124,7 @@ create or replace function public.increment_feedback_upvote_count(feedback_item_
 returns void
 language plpgsql
 security definer
+set search_path = public, pg_temp
 as $$
 begin
     update public.agent_feedback_items

@@ -947,7 +947,7 @@ function buildAgentsStatus(env: Env) {
     telemetry: {
       state: featureStatusFromMissing(telemetryMissing),
       reason: summarizeReason(telemetryMissing),
-      paths: ['/api/agents/telemetry/health', '/api/agents/telemetry/usage'],
+      paths: ['/api/agents/telemetry/health', '/api/agents/telemetry/recent', '/api/agents/telemetry/usage'],
       sample_success_rate: parseSampleRate(env.TELEMETRY_SUCCESS_SAMPLE_RATE, 0.25),
     },
     oauth_m2m: {
@@ -1157,8 +1157,17 @@ function buildAgentsCapabilities(env: Env) {
         id: 'agents.telemetry.health',
         method: 'GET',
         path: '/api/agents/telemetry/health?hours=24',
-        auth: 'none',
+        auth: 'bearer_user_or_agent',
         state: status.features.telemetry.state,
+        required_scope: 'telemetry:read',
+      },
+      {
+        id: 'agents.telemetry.recent',
+        method: 'GET',
+        path: '/api/agents/telemetry/recent?minutes=30&limit=80',
+        auth: 'bearer_user_or_agent',
+        state: status.features.telemetry.state,
+        required_scope: 'telemetry:read',
       },
       {
         id: 'agents.telemetry.usage',
@@ -1690,6 +1699,91 @@ router.get('/api/agents/telemetry/health', async (request: IRequest, env: Env) =
   });
 });
 
+// Recent telemetry feed (sanitized): requires auth, server-role sourced.
+router.get('/api/agents/telemetry/recent', async (request: IRequest, env: Env) => {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+    return json({ error: 'Telemetry unavailable' }, 503);
+  }
+
+  const bearer = getBearerToken(request);
+  if (!bearer) return json({ error: 'Unauthorized' }, 401);
+
+  if (bearer.startsWith('mna_')) {
+    const auth = await requireAgentTokenScope(request, env, 'telemetry:read');
+    if (auth.response) return auth.response;
+  } else {
+    if (!env.SUPABASE_ANON_KEY) {
+      return json({ error: 'Telemetry recent requires SUPABASE_ANON_KEY' }, 503);
+    }
+    const authHeader = request.headers.get('Authorization') || undefined;
+    const userSupabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+      global: {
+        headers: authHeader ? { Authorization: authHeader } : {},
+      },
+    });
+    const user = await getUser(request, userSupabase);
+    if (!user) return json({ error: 'Unauthorized' }, 401);
+  }
+
+  const url = new URL(request.url);
+  const minutes = parsePositiveInt(url.searchParams.get('minutes') || undefined, 30, 1, 24 * 60);
+  const limit = parsePositiveInt(url.searchParams.get('limit') || undefined, 80, 1, 200);
+  const since = new Date(Date.now() - minutes * 60 * 1000).toISOString();
+
+  const supabase = getServiceSupabase(env);
+  const { data, error } = await supabase
+    .from('agent_telemetry_events')
+    .select('endpoint,method,feature_area,auth_mode,status_code,duration_ms,success,created_at')
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error('Telemetry recent read error', error);
+    return json({ error: 'Failed to fetch recent telemetry' }, 500);
+  }
+
+  const rows = (data || []).map((row: any) => ({
+    endpoint: row.endpoint || 'unknown',
+    method: row.method || 'GET',
+    feature_area: row.feature_area || 'unknown',
+    auth_mode: row.auth_mode || 'none',
+    status_code: Number(row.status_code || 0),
+    duration_ms: Number(row.duration_ms || 0),
+    success: row.success === true,
+    created_at: row.created_at,
+  }));
+
+  const byFeatureArea: Record<string, number> = {};
+  const byEndpoint: Record<string, number> = {};
+  let serverErrors = 0;
+  let clientErrors = 0;
+  rows.forEach((row) => {
+    byFeatureArea[row.feature_area] = (byFeatureArea[row.feature_area] || 0) + 1;
+    byEndpoint[row.endpoint] = (byEndpoint[row.endpoint] || 0) + 1;
+    if (row.status_code >= 500) serverErrors += 1;
+    if (row.status_code >= 400 && row.status_code < 500) clientErrors += 1;
+  });
+
+  const topEndpoints = Object.entries(byEndpoint)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([endpoint, count]) => ({ endpoint, count }));
+
+  return json({
+    window_minutes: minutes,
+    generated_at: new Date().toISOString(),
+    totals: {
+      requests: rows.length,
+      client_errors: clientErrors,
+      server_errors: serverErrors,
+    },
+    by_feature_area: byFeatureArea,
+    top_endpoints: topEndpoints,
+    events: rows,
+  });
+});
+
 router.get('/api/agents/telemetry/usage', async (request: IRequest, env: Env) => {
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
     return json({ error: 'Telemetry unavailable' }, 503);
@@ -2131,12 +2225,14 @@ router.post('/api/billing/webhook', async (request: IRequest, env: Env) => {
 
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(payload, signature, env.STRIPE_WEBHOOK_SECRET);
+    event = await stripe.webhooks.constructEventAsync(payload, signature, env.STRIPE_WEBHOOK_SECRET);
   } catch (err: any) {
+    console.error('Stripe webhook signature verification failed', err?.message || err);
     return json({ error: `Webhook signature verification failed: ${err?.message || 'unknown error'}` }, 400);
   }
 
   try {
+    console.log('Stripe webhook received', { id: event.id, type: event.type });
     const supabase = getServiceSupabase(env);
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object as Stripe.Checkout.Session;
@@ -2966,6 +3062,11 @@ router.post('/api/conversations', async (request: IRequest, env: Env) => {
     return json({ error: 'Invalid platform' }, 400);
   }
 
+  const normalizedTags = parseTags(body.tags);
+  const hasPrivateTag = normalizedTags.includes('private');
+  const desiredPublic = body.is_public ?? true;
+  const isPublic = hasPrivateTag ? false : desiredPublic;
+
   const isAgentWrite = !!agentClaims;
   const agentPayloadBytes = isAgentWrite ? estimateConversationPayloadBytes(body) : 0;
   if (isAgentWrite) {
@@ -3025,8 +3126,8 @@ router.post('/api/conversations', async (request: IRequest, env: Env) => {
       description: body.description || null,
       platform: body.platform,
       messages: body.messages,
-      tags: body.tags || [],
-      is_public: body.is_public ?? true,
+      tags: normalizedTags,
+      is_public: isPublic,
       show_author: body.show_author ?? true,
       model_id: body.model_id || null,
       model_display_name: body.model_display_name || null,
@@ -3089,6 +3190,10 @@ router.post('/api/archive', async (request: IRequest, env: Env) => {
   const platform = (conv.platform as CreateConversationBody['platform']) || 'other';
   const title = conv.title?.trim() || 'Untitled conversation';
   const messages = conv.messages || [];
+  const normalizedTags = parseTags(conv.tags);
+  const hasPrivateTag = normalizedTags.includes('private');
+  const desiredPublic = conv.is_public ?? true;
+  const isPublic = hasPrivateTag ? false : desiredPublic;
   if (!messages.length) {
     return json({ error: 'Missing messages' }, 400);
   }
@@ -3104,7 +3209,7 @@ router.post('/api/archive', async (request: IRequest, env: Env) => {
     description: conv.description,
     platform,
     messages,
-    tags: conv.tags || [],
+    tags: normalizedTags,
     model_id: conv.model_id || null,
     model_display_name: conv.model_display_name || null,
     platform_conversation_id: conv.platform_conversation_id || null,
@@ -3171,8 +3276,8 @@ router.post('/api/archive', async (request: IRequest, env: Env) => {
       description: conv.description || null,
       platform,
       messages,
-      tags: conv.tags || [],
-      is_public: conv.is_public ?? true,
+      tags: normalizedTags,
+      is_public: isPublic,
       show_author: conv.show_author ?? true,
       model_id: conv.model_id || null,
       model_display_name: conv.model_display_name || null,
@@ -3224,7 +3329,7 @@ router.put('/api/conversations/:id', async (request: IRequest, env: Env) => {
   // Verify ownership
   const { data: existing, error: fetchErr } = await supabase
     .from('conversations')
-    .select('id, user_id')
+    .select('id, user_id, tags')
     .eq('id', id)
     .single();
   if (fetchErr || !existing) return json({ error: 'Conversation not found' }, 404);
@@ -3234,7 +3339,8 @@ router.put('/api/conversations/:id', async (request: IRequest, env: Env) => {
   if (body.title !== undefined) updates.title = body.title;
   if (body.description !== undefined) updates.description = body.description;
   if (body.platform !== undefined) updates.platform = body.platform;
-  if (body.tags !== undefined) updates.tags = body.tags;
+  const nextTags = body.tags !== undefined ? parseTags(body.tags) : (Array.isArray((existing as any).tags) ? (existing as any).tags : []);
+  if (body.tags !== undefined) updates.tags = nextTags;
   if (body.show_author !== undefined) updates.show_author = body.show_author;
   if (body.is_public !== undefined) updates.is_public = body.is_public;
   if (body.messages !== undefined) updates.messages = body.messages;
@@ -3246,6 +3352,11 @@ router.put('/api/conversations/:id', async (request: IRequest, env: Env) => {
    if (body.pii_scanned !== undefined) updates.pii_scanned = body.pii_scanned;
    if (body.pii_redacted !== undefined) updates.pii_redacted = body.pii_redacted;
    if (body.source !== undefined) updates.source = body.source;
+
+  if (Array.isArray(nextTags) && nextTags.includes('private')) {
+    // "private" tag always forces non-public visibility.
+    updates.is_public = false;
+  }
 
   const { data, error } = await supabase
     .from('conversations')
@@ -3345,6 +3456,8 @@ router.get('/api/conversations', async (request: IRequest, env: Env) => {
 
   // Public list only for this endpoint
   query = query.eq('is_public', true);
+  // Defense-in-depth: a "private" tag should never be publicly visible even if is_public=true.
+  query = query.or('tags.is.null,tags.not.cs.{private}');
   if (origin === 'agent') {
     query = query.eq('created_via_agent_auth', true);
   } else if (origin === 'human') {
