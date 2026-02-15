@@ -7,6 +7,7 @@ interface Env {
   SUPABASE_URL: string;
   SUPABASE_ANON_KEY: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
+  RATE_LIMITER: DurableObjectNamespace;
   DEEPSEEK_API_KEY?: string;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
@@ -29,6 +30,10 @@ interface Env {
   BILLING_TRIAL_DAYS?: string;
   BILLING_TRIAL_MAX_SIGNUPS?: string;
   BILLING_TRIAL_ELIGIBLE_PLANS?: string;
+  RATE_LIMIT_PUBLIC_READ_RPM?: string;
+  RATE_LIMIT_PUBLIC_WRITE_RPM?: string;
+  RATE_LIMIT_PUBLIC_VOTE_RPM?: string;
+  RATE_LIMIT_AUTHED_RPM?: string;
 }
 
 type FeatureState = 'available' | 'degraded' | 'unavailable';
@@ -115,6 +120,17 @@ function json(data: any, status = 200) {
   });
 }
 
+function jsonWithExtraHeaders(data: any, status: number, extraHeaders: Record<string, string>) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      'Content-Type': 'application/json',
+      ...corsHeaders,
+      ...extraHeaders,
+    },
+  });
+}
+
 async function parseJson<T>(request: IRequest): Promise<T | null> {
   try {
     return await request.json();
@@ -131,6 +147,17 @@ function getStripe(env: Env) {
     apiVersion: '2023-10-16',
     httpClient: Stripe.createFetchHttpClient(),
   });
+}
+
+type StripeMode = 'live' | 'test' | 'unknown';
+
+function stripeModeFromSecret(secret?: string | null): StripeMode {
+  if (typeof secret !== 'string') return 'unknown';
+  const normalized = secret.trim();
+  if (!normalized) return 'unknown';
+  if (normalized.startsWith('sk_live_')) return 'live';
+  if (normalized.startsWith('sk_test_')) return 'test';
+  return 'unknown';
 }
 
 function getBaseUrl(env: Env) {
@@ -194,6 +221,49 @@ async function hashString(message: string) {
   return Array.from(new Uint8Array(digest))
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
+}
+
+type RateLimitCheck = {
+  key: string;
+  limit: number;
+  window_seconds: number;
+};
+
+async function rateLimitOrRespond(
+  request: IRequest,
+  env: Env,
+  checks: RateLimitCheck[],
+  message = 'Rate limited',
+) {
+  // Fail open if the binding isn't available (misconfigured env).
+  if (!(env as any).RATE_LIMITER) return null as Response | null;
+
+  try {
+    // Shard by a stable hash of the first key to avoid a single hot DO.
+    const shardSeed = checks[0]?.key || 'default';
+    const shard = (await hashString(`rl:${shardSeed}`)).slice(0, 2);
+    const id = env.RATE_LIMITER.idFromName(`rl:${shard}`);
+    const stub = env.RATE_LIMITER.get(id);
+
+    const resp = await stub.fetch('https://rate-limiter/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ checks }),
+    });
+    const out: any = await resp.json().catch(() => null);
+    if (out && out.allowed === false) {
+      const retryAfter = Number(out.retry_after_seconds || 0);
+      return jsonWithExtraHeaders(
+        { error: message, retry_after_seconds: retryAfter || null },
+        429,
+        retryAfter > 0 ? { 'Retry-After': String(retryAfter) } : {},
+      );
+    }
+  } catch (err) {
+    console.error('Rate limiter failure (fail-open)', err);
+  }
+
+  return null as Response | null;
 }
 
 function getBearerToken(request: IRequest) {
@@ -327,6 +397,15 @@ function parsePositiveInt(value: string | undefined, fallback: number, min: numb
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
   return Math.min(Math.max(Math.floor(n), min), max);
+}
+
+function buildRateLimitConfig(env: Env) {
+  return {
+    publicReadRpm: parsePositiveInt(env.RATE_LIMIT_PUBLIC_READ_RPM, 120, 10, 6000),
+    publicWriteRpm: parsePositiveInt(env.RATE_LIMIT_PUBLIC_WRITE_RPM, 30, 1, 600),
+    publicVoteRpm: parsePositiveInt(env.RATE_LIMIT_PUBLIC_VOTE_RPM, 6, 1, 120),
+    authedRpm: parsePositiveInt(env.RATE_LIMIT_AUTHED_RPM, 240, 10, 6000),
+  };
 }
 
 function parseBoolean(value: string | undefined, fallback: boolean) {
@@ -819,6 +898,7 @@ function buildAgentsStatus(env: Env) {
   const hasPollSalt = hasEnvValue(env.POLL_SALT);
   const hasStripeSecret = hasEnvValue(env.STRIPE_SECRET_KEY);
   const hasStripeWebhookSecret = hasEnvValue(env.STRIPE_WEBHOOK_SECRET);
+  const stripeMode = stripeModeFromSecret(env.STRIPE_SECRET_KEY);
   const feedbackCfg = buildFeedbackConfig(env);
   const storagePolicy = buildAgentConversationStoragePolicy(env);
   const billingTrialCfg = buildBillingTrialConfig(env);
@@ -912,6 +992,7 @@ function buildAgentsStatus(env: Env) {
       state: billingState,
       reason: billingReason,
       paths: ['/api/billing/status', '/api/billing/checkout', '/api/billing/portal', '/api/billing/webhook'],
+      stripe_mode: stripeMode,
       trial: {
         enabled: billingTrialCfg.enabled,
         days: billingTrialCfg.days,
@@ -1521,6 +1602,17 @@ router.post('/api/agents/oauth/token', async (request: IRequest, env: Env) => {
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
     return oauthError('server_error', 'OAuth token service unavailable', 503);
   }
+
+  const rlCfg = buildRateLimitConfig(env);
+  const ip = getClientIp(request) || 'unknown';
+  const ipHash = (await hashString(`ip:${ip}`)).slice(0, 24);
+  const rl = await rateLimitOrRespond(
+    request,
+    env,
+    [{ key: `oauth_token:ip:${ipHash}`, limit: rlCfg.publicWriteRpm, window_seconds: 60 }],
+    'Too many token requests',
+  );
+  if (rl) return rl;
 
   const basic = getBasicAuthCredentials(request);
   const body = await parseFormOrJson(request);
@@ -2284,6 +2376,48 @@ router.post('/api/billing/webhook', async (request: IRequest, env: Env) => {
       }
     }
 
+    if (event.type === 'invoice.paid' || event.type === 'invoice.payment_failed') {
+      const invoice = event.data.object as Stripe.Invoice;
+      const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
+      const subscriptionId = typeof invoice.subscription === 'string'
+        ? invoice.subscription
+        : invoice.subscription?.id;
+      const nowIso = new Date().toISOString();
+
+      // Derive plan/status from the subscription when possible (authoritative for subscription billing).
+      let plan = resolvePlanFromPrice(env, invoice.lines?.data?.[0]?.price?.id || null);
+      let billingStatus = event.type === 'invoice.paid' ? 'active' : 'past_due';
+      let trialStartIso: string | null = null;
+      let trialEndIso: string | null = null;
+
+      if (subscriptionId) {
+        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+        billingStatus = subscription.status || billingStatus;
+        plan = plan || resolvePlanFromPrice(env, subscription.items.data[0]?.price?.id || null);
+        trialStartIso = unixSecondsToIso(subscription.trial_start as number | null | undefined);
+        trialEndIso = unixSecondsToIso(subscription.trial_end as number | null | undefined);
+      }
+
+      if (customerId) {
+        const updates: Record<string, any> = {
+          billing_plan: plan,
+          billing_status: billingStatus,
+          billing_updated_at: nowIso,
+        };
+        if (trialStartIso) {
+          updates.billing_trial_started_at = trialStartIso;
+          updates.billing_trial_consumed_at = trialStartIso;
+        }
+        if (trialEndIso) {
+          updates.billing_trial_ends_at = trialEndIso;
+        }
+        await supabase
+          .from('profile_private')
+          .update(updates)
+          .eq('stripe_customer_id', customerId);
+      }
+    }
+
     if (event.type.startsWith('customer.subscription.')) {
       const subscription = event.data.object as Stripe.Subscription;
       const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id;
@@ -2328,6 +2462,16 @@ router.get('/api/agents/poll', async (request: IRequest, env: Env) => {
   if (!env.POLL_SALT || !env.SUPABASE_SERVICE_ROLE_KEY) {
     return json({ error: 'Poll unavailable' }, 503);
   }
+  const rlCfg = buildRateLimitConfig(env);
+  const ip = getClientIp(request) || 'unknown';
+  const ipHash = (await hashString(`ip:${ip}`)).slice(0, 24);
+  const rl = await rateLimitOrRespond(
+    request,
+    env,
+    [{ key: `poll_read:ip:${ipHash}`, limit: rlCfg.publicReadRpm, window_seconds: 60 }],
+  );
+  if (rl) return rl;
+
   const supabase = getServiceSupabase(env);
   try {
     const results = await getPollResults(supabase);
@@ -2355,6 +2499,19 @@ router.post('/api/agents/poll/vote', async (request: IRequest, env: Env) => {
   if (!ip) {
     return json({ error: 'Unable to verify voter' }, 400);
   }
+
+  const rlCfg = buildRateLimitConfig(env);
+  const ipHash = (await hashString(`ip:${ip}`)).slice(0, 24);
+  const rl = await rateLimitOrRespond(
+    request,
+    env,
+    [
+      { key: `poll_vote:${pollQuestion.id}:ip:${ipHash}`, limit: rlCfg.publicVoteRpm, window_seconds: 60 },
+      { key: `poll_vote:${pollQuestion.id}:ip:${ipHash}:h`, limit: rlCfg.publicVoteRpm * 20, window_seconds: 3600 },
+    ],
+  );
+  if (rl) return rl;
+
   const fingerprint = await hashString(`${env.POLL_SALT}:${ip}:${pollQuestion.id}`);
   const supabase = getServiceSupabase(env);
 
@@ -2666,6 +2823,16 @@ router.get('/api/agents/feedback', async (request: IRequest, env: Env) => {
   if (!env.SUPABASE_SERVICE_ROLE_KEY) {
     return json({ error: 'Feedback unavailable' }, 503);
   }
+  const rlCfg = buildRateLimitConfig(env);
+  const ip = getClientIp(request) || 'unknown';
+  const ipHash = (await hashString(`ip:${ip}`)).slice(0, 24);
+  const rl = await rateLimitOrRespond(
+    request,
+    env,
+    [{ key: `feedback_list:ip:${ipHash}`, limit: rlCfg.publicReadRpm, window_seconds: 60 }],
+  );
+  if (rl) return rl;
+
   const supabase = getServiceSupabase(env);
   const url = new URL(request.url);
   const q = (url.searchParams.get('q') || '').trim();
@@ -2742,6 +2909,16 @@ router.get('/api/agents/feedback/trending', async (request: IRequest, env: Env) 
   if (!env.SUPABASE_SERVICE_ROLE_KEY) {
     return json({ error: 'Feedback unavailable' }, 503);
   }
+  const rlCfg = buildRateLimitConfig(env);
+  const ip = getClientIp(request) || 'unknown';
+  const ipHash = (await hashString(`ip:${ip}`)).slice(0, 24);
+  const rl = await rateLimitOrRespond(
+    request,
+    env,
+    [{ key: `feedback_trending:ip:${ipHash}`, limit: rlCfg.publicReadRpm, window_seconds: 60 }],
+  );
+  if (rl) return rl;
+
   const supabase = getServiceSupabase(env);
   const url = new URL(request.url);
   const type = (url.searchParams.get('type') || '').trim().toLowerCase();
@@ -2771,6 +2948,16 @@ router.get('/api/agents/feedback/:id', async (request: IRequest, env: Env) => {
   if (!env.SUPABASE_SERVICE_ROLE_KEY) {
     return json({ error: 'Feedback unavailable' }, 503);
   }
+  const rlCfg = buildRateLimitConfig(env);
+  const ip = getClientIp(request) || 'unknown';
+  const ipHash = (await hashString(`ip:${ip}`)).slice(0, 24);
+  const rl = await rateLimitOrRespond(
+    request,
+    env,
+    [{ key: `feedback_get:ip:${ipHash}`, limit: rlCfg.publicReadRpm, window_seconds: 60 }],
+  );
+  if (rl) return rl;
+
   const supabase = getServiceSupabase(env);
   const { id } = request.params;
 
@@ -2822,6 +3009,20 @@ router.post('/api/agents/feedback', async (request: IRequest, env: Env) => {
   }
   const actor = await resolveFeedbackActor(request, env, 'feedback:write', false);
   if (actor.response) return actor.response;
+
+  const rlCfg = buildRateLimitConfig(env);
+  const ip = getClientIp(request) || 'unknown';
+  const ipHash = (await hashString(`ip:${ip}`)).slice(0, 24);
+  const actorHash = (await hashString(`actor:${actor.identityType}:${actor.identityValue}`)).slice(0, 24);
+  const rl = await rateLimitOrRespond(
+    request,
+    env,
+    [
+      { key: `feedback_create:ip:${ipHash}`, limit: rlCfg.publicWriteRpm, window_seconds: 60 },
+      { key: `feedback_create:actor:${actorHash}`, limit: rlCfg.authedRpm, window_seconds: 60 },
+    ],
+  );
+  if (rl) return rl;
 
   const body = await parseJson<{
     type?: string;
@@ -2912,6 +3113,21 @@ router.post('/api/agents/feedback/:id/vote', async (request: IRequest, env: Env)
   const actor = await resolveFeedbackActor(request, env, 'feedback:vote', true);
   if (actor.response) return actor.response;
   const { id } = request.params;
+
+  const rlCfg = buildRateLimitConfig(env);
+  const ip = getClientIp(request) || 'unknown';
+  const ipHash = (await hashString(`ip:${ip}`)).slice(0, 24);
+  const actorHash = (await hashString(`actor:${actor.identityType}:${actor.identityValue}`)).slice(0, 24);
+  const perMinute = actor.mode === 'anonymous' ? rlCfg.publicVoteRpm : rlCfg.authedRpm;
+  const rl = await rateLimitOrRespond(
+    request,
+    env,
+    [
+      { key: `feedback_vote:ip:${ipHash}`, limit: perMinute, window_seconds: 60 },
+      { key: `feedback_vote:actor:${actorHash}`, limit: perMinute, window_seconds: 60 },
+    ],
+  );
+  if (rl) return rl;
 
   const supabase = getServiceSupabase(env);
   const { data: item, error: itemError } = await supabase
@@ -4162,6 +4378,71 @@ router.options('*', () => new Response(null, { headers: corsHeaders }));
 
 // 404 fallback
 router.all('*', () => json({ error: 'Not found' }, 404));
+
+export class RateLimiter {
+  private state: DurableObjectState;
+
+  constructor(state: DurableObjectState) {
+    this.state = state;
+  }
+
+  async fetch(request: Request): Promise<Response> {
+    if (request.method.toUpperCase() !== 'POST') {
+      return new Response('Method not allowed', { status: 405 });
+    }
+
+    let payload: any = null;
+    try {
+      payload = await request.json();
+    } catch {
+      payload = null;
+    }
+    const checks: RateLimitCheck[] = Array.isArray(payload?.checks) ? payload.checks : [];
+    if (!checks.length) {
+      return new Response(JSON.stringify({ allowed: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    let allowed = true;
+    let retryAfterSeconds = 0;
+
+    await this.state.blockConcurrencyWhile(async () => {
+      for (const check of checks) {
+        const key = typeof check?.key === 'string' ? check.key : '';
+        const limit = Number(check?.limit || 0);
+        const windowSeconds = Number(check?.window_seconds || 0);
+        if (!key || !Number.isFinite(limit) || !Number.isFinite(windowSeconds) || limit <= 0 || windowSeconds <= 0) {
+          continue;
+        }
+
+        const bucket = Math.floor(now / windowSeconds);
+        const storageKey = `rl:${key}:${bucket}`;
+        const existingCount = await this.state.storage.get<number>(storageKey);
+        const nextCount = (typeof existingCount === 'number' ? existingCount : 0) + 1;
+        await this.state.storage.put(storageKey, nextCount);
+
+        // Best-effort cleanup of older buckets for this key (keeps storage bounded per key).
+        if (bucket > 2) {
+          void this.state.storage.delete(`rl:${key}:${bucket - 2}`);
+        }
+
+        if (nextCount > limit) {
+          allowed = false;
+          const bucketEnd = (bucket + 1) * windowSeconds;
+          retryAfterSeconds = Math.max(retryAfterSeconds, Math.max(0, bucketEnd - now));
+        }
+      }
+    });
+
+    return new Response(JSON.stringify({ allowed, retry_after_seconds: retryAfterSeconds || null }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+}
 
 // Main export
 export default {

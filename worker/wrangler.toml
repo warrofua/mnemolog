@@ -25,6 +25,18 @@ ENVIRONMENT = "production"
 # BILLING_TRIAL_DAYS
 # BILLING_TRIAL_MAX_SIGNUPS
 # BILLING_TRIAL_ELIGIBLE_PLANS
+# RATE_LIMIT_PUBLIC_READ_RPM
+# RATE_LIMIT_PUBLIC_WRITE_RPM
+# RATE_LIMIT_PUBLIC_VOTE_RPM
+# RATE_LIMIT_AUTHED_RPM
+
+[[durable_objects.bindings]]
+name = "RATE_LIMITER"
+class_name = "RateLimiter"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["RateLimiter"]
 
 [dev]
 port = 8787
