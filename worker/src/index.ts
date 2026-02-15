@@ -1599,6 +1599,27 @@ router.get('/api/agents/telemetry/health', async (request: IRequest, env: Env) =
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
     return json({ error: 'Telemetry unavailable' }, 503);
   }
+
+  const bearer = getBearerToken(request);
+  if (!bearer) return json({ error: 'Unauthorized' }, 401);
+
+  if (bearer.startsWith('mna_')) {
+    const auth = await requireAgentTokenScope(request, env, 'telemetry:read');
+    if (auth.response) return auth.response;
+  } else {
+    if (!env.SUPABASE_ANON_KEY) {
+      return json({ error: 'Telemetry health requires SUPABASE_ANON_KEY' }, 503);
+    }
+    const authHeader = request.headers.get('Authorization') || undefined;
+    const userSupabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+      global: {
+        headers: authHeader ? { Authorization: authHeader } : {},
+      },
+    });
+    const user = await getUser(request, userSupabase);
+    if (!user) return json({ error: 'Unauthorized' }, 401);
+  }
+
   const url = new URL(request.url);
   const hours = parsePositiveInt(url.searchParams.get('hours') || undefined, 24, 1, 24 * 30);
   const maxRows = parsePositiveInt(env.TELEMETRY_MAX_USAGE_ROWS, 5000, 500, 20000);
