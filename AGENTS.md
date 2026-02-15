@@ -2,6 +2,19 @@
 
 This file is for local repo operators and coding agents. It is not served by the website.
 
+## Project Identity (Supabase)
+
+- Supabase project ref: `mztjbnjfgsaydbrqnvnb`
+- Supabase URL: `https://mztjbnjfgsaydbrqnvnb.supabase.co`
+- Supabase MCP endpoint:
+  - `https://mcp.supabase.com/mcp?project_ref=mztjbnjfgsaydbrqnvnb`
+  - Example config snippet:
+    - `{"mcpServers":{"supabase":{"url":"https://mcp.supabase.com/mcp?project_ref=mztjbnjfgsaydbrqnvnb"}}}`
+
+Notes:
+- Do not put `SUPABASE_SERVICE_ROLE_KEY` anywhere client-exposed (frontend, extension, public docs).
+- The frontend uses a publishable key (safe to ship) such as `sb_publishable_...` for `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`.
+
 ## Deploy Across Stack
 
 Repository root: `/Users/joshuafarrow/Projects/mnemolog`
@@ -29,6 +42,17 @@ Apply SQL migrations when schema changed:
 - `supabase/profile_private_and_rpc_lockdown_migration.sql`
 
 If Supabase CLI is configured, run your normal migration/push flow. Otherwise apply SQL in Supabase SQL Editor before app deploys that depend on new tables/functions.
+
+### Remote Migrations (Supabase CLI)
+
+This repo is linked (via `supabase/.temp/project-ref`). Helpful commands:
+- List migration status (local vs remote): `supabase migration list --linked`
+- Push pending migrations: `supabase db push --linked`
+
+Important:
+- `supabase db push --linked` may require a DB password (`--password`) depending on your org/project settings.
+- If you applied a migration manually in Supabase SQL Editor, it will not appear in `supabase_migrations.schema_migrations` unless you also repair history. Optional:
+  - `supabase migration repair <version> --status applied --linked`
 
 ### Deploy Order
 
