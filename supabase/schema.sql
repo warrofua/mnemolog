@@ -669,3 +669,6 @@ grant execute on function public.increment_view_count(uuid) to service_role;
 
 revoke execute on function public.increment_feedback_upvote_count(uuid) from public, anon, authenticated;
 grant execute on function public.increment_feedback_upvote_count(uuid) to service_role;
+
+-- SECURITY: handle_new_user() is a trigger function; it should not be callable via RPC.
+revoke execute on function public.handle_new_user() from public, anon, authenticated;
