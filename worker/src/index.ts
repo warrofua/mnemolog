@@ -3018,7 +3018,8 @@ router.post('/api/agents/feedback', async (request: IRequest, env: Env) => {
     request,
     env,
     [
-      { key: `feedback_create:ip:${ipHash}`, limit: rlCfg.publicWriteRpm, window_seconds: 60 },
+      // Authed endpoint; keep an IP-based limit but don't punish NATed agent fleets with the anonymous limit.
+      { key: `feedback_create:ip:${ipHash}`, limit: rlCfg.authedRpm, window_seconds: 60 },
       { key: `feedback_create:actor:${actorHash}`, limit: rlCfg.authedRpm, window_seconds: 60 },
     ],
   );
