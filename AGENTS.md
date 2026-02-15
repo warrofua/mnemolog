@@ -24,6 +24,8 @@ Apply SQL migrations when schema changed:
 - `supabase/agent_feedback_migration.sql`
 - `supabase/agent_telemetry_migration.sql`
 - `supabase/agent_oauth_m2m_migration.sql`
+- `supabase/agent_conversation_storage_migration.sql`
+- `supabase/agent_billing_trial_migration.sql`
 
 If Supabase CLI is configured, run your normal migration/push flow. Otherwise apply SQL in Supabase SQL Editor before app deploys that depend on new tables/functions.
 

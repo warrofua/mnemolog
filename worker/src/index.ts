@@ -22,6 +22,13 @@ interface Env {
   FEEDBACK_MAX_VOTING_DAYS?: string;
   TELEMETRY_SUCCESS_SAMPLE_RATE?: string;
   TELEMETRY_MAX_USAGE_ROWS?: string;
+  AGENT_STORAGE_MAX_ITEMS?: string;
+  AGENT_STORAGE_MAX_TOTAL_BYTES?: string;
+  AGENT_STORAGE_MAX_ITEM_BYTES?: string;
+  BILLING_TRIAL_ENABLED?: string;
+  BILLING_TRIAL_DAYS?: string;
+  BILLING_TRIAL_MAX_SIGNUPS?: string;
+  BILLING_TRIAL_ELIGIBLE_PLANS?: string;
 }
 
 type FeatureState = 'available' | 'degraded' | 'unavailable';
@@ -75,6 +82,19 @@ interface AgentTokenClaims {
   token_source: 'agent_token' | 'oauth_client_credentials';
   agent_token_id: string | null;
   oauth_client_id: string | null;
+}
+
+interface AgentConversationStoragePolicy {
+  maxItems: number;
+  maxTotalBytes: number;
+  maxItemBytes: number;
+}
+
+interface BillingTrialConfig {
+  enabled: boolean;
+  days: number;
+  maxSignups: number | null;
+  eligiblePlans: Set<string>;
 }
 
 // CORS headers
@@ -309,6 +329,20 @@ function parsePositiveInt(value: string | undefined, fallback: number, min: numb
   return Math.min(Math.max(Math.floor(n), min), max);
 }
 
+function parseBoolean(value: string | undefined, fallback: boolean) {
+  if (typeof value !== 'string') return fallback;
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return fallback;
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+  return fallback;
+}
+
+function unixSecondsToIso(value: number | null | undefined) {
+  if (!Number.isFinite(Number(value)) || Number(value) <= 0) return null;
+  return new Date(Number(value) * 1000).toISOString();
+}
+
 function withinWindow(nowMs: number, startIso?: string | null, endIso?: string | null) {
   if (startIso) {
     const startMs = new Date(startIso).getTime();
@@ -331,6 +365,104 @@ function buildFeedbackConfig(env: Env) {
     postingEnd,
     defaultVotingDays,
     maxVotingDays,
+  };
+}
+
+function buildBillingTrialConfig(env: Env): BillingTrialConfig {
+  const enabled = parseBoolean(env.BILLING_TRIAL_ENABLED, true);
+  const days = parsePositiveInt(env.BILLING_TRIAL_DAYS, 30, 1, 365);
+  const maxSignupsRaw = (env.BILLING_TRIAL_MAX_SIGNUPS || '').trim();
+  const maxSignups = maxSignupsRaw
+    ? parsePositiveInt(maxSignupsRaw, 100, 1, 1000000)
+    : null;
+  const plans = (env.BILLING_TRIAL_ELIGIBLE_PLANS || 'solo')
+    .split(',')
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean);
+
+  return {
+    enabled,
+    days,
+    maxSignups,
+    eligiblePlans: new Set(plans.length ? plans : ['solo']),
+  };
+}
+
+function estimateConversationPayloadBytes(input: Partial<CreateConversationBody>) {
+  const payload = {
+    title: input.title || '',
+    description: input.description || '',
+    platform: input.platform || 'other',
+    messages: Array.isArray(input.messages) ? input.messages : [],
+    tags: Array.isArray(input.tags) ? input.tags : [],
+    model_id: input.model_id || null,
+    model_display_name: input.model_display_name || null,
+    platform_conversation_id: input.platform_conversation_id || null,
+    attribution_confidence: input.attribution_confidence || null,
+    attribution_source: input.attribution_source || null,
+    pii_scanned: input.pii_scanned ?? false,
+    pii_redacted: input.pii_redacted ?? false,
+    source: input.source || null,
+  };
+  return new TextEncoder().encode(JSON.stringify(payload)).length;
+}
+
+function buildAgentConversationStoragePolicy(env: Env): AgentConversationStoragePolicy {
+  const maxItems = parsePositiveInt(env.AGENT_STORAGE_MAX_ITEMS, 200, 10, 10000);
+  const maxTotalBytes = parsePositiveInt(env.AGENT_STORAGE_MAX_TOTAL_BYTES, 20 * 1024 * 1024, 256 * 1024, 1024 * 1024 * 1024);
+  const maxItemBytes = parsePositiveInt(env.AGENT_STORAGE_MAX_ITEM_BYTES, 256 * 1024, 1024, maxTotalBytes);
+  return {
+    maxItems,
+    maxTotalBytes,
+    maxItemBytes: Math.min(maxItemBytes, maxTotalBytes),
+  };
+}
+
+async function fetchAgentConversationStorageUsage(
+  supabase: SupabaseClient,
+  ownerUserId: string,
+  maxRows: number,
+) {
+  const { data, error, count } = await supabase
+    .from('conversations')
+    .select('agent_payload_bytes', { count: 'exact' })
+    .eq('user_id', ownerUserId)
+    .eq('created_via_agent_auth', true)
+    .limit(maxRows);
+
+  if (error) throw error;
+
+  const totalBytes = (data || []).reduce((sum, row: any) => {
+    const n = typeof row.agent_payload_bytes === 'number' ? row.agent_payload_bytes : 0;
+    return sum + Math.max(0, n);
+  }, 0);
+
+  return {
+    itemCount: typeof count === 'number' ? count : (data || []).length,
+    totalBytes,
+  };
+}
+
+function buildAgentStorageLimitPayload(
+  code: string,
+  message: string,
+  policy: AgentConversationStoragePolicy,
+  usage: { itemCount: number; totalBytes: number },
+  incomingBytes: number,
+) {
+  return {
+    error: message,
+    code,
+    limits: {
+      max_items: policy.maxItems,
+      max_total_bytes: policy.maxTotalBytes,
+      max_item_bytes: policy.maxItemBytes,
+    },
+    usage: {
+      item_count: usage.itemCount,
+      total_bytes: usage.totalBytes,
+      incoming_bytes: incomingBytes,
+    },
   };
 }
 
@@ -381,6 +513,8 @@ function telemetryFeatureArea(pathname: string) {
 function shouldLogTelemetry(pathname: string, method: string) {
   if (method.toUpperCase() === 'OPTIONS') return false;
   if (pathname.startsWith('/api/agents')) return true;
+  if (pathname.startsWith('/api/billing')) return true;
+  if (pathname === '/api/auth/user') return true;
   if (pathname === '/api/archive') return true;
   if (pathname.startsWith('/api/conversations') && ['POST', 'PUT'].includes(method.toUpperCase())) return true;
   return false;
@@ -401,6 +535,11 @@ async function logAgentTelemetry(request: IRequest, response: Response, env: Env
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return;
 
   const status = Number(response.status || 500);
+  if (path === '/api/billing/webhook') {
+    // Avoid polluting telemetry with unauthenticated probes against the webhook endpoint.
+    const hasStripeSig = !!request.headers.get('Stripe-Signature');
+    if (!hasStripeSig && status < 500) return;
+  }
   const statusClass = `${Math.floor(status / 100)}xx`;
   const success = status < 400;
   const successSampleRate = parseSampleRate(env.TELEMETRY_SUCCESS_SAMPLE_RATE, 0.25);
@@ -500,7 +639,7 @@ async function resolveFeedbackActor(request: IRequest, env: Env, requiredAgentSc
   };
 }
 
-async function resolveAgentTokenClaims(request: IRequest, env: Env) {
+async function resolveAgentTokenClaims(request: IRequest, env: Env): Promise<AgentTokenClaims | null> {
   const token = getBearerToken(request);
   if (!token || !token.startsWith('mna_')) return null;
   if (!env.SUPABASE_SERVICE_ROLE_KEY || !env.SUPABASE_URL) return null;
@@ -578,7 +717,7 @@ async function resolveAgentTokenClaims(request: IRequest, env: Env) {
     token_source: 'oauth_client_credentials',
     agent_token_id: null,
     oauth_client_id: oauthClient.id,
-  };
+  } as AgentTokenClaims;
 }
 
 async function requireAgentTokenScope(request: IRequest, env: Env, scope?: string) {
@@ -674,7 +813,10 @@ function buildAgentsStatus(env: Env) {
   const hasSupabaseServiceRole = hasEnvValue(env.SUPABASE_SERVICE_ROLE_KEY);
   const hasPollSalt = hasEnvValue(env.POLL_SALT);
   const hasStripeSecret = hasEnvValue(env.STRIPE_SECRET_KEY);
+  const hasStripeWebhookSecret = hasEnvValue(env.STRIPE_WEBHOOK_SECRET);
   const feedbackCfg = buildFeedbackConfig(env);
+  const storagePolicy = buildAgentConversationStoragePolicy(env);
+  const billingTrialCfg = buildBillingTrialConfig(env);
 
   const stripePrices = getStripePriceMap(env);
   const hasAnyStripePrice = Object.values(stripePrices).some((value) => hasEnvValue(value));
@@ -689,11 +831,14 @@ function buildAgentsStatus(env: Env) {
     ['SUPABASE_SERVICE_ROLE_KEY', hasSupabaseServiceRole],
     ['POLL_SALT', hasPollSalt],
   ]);
-  const billingMissing = missingEnvNames([
+  const billingCoreMissing = missingEnvNames([
     ['SUPABASE_URL', hasSupabaseUrl],
     ['SUPABASE_ANON_KEY', hasSupabaseAnon],
     ['STRIPE_SECRET_KEY', hasStripeSecret],
     ['STRIPE_PRICE_MAP or STRIPE_PRICE_*', hasAnyStripePrice],
+  ]);
+  const billingWebhookMissing = missingEnvNames([
+    ['STRIPE_WEBHOOK_SECRET', hasStripeWebhookSecret],
   ]);
   const tokenCoreMissing = missingEnvNames([
     ['SUPABASE_URL', hasSupabaseUrl],
@@ -726,11 +871,27 @@ function buildAgentsStatus(env: Env) {
     ? `Management endpoints ready; bearer-token introspection unavailable (${tokenAuthMissing.join(', ')})`
     : 'Ready';
 
+  const billingState: FeatureState = billingCoreMissing.length
+    ? 'unavailable'
+    : billingWebhookMissing.length
+    ? 'degraded'
+    : 'available';
+  const billingReason = billingCoreMissing.length
+    ? summarizeReason(billingCoreMissing)
+    : billingWebhookMissing.length
+    ? `Checkout/portal ready; webhook processing unavailable (${summarizeReason(billingWebhookMissing)})`
+    : 'Ready';
+
   const features = {
     core_api: {
       state: featureStatusFromMissing(coreMissing),
       reason: summarizeReason(coreMissing),
       paths: ['/api/health', '/api/conversations', '/api/conversations/:id'],
+      agent_storage_limits: {
+        max_items: storagePolicy.maxItems,
+        max_total_bytes: storagePolicy.maxTotalBytes,
+        max_item_bytes: storagePolicy.maxItemBytes,
+      },
     },
     auth: {
       state: featureStatusFromMissing(coreMissing),
@@ -743,9 +904,15 @@ function buildAgentsStatus(env: Env) {
       paths: ['/api/agents/poll', '/api/agents/poll/vote'],
     },
     billing: {
-      state: featureStatusFromMissing(billingMissing),
-      reason: summarizeReason(billingMissing),
-      paths: ['/api/billing/checkout', '/api/billing/portal'],
+      state: billingState,
+      reason: billingReason,
+      paths: ['/api/billing/status', '/api/billing/checkout', '/api/billing/portal', '/api/billing/webhook'],
+      trial: {
+        enabled: billingTrialCfg.enabled,
+        days: billingTrialCfg.days,
+        max_signups: billingTrialCfg.maxSignups,
+        eligible_plans: Array.from(billingTrialCfg.eligiblePlans.values()),
+      },
     },
     continuation: {
       state: hasSupabaseUrl ? 'available' : 'unavailable',
@@ -798,12 +965,13 @@ function buildAgentsStatus(env: Env) {
 
   const states = Object.values(features).map((feature) => feature.state);
   const unavailableCount = states.filter((state) => state === 'unavailable').length;
+  const degradedCount = states.filter((state) => state === 'degraded').length;
   const overall: FeatureState =
-    unavailableCount === 0
-      ? 'available'
-      : unavailableCount === states.length
+    unavailableCount === states.length
       ? 'unavailable'
-      : 'degraded';
+      : unavailableCount > 0 || degradedCount > 0
+      ? 'degraded'
+      : 'available';
 
   return {
     overall,
@@ -1001,17 +1169,31 @@ function buildAgentsCapabilities(env: Env) {
         required_scope: 'telemetry:read',
       },
       {
+        id: 'billing.status.read',
+        method: 'GET',
+        path: '/api/billing/status',
+        auth: 'bearer',
+        state: status.features.billing.state,
+      },
+      {
         id: 'billing.checkout.create',
         method: 'POST',
         path: '/api/billing/checkout',
         auth: 'bearer',
         state: status.features.billing.state,
-        body: { plan: 'solo' },
+        body: { plan: 'solo', trial_opt_in: true },
+      },
+      {
+        id: 'billing.portal.create',
+        method: 'POST',
+        path: '/api/billing/portal',
+        auth: 'bearer',
+        state: status.features.billing.state,
       },
       {
         id: 'conversation.list',
         method: 'GET',
-        path: '/api/conversations?limit=20&sort=newest',
+        path: '/api/conversations?limit=20&sort=newest&origin=agent',
         auth: 'optional',
         state: status.features.core_api.state,
       },
@@ -1442,18 +1624,26 @@ router.get('/api/agents/telemetry/health', async (request: IRequest, env: Env) =
   const successes = rows.filter((row: any) => row.success === true).length;
   const p95LatencyMs = percentile95(rows.map((row: any) => Number(row.duration_ms) || 0));
 
-  const failingByEndpoint: Record<string, number> = {};
+  const endpointAgg: Record<string, { requests: number; server_errors: number }> = {};
   rows.forEach((row: any) => {
+    const endpoint = row.endpoint || 'unknown';
     const statusCode = Number(row.status_code || 0);
-    if (statusCode >= 500) {
-      const key = row.endpoint || 'unknown';
-      failingByEndpoint[key] = (failingByEndpoint[key] || 0) + 1;
+    if (!endpointAgg[endpoint]) {
+      endpointAgg[endpoint] = { requests: 0, server_errors: 0 };
     }
+    endpointAgg[endpoint].requests += 1;
+    if (statusCode >= 500) endpointAgg[endpoint].server_errors += 1;
   });
-  const topFailingEndpoints = Object.entries(failingByEndpoint)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
-    .map(([endpoint, count]) => ({ endpoint, count }));
+  const topFailingEndpoints = Object.entries(endpointAgg)
+    .map(([endpoint, stats]) => ({
+      endpoint,
+      total_requests: stats.requests,
+      server_errors: stats.server_errors,
+      error_rate: stats.requests ? Number((stats.server_errors / stats.requests).toFixed(4)) : 0,
+    }))
+    .filter((row) => row.server_errors > 0)
+    .sort((a, b) => b.error_rate - a.error_rate || b.server_errors - a.server_errors)
+    .slice(0, 5);
 
   return json({
     window_hours: hours,
@@ -1597,6 +1787,137 @@ router.get('/api/auth/user', async (request: IRequest, env: Env) => {
   return json({ user, profile });
 });
 
+const activeBillingStatuses = new Set([
+  'trialing',
+  'trial_will_end',
+  'active',
+  'past_due',
+  'unpaid',
+  'incomplete',
+]);
+
+async function isTrialCapacityAvailable(
+  supabase: SupabaseClient,
+  maxSignups: number | null,
+  trialAlreadyStarted: boolean,
+) {
+  if (!maxSignups || maxSignups <= 0) {
+    return { available: true, activeSignups: null as number | null };
+  }
+  if (trialAlreadyStarted) {
+    return { available: true, activeSignups: null as number | null };
+  }
+  const { count, error } = await supabase
+    .from('profile_private')
+    .select('profile_id', { count: 'exact', head: true })
+    .not('billing_trial_started_at', 'is', null);
+  if (error) {
+    throw error;
+  }
+  const activeSignups = typeof count === 'number' ? count : 0;
+  return {
+    available: activeSignups < maxSignups,
+    activeSignups,
+  };
+}
+
+function isBillingTrialEligibleForProfile(
+  profile: {
+    billing_status?: string | null;
+    billing_trial_started_at?: string | null;
+    billing_trial_consumed_at?: string | null;
+  } | null,
+) {
+  const billingStatus = (profile?.billing_status || '').toLowerCase();
+  const trialConsumed = !!profile?.billing_trial_consumed_at;
+  const trialStarted = !!profile?.billing_trial_started_at;
+  const activeBilling = activeBillingStatuses.has(billingStatus);
+  return {
+    eligible: !trialConsumed && !trialStarted && !activeBilling,
+    trialStarted,
+    trialConsumed,
+    activeBilling,
+  };
+}
+
+// Billing status for signed-in users
+router.get('/api/billing/status', async (request: IRequest, env: Env) => {
+  const auth = await requireUserSession(request, env);
+  if (auth.response) return auth.response;
+
+  const trialCfg = buildBillingTrialConfig(env);
+  const { data: profile, error } = await auth.supabase!
+    .from('profile_private')
+    .select(
+      `
+      stripe_customer_id,
+      billing_plan,
+      billing_status,
+      billing_updated_at,
+      billing_trial_started_at,
+      billing_trial_ends_at,
+      billing_trial_consumed_at,
+      billing_trial_reminder_sent_at
+    `,
+    )
+    .eq('profile_id', auth.user.id)
+    .maybeSingle();
+  if (error) {
+    console.error('Billing status read error', error);
+    return json({ error: 'Failed to read billing status' }, 500);
+  }
+
+  const trialEligibility = isBillingTrialEligibleForProfile(profile as any);
+  const nowMs = Date.now();
+  const trialEndsMs = profile?.billing_trial_ends_at ? new Date(profile.billing_trial_ends_at).getTime() : NaN;
+  const trialActive = Number.isFinite(trialEndsMs)
+    ? trialEndsMs > nowMs
+    : (profile?.billing_status || '').toLowerCase() === 'trialing';
+  const trialDaysRemaining = Number.isFinite(trialEndsMs)
+    ? Math.max(0, Math.ceil((trialEndsMs - nowMs) / (24 * 60 * 60 * 1000)))
+    : null;
+
+  let trialCapacity: { available: boolean; activeSignups: number | null } = {
+    available: true,
+    activeSignups: null,
+  };
+  try {
+    // Capacity is evaluated with service role to avoid leaking or breaking under owner-only RLS.
+    const service = getServiceSupabase(env);
+    trialCapacity = await isTrialCapacityAvailable(
+      service,
+      trialCfg.maxSignups,
+      trialEligibility.trialStarted,
+    );
+  } catch (capError) {
+    console.error('Billing trial capacity check failed', capError);
+  }
+
+  return json({
+    billing: {
+      stripe_customer_id: profile?.stripe_customer_id || null,
+      plan: profile?.billing_plan || null,
+      status: profile?.billing_status || null,
+      updated_at: profile?.billing_updated_at || null,
+    },
+    trial: {
+      enabled: trialCfg.enabled,
+      days: trialCfg.days,
+      max_signups: trialCfg.maxSignups,
+      active_signups: trialCapacity.activeSignups,
+      capacity_available: trialCapacity.available,
+      eligible_plans: Array.from(trialCfg.eligiblePlans.values()),
+      eligible: trialCfg.enabled && trialEligibility.eligible && trialCapacity.available,
+      active: trialActive,
+      days_remaining: trialDaysRemaining,
+      started_at: profile?.billing_trial_started_at || null,
+      ends_at: profile?.billing_trial_ends_at || null,
+      consumed_at: profile?.billing_trial_consumed_at || null,
+      reminder_sent_at: profile?.billing_trial_reminder_sent_at || null,
+    },
+  });
+});
+
 // Create Stripe checkout session
 router.post('/api/billing/checkout', async (request: IRequest, env: Env) => {
   if (!env.STRIPE_SECRET_KEY) {
@@ -1613,43 +1934,117 @@ router.post('/api/billing/checkout', async (request: IRequest, env: Env) => {
     return json({ error: 'Unauthorized' }, 401);
   }
 
-  const body = await parseJson<{ plan?: string; success_url?: string; cancel_url?: string }>(request);
+  const body = await parseJson<{
+    plan?: string;
+    success_url?: string;
+    cancel_url?: string;
+    trial_opt_in?: boolean;
+  }>(request);
   if (!body?.plan) {
     return json({ error: 'Plan is required' }, 400);
   }
 
-  const priceId = requireStripePrice(env, body.plan);
+  const normalizedPlan = body.plan.trim().toLowerCase();
+  const priceId = requireStripePrice(env, normalizedPlan);
   const baseUrl = getBaseUrl(env);
   const stripe = getStripe(env);
+  const trialCfg = buildBillingTrialConfig(env);
   const safeSuccessUrl = sanitizeRedirectUrl(body.success_url, baseUrl);
   const safeCancelUrl = sanitizeRedirectUrl(body.cancel_url, baseUrl);
+  const trialOptIn = body.trial_opt_in !== false;
 
   let stripeCustomerId: string | null = null;
+  let profile: any = null;
   try {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('stripe_customer_id')
-      .eq('id', user.id)
-      .single();
-    stripeCustomerId = profile?.stripe_customer_id ?? null;
+    const { data } = await supabase
+      .from('profile_private')
+      .select(
+        `
+        stripe_customer_id,
+        billing_status,
+        billing_trial_started_at,
+        billing_trial_consumed_at
+      `,
+      )
+      .eq('profile_id', user.id)
+      .maybeSingle();
+    profile = data || null;
+    stripeCustomerId = data?.stripe_customer_id ?? null;
   } catch {
+    profile = null;
     stripeCustomerId = null;
   }
+
+  const trialEligibility = isBillingTrialEligibleForProfile(profile);
+  let trialCapacity: { available: boolean; activeSignups: number | null } = {
+    available: true,
+    activeSignups: null,
+  };
+  if (trialCfg.enabled && trialOptIn && trialEligibility.eligible && trialCfg.eligiblePlans.has(normalizedPlan)) {
+    try {
+      const service = getServiceSupabase(env);
+      trialCapacity = await isTrialCapacityAvailable(service, trialCfg.maxSignups, trialEligibility.trialStarted);
+    } catch (trialCapacityErr) {
+      console.error('Billing trial capacity check failed', trialCapacityErr);
+      return json({ error: 'Unable to evaluate trial capacity' }, 500);
+    }
+  }
+
+  const trialApplied = trialCfg.enabled
+    && trialOptIn
+    && trialCfg.eligiblePlans.has(normalizedPlan)
+    && trialEligibility.eligible
+    && trialCapacity.available;
+
+  const trialReason = !trialCfg.enabled
+    ? 'trial_disabled'
+    : !trialOptIn
+    ? 'trial_opt_out'
+    : !trialCfg.eligiblePlans.has(normalizedPlan)
+    ? 'plan_not_eligible'
+    : !trialEligibility.eligible
+    ? 'already_used_or_active_subscription'
+    : !trialCapacity.available
+    ? 'trial_capacity_reached'
+    : 'trial_applied';
 
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
     payment_method_types: ['card'],
+    payment_method_collection: 'always',
     ...(stripeCustomerId ? { customer: stripeCustomerId } : { customer_email: user.email }),
     line_items: [{ price: priceId, quantity: 1 }],
     success_url: safeSuccessUrl || `${baseUrl}/agents/thanks?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: safeCancelUrl || `${baseUrl}/agents/`,
+    subscription_data: {
+      metadata: {
+        user_id: user.id,
+        plan: normalizedPlan,
+        trial_opt_in: String(trialOptIn),
+        trial_applied: String(trialApplied),
+      },
+      ...(trialApplied ? { trial_period_days: trialCfg.days } : {}),
+    },
     metadata: {
       user_id: user.id,
-      plan: body.plan,
+      plan: normalizedPlan,
+      trial_opt_in: String(trialOptIn),
+      trial_applied: String(trialApplied),
     },
   });
 
-  return json({ id: session.id, url: session.url });
+  return json({
+    id: session.id,
+    url: session.url,
+    trial: {
+      opt_in: trialOptIn,
+      applied: trialApplied,
+      days: trialApplied ? trialCfg.days : 0,
+      reason: trialReason,
+      max_signups: trialCfg.maxSignups,
+      active_signups: trialCapacity.activeSignups,
+    },
+  });
 });
 
 // Create Stripe customer portal session
@@ -1672,10 +2067,10 @@ router.post('/api/billing/portal', async (request: IRequest, env: Env) => {
   let customerId: string | null = null;
   try {
     const { data: profile } = await supabase
-      .from('profiles')
+      .from('profile_private')
       .select('stripe_customer_id')
-      .eq('id', user.id)
-      .single();
+      .eq('profile_id', user.id)
+      .maybeSingle();
     customerId = profile?.stripe_customer_id ?? null;
   } catch {
     customerId = null;
@@ -1727,25 +2122,43 @@ router.post('/api/billing/webhook', async (request: IRequest, env: Env) => {
       const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id;
       const userId = session.metadata?.user_id || null;
       let plan = session.metadata?.plan || null;
+      const nowIso = new Date().toISOString();
+      let billingStatus = 'active';
+      let trialStartIso: string | null = null;
+      let trialEndIso: string | null = null;
 
-      if (!plan && session.subscription) {
+      if (session.subscription) {
         const subscriptionId = typeof session.subscription === 'string'
           ? session.subscription
           : session.subscription.id;
         const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-        plan = resolvePlanFromPrice(env, subscription.items.data[0]?.price?.id || null);
+        billingStatus = subscription.status || billingStatus;
+        if (!plan) {
+          plan = resolvePlanFromPrice(env, subscription.items.data[0]?.price?.id || null);
+        }
+        trialStartIso = unixSecondsToIso(subscription.trial_start as number | null | undefined);
+        trialEndIso = unixSecondsToIso(subscription.trial_end as number | null | undefined);
       }
 
       if (customerId && userId) {
+        const updates: Record<string, any> = {
+          stripe_customer_id: customerId,
+          billing_plan: plan,
+          billing_status: billingStatus,
+          billing_updated_at: nowIso,
+        };
+        if (trialStartIso) {
+          updates.billing_trial_started_at = trialStartIso;
+          updates.billing_trial_consumed_at = trialStartIso;
+        }
+        if (trialEndIso) {
+          updates.billing_trial_ends_at = trialEndIso;
+        }
+
         await supabase
-          .from('profiles')
-          .update({
-            stripe_customer_id: customerId,
-            billing_plan: plan,
-            billing_status: 'active',
-            billing_updated_at: new Date().toISOString(),
-          })
-          .eq('id', userId);
+          .from('profile_private')
+          .update(updates)
+          .eq('profile_id', userId);
       }
     }
 
@@ -1754,14 +2167,29 @@ router.post('/api/billing/webhook', async (request: IRequest, env: Env) => {
       const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id;
       const status = subscription.status;
       const plan = resolvePlanFromPrice(env, subscription.items.data[0]?.price?.id || null);
+      const trialStartIso = unixSecondsToIso(subscription.trial_start as number | null | undefined);
+      const trialEndIso = unixSecondsToIso(subscription.trial_end as number | null | undefined);
       if (customerId) {
+        const updates: Record<string, any> = {
+          billing_plan: plan,
+          billing_status: status,
+          billing_updated_at: new Date().toISOString(),
+        };
+        if (trialStartIso) {
+          updates.billing_trial_started_at = trialStartIso;
+          updates.billing_trial_consumed_at = trialStartIso;
+        }
+        if (trialEndIso) {
+          updates.billing_trial_ends_at = trialEndIso;
+        }
+        if (event.type === 'customer.subscription.trial_will_end') {
+          updates.billing_trial_reminder_sent_at = new Date().toISOString();
+          updates.billing_status = 'trial_will_end';
+        }
+
         await supabase
-          .from('profiles')
-          .update({
-            billing_plan: plan,
-            billing_status: status,
-            billing_updated_at: new Date().toISOString(),
-          })
+          .from('profile_private')
+          .update(updates)
           .eq('stripe_customer_id', customerId);
       }
     }
@@ -2481,11 +2909,13 @@ router.post('/api/conversations', async (request: IRequest, env: Env) => {
 
   let supabase: SupabaseClient;
   let userId: string;
+  let agentClaims: AgentTokenClaims | null = null;
   if (isAgentBearer) {
     const agentAuth = await requireAgentTokenScope(request, env, 'conversations:write');
     if (agentAuth.response) return agentAuth.response;
     supabase = getServiceSupabase(env);
     userId = agentAuth.claims!.user_id;
+    agentClaims = agentAuth.claims!;
   } else {
     supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
       global: {
@@ -2515,6 +2945,56 @@ router.post('/api/conversations', async (request: IRequest, env: Env) => {
     return json({ error: 'Invalid platform' }, 400);
   }
 
+  const isAgentWrite = !!agentClaims;
+  const agentPayloadBytes = isAgentWrite ? estimateConversationPayloadBytes(body) : 0;
+  if (isAgentWrite) {
+    const policy = buildAgentConversationStoragePolicy(env);
+    const usageBase = { itemCount: 0, totalBytes: 0 };
+    if (agentPayloadBytes > policy.maxItemBytes) {
+      return json(
+        buildAgentStorageLimitPayload(
+          'agent_storage_item_limit_exceeded',
+          'Agent storage limit reached: single item is too large.',
+          policy,
+          usageBase,
+          agentPayloadBytes,
+        ),
+        413,
+      );
+    }
+    let usage: { itemCount: number; totalBytes: number };
+    try {
+      usage = await fetchAgentConversationStorageUsage(supabase, userId, policy.maxItems + 1);
+    } catch (err) {
+      console.error('Agent storage usage query failed', err);
+      return json({ error: 'Failed to evaluate agent storage limits' }, 500);
+    }
+    if (usage.itemCount >= policy.maxItems) {
+      return json(
+        buildAgentStorageLimitPayload(
+          'agent_storage_item_limit_exceeded',
+          'Agent storage limit reached: maximum number of stored items exceeded.',
+          policy,
+          usage,
+          agentPayloadBytes,
+        ),
+        413,
+      );
+    }
+    if (usage.totalBytes + agentPayloadBytes > policy.maxTotalBytes) {
+      return json(
+        buildAgentStorageLimitPayload(
+          'agent_storage_total_limit_exceeded',
+          'Agent storage limit reached: total storage bytes exceeded.',
+          policy,
+          usage,
+          agentPayloadBytes,
+        ),
+        413,
+      );
+    }
+  }
+
   // Insert conversation
   const { data, error } = await supabase
     .from('conversations')
@@ -2534,7 +3014,11 @@ router.post('/api/conversations', async (request: IRequest, env: Env) => {
       attribution_source: body.attribution_source || null,
       pii_scanned: body.pii_scanned ?? false,
       pii_redacted: body.pii_redacted ?? false,
-      source: body.source || 'web',
+      source: isAgentWrite ? 'api' : (body.source || 'web'),
+      created_via_agent_auth: isAgentWrite,
+      created_by_agent_token_id: agentClaims?.agent_token_id || null,
+      created_by_oauth_client_id: agentClaims?.oauth_client_id || null,
+      agent_payload_bytes: agentPayloadBytes,
     })
     .select()
     .single();
@@ -2555,11 +3039,13 @@ router.post('/api/archive', async (request: IRequest, env: Env) => {
 
   let supabase: SupabaseClient;
   let userId: string;
+  let agentClaims: AgentTokenClaims | null = null;
   if (isAgentBearer) {
     const agentAuth = await requireAgentTokenScope(request, env, 'conversations:write');
     if (agentAuth.response) return agentAuth.response;
     supabase = getServiceSupabase(env);
     userId = agentAuth.claims!.user_id;
+    agentClaims = agentAuth.claims!;
   } else {
     supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
       global: {
@@ -2591,6 +3077,71 @@ router.post('/api/archive', async (request: IRequest, env: Env) => {
     return json({ error: 'Invalid platform' }, 400);
   }
 
+  const isAgentWrite = !!agentClaims;
+  const archiveBody: Partial<CreateConversationBody> = {
+    title,
+    description: conv.description,
+    platform,
+    messages,
+    tags: conv.tags || [],
+    model_id: conv.model_id || null,
+    model_display_name: conv.model_display_name || null,
+    platform_conversation_id: conv.platform_conversation_id || null,
+    attribution_confidence: conv.attribution_confidence || null,
+    attribution_source: conv.attribution_source || null,
+    pii_scanned: conv.pii_scanned ?? true,
+    pii_redacted: conv.pii_redacted ?? false,
+    source: isAgentWrite ? 'api' : (payload.source || 'extension'),
+  };
+  const agentPayloadBytes = isAgentWrite ? estimateConversationPayloadBytes(archiveBody) : 0;
+  if (isAgentWrite) {
+    const policy = buildAgentConversationStoragePolicy(env);
+    const usageBase = { itemCount: 0, totalBytes: 0 };
+    if (agentPayloadBytes > policy.maxItemBytes) {
+      return json(
+        buildAgentStorageLimitPayload(
+          'agent_storage_item_limit_exceeded',
+          'Agent storage limit reached: single item is too large.',
+          policy,
+          usageBase,
+          agentPayloadBytes,
+        ),
+        413,
+      );
+    }
+    let usage: { itemCount: number; totalBytes: number };
+    try {
+      usage = await fetchAgentConversationStorageUsage(supabase, userId, policy.maxItems + 1);
+    } catch (err) {
+      console.error('Agent storage usage query failed', err);
+      return json({ error: 'Failed to evaluate agent storage limits' }, 500);
+    }
+    if (usage.itemCount >= policy.maxItems) {
+      return json(
+        buildAgentStorageLimitPayload(
+          'agent_storage_item_limit_exceeded',
+          'Agent storage limit reached: maximum number of stored items exceeded.',
+          policy,
+          usage,
+          agentPayloadBytes,
+        ),
+        413,
+      );
+    }
+    if (usage.totalBytes + agentPayloadBytes > policy.maxTotalBytes) {
+      return json(
+        buildAgentStorageLimitPayload(
+          'agent_storage_total_limit_exceeded',
+          'Agent storage limit reached: total storage bytes exceeded.',
+          policy,
+          usage,
+          agentPayloadBytes,
+        ),
+        413,
+      );
+    }
+  }
+
   const { data, error } = await supabase
     .from('conversations')
     .insert({
@@ -2609,7 +3160,11 @@ router.post('/api/archive', async (request: IRequest, env: Env) => {
       attribution_source: conv.attribution_source || null,
       pii_scanned: conv.pii_scanned ?? true,
       pii_redacted: conv.pii_redacted ?? false,
-      source: payload.source || 'extension',
+      source: isAgentWrite ? 'api' : (payload.source || 'extension'),
+      created_via_agent_auth: isAgentWrite,
+      created_by_agent_token_id: agentClaims?.agent_token_id || null,
+      created_by_oauth_client_id: agentClaims?.oauth_client_id || null,
+      agent_payload_bytes: agentPayloadBytes,
     })
     .select('id')
     .single();
@@ -2727,7 +3282,8 @@ router.get('/api/conversations', async (request: IRequest, env: Env) => {
   const platformParam = url.searchParams.get('platform');
   const tagParam = url.searchParams.get('tag');
   const search = url.searchParams.get('q');
-  const user = await getUser(request, supabase);
+  const originParam = (url.searchParams.get('origin') || '').trim().toLowerCase();
+  const origin = originParam === 'agent' || originParam === 'human' ? originParam : '';
 
   const platforms = platformParam
     ? platformParam.split(',').map(p => p.trim()).filter(Boolean)
@@ -2760,13 +3316,19 @@ router.get('/api/conversations', async (request: IRequest, env: Env) => {
       attribution_source,
       pii_scanned,
       pii_redacted,
-      source
+      source,
+      created_via_agent_auth
     `,
       { count: 'exact' }
     );
 
   // Public list only for this endpoint
   query = query.eq('is_public', true);
+  if (origin === 'agent') {
+    query = query.eq('created_via_agent_auth', true);
+  } else if (origin === 'human') {
+    query = query.eq('created_via_agent_auth', false);
+  }
 
   if (sort === 'oldest') {
     query = query.order('created_at', { ascending: true });
@@ -2837,9 +3399,12 @@ router.get('/api/conversations', async (request: IRequest, env: Env) => {
     const mergedMessages = Array.isArray(c.messages) ? c.messages : (c.messages ? c.messages : []);
     const firstTableMsg = firstMessageMap[c.id];
     const messages = firstTableMsg ? [firstTableMsg, ...mergedMessages] : mergedMessages;
+    const conversationOrigin = c.created_via_agent_auth ? 'agent' : 'human';
     return {
       ...c,
+      origin: conversationOrigin,
       messages,
+      created_via_agent_auth: undefined,
       profiles: undefined, // profiles omitted in list view
     };
   });
@@ -2964,9 +3529,12 @@ router.get('/api/conversations/:id', async (request: IRequest, env: Env) => {
 
   // Increment view count (best-effort)
   try {
-    const { error: viewErr } = await supabase.rpc('increment_view_count', { conversation_id: id });
-    if (viewErr) {
-      console.error('increment_view_count failed', viewErr);
+    if (env.SUPABASE_SERVICE_ROLE_KEY) {
+      const service = getServiceSupabase(env);
+      const { error: viewErr } = await service.rpc('increment_view_count', { conversation_id: id });
+      if (viewErr) {
+        console.error('increment_view_count failed', viewErr);
+      }
     }
   } catch (err) {
     console.error('increment_view_count exception', err);
@@ -3200,6 +3768,8 @@ router.get('/api/users/:userId/conversations', async (request: IRequest, env: En
   
   const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 100);
   const offset = parseInt(url.searchParams.get('offset') || '0');
+  const originParam = (url.searchParams.get('origin') || '').trim().toLowerCase();
+  const origin = originParam === 'agent' || originParam === 'human' ? originParam : '';
 
   // If viewing own profile, show all; otherwise only public
   const isOwner = user?.id === userId;
@@ -3214,6 +3784,11 @@ router.get('/api/users/:userId/conversations', async (request: IRequest, env: En
   if (!isOwner) {
     query = query.eq('is_public', true);
   }
+  if (origin === 'agent') {
+    query = query.eq('created_via_agent_auth', true);
+  } else if (origin === 'human') {
+    query = query.eq('created_via_agent_auth', false);
+  }
 
   const { data, error } = await query;
 
@@ -3221,7 +3796,12 @@ router.get('/api/users/:userId/conversations', async (request: IRequest, env: En
     return json({ error: 'Failed to fetch conversations' }, 500);
   }
 
-  return json({ conversations: data });
+  const conversations = (data || []).map((row: any) => ({
+    ...row,
+    origin: row.created_via_agent_auth ? 'agent' : 'human',
+  }));
+
+  return json({ conversations });
 });
 
 // Delete conversation

@@ -10,16 +10,29 @@ create table public.profiles (
     avatar_url text,
     bio text,
     website text,
-    stripe_customer_id text,
-    billing_plan text,
-    billing_status text,
-    billing_updated_at timestamp with time zone,
     created_at timestamp with time zone default timezone('utc'::text, now()) not null,
     updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
-create unique index if not exists profiles_stripe_customer_id_idx
-    on public.profiles (stripe_customer_id);
+-- Private billing/stripe fields live in profile_private (owner-only).
+create table if not exists public.profile_private (
+    profile_id uuid primary key references public.profiles(id) on delete cascade,
+    stripe_customer_id text,
+    billing_plan text,
+    billing_status text,
+    billing_updated_at timestamp with time zone,
+    billing_trial_started_at timestamp with time zone,
+    billing_trial_ends_at timestamp with time zone,
+    billing_trial_consumed_at timestamp with time zone,
+    billing_trial_reminder_sent_at timestamp with time zone,
+    created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+    updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create unique index if not exists profile_private_stripe_customer_id_idx
+    on public.profile_private (stripe_customer_id);
+create index if not exists profile_private_billing_trial_started_idx
+    on public.profile_private (billing_trial_started_at);
 
 -- Conversations table
 create table public.conversations (
@@ -46,6 +59,10 @@ create table public.conversations (
     pii_scanned boolean default false,
     pii_redacted boolean default false,
     source text check (source in ('extension', 'web', 'api')),
+    created_via_agent_auth boolean not null default false,
+    created_by_agent_token_id uuid,
+    created_by_oauth_client_id uuid,
+    agent_payload_bytes integer not null default 0 check (agent_payload_bytes >= 0),
     
     -- Continuations / provider lineage
     root_conversation_id uuid,
@@ -71,6 +88,8 @@ create index conversations_tags_idx on public.conversations using gin(tags);
 create index conversations_is_public_idx on public.conversations(is_public) where is_public = true;
 create index if not exists conversations_root_idx on public.conversations(root_conversation_id);
 create index if not exists conversations_parent_idx on public.conversations(parent_conversation_id);
+create index if not exists conversations_agent_origin_idx on public.conversations(created_via_agent_auth, created_at desc);
+create index if not exists conversations_agent_owner_idx on public.conversations(user_id, created_via_agent_auth, created_at desc);
 
 -- Full-text search index
 alter table public.conversations add column fts tsvector 
@@ -244,6 +263,38 @@ create policy if not exists "Users can update own oauth clients"
     on public.agent_oauth_clients for update
     using (auth.uid() = owner_user_id)
     with check (auth.uid() = owner_user_id);
+
+do $$
+begin
+    if not exists (
+        select 1
+        from pg_constraint
+        where conname = 'conversations_created_by_agent_token_fk'
+    ) then
+        alter table public.conversations
+            add constraint conversations_created_by_agent_token_fk
+            foreign key (created_by_agent_token_id)
+            references public.agent_tokens(id)
+            on delete set null;
+    end if;
+end
+$$;
+
+do $$
+begin
+    if not exists (
+        select 1
+        from pg_constraint
+        where conname = 'conversations_created_by_oauth_client_fk'
+    ) then
+        alter table public.conversations
+            add constraint conversations_created_by_oauth_client_fk
+            foreign key (created_by_oauth_client_id)
+            references public.agent_oauth_clients(id)
+            on delete set null;
+    end if;
+end
+$$;
 
 -- OAuth access tokens issued via client credentials
 create table if not exists public.agent_oauth_access_tokens (
@@ -444,6 +495,7 @@ create index idx_bookmarks_conversation_id on public.bookmarks(conversation_id);
 
 -- Row Level Security
 alter table public.profiles enable row level security;
+alter table public.profile_private enable row level security;
 alter table public.conversations enable row level security;
 alter table public.bookmarks enable row level security;
 
@@ -455,6 +507,20 @@ create policy "Public profiles are viewable by everyone"
 create policy "Users can update own profile"
     on public.profiles for update
     using (auth.uid() = id);
+
+-- Private profile policies (billing/stripe)
+create policy if not exists "Users can view own private profile"
+    on public.profile_private for select
+    using (auth.uid() = profile_id);
+
+create policy if not exists "Users can insert own private profile"
+    on public.profile_private for insert
+    with check (auth.uid() = profile_id);
+
+create policy if not exists "Users can update own private profile"
+    on public.profile_private for update
+    using (auth.uid() = profile_id)
+    with check (auth.uid() = profile_id);
 
 -- Conversations policies
 create policy "Public conversations are viewable by everyone"
@@ -521,7 +587,12 @@ begin
         new.id,
         coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
         new.raw_user_meta_data->>'avatar_url'
-    );
+    )
+    on conflict (id) do nothing;
+
+    insert into public.profile_private (profile_id)
+    values (new.id)
+    on conflict (profile_id) do nothing;
     return new;
 end;
 $$;
@@ -545,6 +616,10 @@ $$;
 -- Triggers for updated_at
 create trigger update_profiles_updated_at
     before update on public.profiles
+    for each row execute procedure public.update_updated_at_column();
+
+create trigger update_profile_private_updated_at
+    before update on public.profile_private
     for each row execute procedure public.update_updated_at_column();
 
 create trigger update_conversations_updated_at
@@ -587,3 +662,10 @@ begin
     where id = conversation_id;
 end;
 $$;
+
+-- SECURITY: do not allow anon/authenticated clients to execute SECURITY DEFINER RPCs via PostgREST.
+revoke execute on function public.increment_view_count(uuid) from public, anon, authenticated;
+grant execute on function public.increment_view_count(uuid) to service_role;
+
+revoke execute on function public.increment_feedback_upvote_count(uuid) from public, anon, authenticated;
+grant execute on function public.increment_feedback_upvote_count(uuid) to service_role;
