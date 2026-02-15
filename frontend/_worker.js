@@ -12,6 +12,15 @@ export default {
   async fetch(request, env, ctx) {
     try {
       const url = new URL(request.url);
+      if (url.pathname === '/.well-known/oauth-authorization-server') {
+        const oauthResp = await fetch(`${API_URL}/.well-known/oauth-authorization-server`);
+        const headers = new Headers(oauthResp.headers);
+        headers.set('Access-Control-Allow-Origin', '*');
+        return new Response(await oauthResp.text(), {
+          status: oauthResp.status,
+          headers,
+        });
+      }
       const match = url.pathname.match(/^\/c\/([^/]+)$/);
 
       // Handle /c/:id for dynamic OG tags
